@@ -1,63 +1,54 @@
 /**
- * Google Apps Script backend
- * Sistema de presença por turmas + histórico + Telegram
+ * Backend Google Apps Script para o seu cenário:
+ * - Lê alunos da aba "ReadBase"
+ * - Grava chamadas na aba "Base"
+ * - Mantém histórico, resumo e relatório para Telegram
+ * - Suporta o front da versão por turmas
  *
- * Planilhas criadas/uso:
- * - turmas
- * - alunos
- * - chamadas
- * - presencas
- * - relatorios
+ * Estrutura esperada da planilha do usuário:
+ *  - ReadBase: base de leitura / cadastro dos alunos
+ *  - Base: histórico de presença gravado por data e turma
+ *
+ * O script também cria abas auxiliares ocultas para controle interno:
+ *  - __ALUNOS_META
+ *  - __TURMAS_META
+ *  - __RELATORIOS
  */
 
 const SPREADSHEET_ID = '1bB3SJnkDnjOb-Ro7d7fxWBzMoTp1DzAPHLQcR6LGysM';
 const TELEGRAM_BOT_TOKEN = '8675551330:AAH5G9TcjqoI-rjvCr-QBAlQ4Wsxkolu9hY';
 const TELEGRAM_CHAT_ID = '-5138652770';
 
-const SHEETS = {
-  TURMAS: 'turmas',
-  ALUNOS: 'alunos',
-  CHAMADAS: 'chamadas',
-  PRESENCAS: 'presencas',
-  RELATORIOS: 'relatorios',
-};
+const READ_SHEET_NAME = 'ReadBase';
+const BASE_SHEET_NAME = 'Base';
+const META_STUDENTS_SHEET = '__ALUNOS_META';
+const META_CLASSES_SHEET = '__TURMAS_META';
+const REPORTS_SHEET = '__RELATORIOS';
 
-const HEADERS = {
-  TURMAS: ['TurmaID', 'Nome', 'Ordem', 'Ativa', 'CriadoEm'],
-  ALUNOS: [
-    'AlunoID', 'Nome', 'CPF', 'TurmaID', 'Ativo',
-    'FaltasConsecutivas', 'TotalPresencas', 'TotalFaltas',
-    'Percentual', 'Status', 'UltimaPresenca', 'UltimaAusencia',
-    'RealocadoDe', 'CriadoEm', 'AtualizadoEm'
-  ],
-  CHAMADAS: [
-    'ChamadaID', 'Data', 'TurmaID', 'Oferta', 'Visitantes',
-    'VisitantesTexto', 'TotalAlunos', 'Presentes', 'Ausentes', 'Percentual',
-    'EnviadoTelegram', 'TelegramEnviadoEm', 'CriadoEm', 'AtualizadoEm'
-  ],
-  PRESENCAS: [
-    'ChamadaID', 'Data', 'TurmaID', 'AlunoID', 'Nome',
-    'Presenca', 'Observacao', 'StatusAluno', 'CriadoEm'
-  ],
-  RELATORIOS: [
-    'RelatorioID', 'Tipo', 'Data', 'TurmaID', 'Hash',
-    'Enviado', 'EnviadoEm', 'Texto', 'CriadoEm'
-  ],
-};
+const BASE_HEADERS = ['DATA', 'ANO', 'MÊS', 'ALUNO', 'CLASSE', 'PRESENÇA', 'ATRASO', 'AUSÊNCIA', 'OFERTA'];
+const META_STUDENTS_HEADERS = [
+  'AlunoID', 'Nome', 'TurmaID', 'TurmaNome', 'Ativo',
+  'FaltasConsecutivas', 'TotalPresencas', 'TotalFaltas', 'Percentual',
+  'Status', 'StatusManual', 'UltimaPresenca', 'UltimaAusencia',
+  'RealocadoDe', 'CriadoEm', 'AtualizadoEm'
+];
+const META_CLASSES_HEADERS = ['TurmaID', 'Nome', 'Ordem', 'Ativa', 'CriadoEm', 'AtualizadoEm'];
+const REPORTS_HEADERS = ['RelatorioID', 'Tipo', 'Data', 'TurmaID', 'Hash', 'Enviado', 'EnviadoEm', 'Texto', 'CriadoEm'];
 
 function doGet(e) {
   const action = String(e?.parameter?.action || 'init').toLowerCase();
 
   try {
-    if (action === 'init') {
-      return json_(init_(e?.parameter || {}));
+    switch (action) {
+      case 'init':
+        return json_(init_(e?.parameter || {}));
+      case 'health':
+        return json_({ ok: true, message: 'ok' });
+      case 'reporttext':
+        return json_(getReportText_(e?.parameter || {}));
+      default:
+        return json_({ ok: false, message: 'Ação inválida.' });
     }
-
-    if (action === 'health') {
-      return json_({ ok: true, message: 'ok' });
-    }
-
-    return json_({ ok: false, message: 'Ação inválida.' });
   } catch (err) {
     return json_({ ok: false, message: err.message || String(err) });
   }
@@ -104,9 +95,7 @@ function init_(params) {
     alunos: sortAlunos_(all.alunos),
     callsByTurma,
     resumoGeral: geral,
-    timestamps: {
-      now: new Date().toISOString(),
-    },
+    timestamps: { now: new Date().toISOString() },
   };
 }
 
@@ -114,16 +103,15 @@ function saveCall_(p) {
   ensureSheets_();
 
   const dateKey = normalizeDateKey_(p.date || todayKey_());
-  const turmaId = String(p.turmaId || '').trim();
+  const turmaId = String(p.turmaId || p.turmaNome || p.turma || '').trim();
   const oferta = String(p.oferta || '').trim();
   const visitantes = Number(p.visitantes || 0) || 0;
   const visitantesTexto = String(p.visitantesTexto || '').trim();
   const chamadaId = String(p.chamadaId || `${turmaId}_${dateKey}`).trim();
   const rowsJson = String(p.rowsJson || '[]');
+  const autoSend = normalizeBool_(p.sendTelegram || p.autoSend || 'nao');
 
   if (!turmaId) throw new Error('Turma inválida.');
-  const turma = getTurmaById_(turmaId);
-  if (!turma) throw new Error('Turma não encontrada.');
 
   let rows;
   try {
@@ -134,23 +122,28 @@ function saveCall_(p) {
   if (!Array.isArray(rows)) throw new Error('Lista de presenças inválida.');
 
   const allBefore = loadAllData_();
-  const alunosDaTurma = allBefore.alunos.filter(a => String(a.TurmaID || '') === turmaId);
+  const turma = getTurmaByIdOrName_(turmaId, allBefore.turmas);
+  if (!turma) throw new Error('Turma não encontrada.');
 
-  // Garante que todos os alunos da turma tenham registro no payload.
+  const roster = getRosterForTurma_(turma.TurmaID, allBefore);
   const byAlunoId = {};
   rows.forEach(item => {
-    const alunoId = String(item.alunoId || '').trim();
+    const alunoId = String(item.alunoId || item.AlunoID || '').trim();
     if (alunoId) byAlunoId[alunoId] = item;
   });
 
-  const normalizedRows = alunosDaTurma.map(aluno => {
+  const normalizedRows = roster.map(aluno => {
     const payload = byAlunoId[aluno.AlunoID] || {};
-    const presenca = normalizePresence_(payload.presenca);
+    const presenca = normalizePresence_(payload.presenca ?? payload.PRESENCA ?? payload.presencaStatus);
+    const atraso = normalizeBool_(payload.atraso ?? payload.atraso ?? payload.Atraso);
     return {
       alunoId: aluno.AlunoID,
       nome: aluno.Nome,
+      turmaId: aluno.TurmaID,
+      turmaNome: aluno.TurmaNome,
       presenca,
-      observacao: String(payload.observacao || '').trim(),
+      atraso,
+      observacao: String(payload.observacao || payload.obs || '').trim(),
       statusAluno: String(aluno.Status || 'ativo').trim(),
     };
   });
@@ -159,36 +152,47 @@ function saveCall_(p) {
   const ausentes = normalizedRows.length - presentes;
   const percentual = normalizedRows.length ? round1_((presentes / normalizedRows.length) * 100) : 0;
 
-  upsertCallRow_({
-    chamadaId,
-    dateKey,
-    turmaId,
+  replaceBaseRowsForCall_(dateKey, turma.TurmaID, normalizedRows, {
     oferta,
     visitantes,
     visitantesTexto,
-    totalAlunos: normalizedRows.length,
+  });
+
+  upsertCallMeta_(
+    chamadaId,
+    dateKey,
+    turma.TurmaID,
+    oferta,
+    visitantes,
+    visitantesTexto,
+    normalizedRows.length,
     presentes,
     ausentes,
     percentual,
-    enviadoTelegram: false,
-  });
+    false
+  );
 
-  replaceAttendanceRows_(chamadaId, dateKey, turmaId, normalizedRows);
   recalculateAndPersistStudentStats_();
 
   const allAfter = loadAllData_();
   const callsByTurma = buildCallsByTurmaForDate_(dateKey, allAfter);
   const geral = buildDailyGeneralSummary_(dateKey, allAfter, callsByTurma);
-  const turmaCall = callsByTurma[turmaId];
+  const turmaCall = callsByTurma[turma.TurmaID];
+
+  let telegram = { sent: false, alreadySent: false, message: '' };
+  if (autoSend) {
+    telegram = sendTelegramForTurma_(dateKey, turma.TurmaID, allAfter, callsByTurma[turma.TurmaID]);
+  }
 
   return {
     ok: true,
     message: 'Chamada salva com sucesso.',
     chamadaId,
-    turmaId,
+    turmaId: turma.TurmaID,
     dateKey,
     turmaCall,
     resumoGeral: geral,
+    telegram,
   };
 }
 
@@ -196,8 +200,8 @@ function sendReport_(p) {
   ensureSheets_();
 
   const dateKey = normalizeDateKey_(p.date || todayKey_());
-  const turmaId = String(p.turmaId || '').trim();
   const scope = String(p.scope || 'turma').toLowerCase();
+  const turmaId = String(p.turmaId || '').trim();
 
   const all = loadAllData_();
   const callsByTurma = buildCallsByTurmaForDate_(dateKey, all);
@@ -205,48 +209,189 @@ function sendReport_(p) {
 
   if (scope === 'geral') {
     const text = buildGeneralReportText_(dateKey, geral, callsByTurma, all);
-    const reportId = `GERAL_${dateKey}`;
-    const hash = textHash_(text);
-    const existing = getReportLogById_(reportId);
-
-    if (existing && String(existing.Enviado || '').toLowerCase() === 'sim' && String(existing.Hash || '') === hash) {
-      return {
-        ok: true,
-        sent: false,
-        alreadySent: true,
-        message: 'Relatório geral já havia sido enviado.',
-        text,
-      };
-    }
-
-    sendTelegram_(text);
-    upsertReportLog_({
-      reportId,
+    return sendTelegramByText_({
+      reportId: `GERAL_${dateKey}`,
       tipo: 'geral',
       dateKey,
       turmaId: '',
-      hash,
-      enviado: 'sim',
-      texto: text,
-    });
-
-    return {
-      ok: true,
-      sent: true,
-      message: 'Relatório geral enviado ao Telegram.',
       text,
-    };
+    });
   }
 
-  if (!turmaId) throw new Error('Turma inválida.');
-  const turma = getTurmaById_(turmaId);
-  if (!turma) throw new Error('Turma não encontrada.');
+  const turma = getTurmaByIdOrName_(turmaId, all.turmas);
+  if (!turma) throw new Error('Turma inválida.');
 
-  const turmaCall = callsByTurma[turmaId];
+  const turmaCall = callsByTurma[turma.TurmaID];
   if (!turmaCall) throw new Error('Não existe chamada salva para esta turma nesta data.');
 
   const text = buildTurmaReportText_(dateKey, turma, turmaCall, all);
-  const reportId = `TURMA_${turmaId}_${dateKey}`;
+  const result = sendTelegramByText_({
+    reportId: `TURMA_${turma.TurmaID}_${dateKey}`,
+    tipo: 'turma',
+    dateKey,
+    turmaId: turma.TurmaID,
+    text,
+  });
+
+  if (result.sent) {
+    markCallAsSent_(turma.TurmaID, dateKey, text);
+  }
+
+  return result;
+}
+
+function addTurma_(p) {
+  ensureSheets_();
+  const nome = String(p.nome || '').trim();
+  const ordem = Number(p.ordem || 0) || 0;
+  if (!nome) throw new Error('Informe o nome da turma.');
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = getOrCreateSheet_(ss, META_CLASSES_SHEET, META_CLASSES_HEADERS, true);
+  const turmaId = buildTurmaId_(nome);
+
+  const existing = findMetaClassById_(turmaId);
+  const now = new Date().toISOString();
+  if (existing) {
+    updateMetaClass_(turmaId, { Nome: nome, Ordem: ordem, Ativa: 'sim', AtualizadoEm: now });
+    return { ok: true, message: 'Turma atualizada com sucesso.', turmaId };
+  }
+
+  sheet.appendRow([turmaId, nome, ordem, 'sim', now, now]);
+  return { ok: true, message: 'Turma cadastrada com sucesso.', turmaId };
+}
+
+function addAluno_(p) {
+  ensureSheets_();
+  const nome = String(p.nome || '').trim();
+  const cpf = normalizeCpf_(p.cpf || '');
+  const turmaId = String(p.turmaId || p.turma || '').trim();
+  if (!nome) throw new Error('Informe o nome do aluno.');
+  if (!turmaId) throw new Error('Informe a turma.');
+
+  const all = loadAllData_();
+  const turma = getTurmaByIdOrName_(turmaId, all.turmas);
+  if (!turma) throw new Error('Turma não encontrada.');
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const readSheet = getOrCreateSheet_(ss, READ_SHEET_NAME, getReadBaseHeaders_(), false);
+  const now = new Date().toISOString();
+  const alunoId = buildStudentId_(nome, turma.TurmaID, cpf);
+
+  appendReadBaseStudent_(readSheet, nome, turma.Nome, cpf, alunoId, now);
+  upsertStudentMeta_({
+    AlunoID: alunoId,
+    Nome: nome,
+    TurmaID: turma.TurmaID,
+    TurmaNome: turma.Nome,
+    Ativo: 'sim',
+    FaltasConsecutivas: 0,
+    TotalPresencas: 0,
+    TotalFaltas: 0,
+    Percentual: 0,
+    Status: 'ativo',
+    StatusManual: '',
+    UltimaPresenca: '',
+    UltimaAusencia: '',
+    RealocadoDe: '',
+    CriadoEm: now,
+    AtualizadoEm: now,
+  });
+
+  return { ok: true, message: 'Aluno cadastrado com sucesso.', alunoId };
+}
+
+function moveAluno_(p) {
+  ensureSheets_();
+  const alunoId = String(p.alunoId || '').trim();
+  const turmaId = String(p.turmaId || p.novaTurmaId || '').trim();
+  if (!alunoId) throw new Error('Aluno inválido.');
+  if (!turmaId) throw new Error('Turma destino inválida.');
+
+  const all = loadAllData_();
+  const turma = getTurmaByIdOrName_(turmaId, all.turmas);
+  if (!turma) throw new Error('Turma destino não encontrada.');
+
+  const meta = findStudentMetaById_(alunoId);
+  if (!meta) throw new Error('Aluno não encontrado no controle interno.');
+
+  const now = new Date().toISOString();
+  upsertStudentMeta_({
+    ...meta,
+    TurmaID: turma.TurmaID,
+    TurmaNome: turma.Nome,
+    RealocadoDe: meta.TurmaNome || meta.TurmaID || '',
+    AtualizadoEm: now,
+  });
+
+  return { ok: true, message: 'Aluno realocado com sucesso.', alunoId, turmaId: turma.TurmaID };
+}
+
+function toggleAluno_(p) {
+  ensureSheets_();
+  const alunoId = String(p.alunoId || '').trim();
+  const ativo = normalizeBool_(p.ativo ?? p.status ?? '');
+  if (!alunoId) throw new Error('Aluno inválido.');
+
+  const meta = findStudentMetaById_(alunoId);
+  if (!meta) throw new Error('Aluno não encontrado no controle interno.');
+
+  const now = new Date().toISOString();
+  const statusManual = ativo ? 'ativo' : 'inativo';
+  upsertStudentMeta_({
+    ...meta,
+    Ativo: ativo ? 'sim' : 'nao',
+    StatusManual: statusManual,
+    Status: ativo ? 'ativo' : 'inativo',
+    AtualizadoEm: now,
+  });
+
+  return { ok: true, message: `Aluno marcado como ${ativo ? 'ativo' : 'inativo'}.`, alunoId, ativo };
+}
+
+function getReportText_(p) {
+  const dateKey = normalizeDateKey_(p.date || todayKey_());
+  const scope = String(p.scope || 'turma').toLowerCase();
+  const turmaId = String(p.turmaId || '').trim();
+
+  const all = loadAllData_();
+  const callsByTurma = buildCallsByTurmaForDate_(dateKey, all);
+  const geral = buildDailyGeneralSummary_(dateKey, all, callsByTurma);
+
+  if (scope === 'geral') {
+    return {
+      ok: true,
+      text: buildGeneralReportText_(dateKey, geral, callsByTurma, all),
+    };
+  }
+
+  const turma = getTurmaByIdOrName_(turmaId, all.turmas);
+  if (!turma) throw new Error('Turma inválida.');
+  const turmaCall = callsByTurma[turma.TurmaID];
+  if (!turmaCall) throw new Error('Não existe chamada salva para esta turma nesta data.');
+
+  return {
+    ok: true,
+    text: buildTurmaReportText_(dateKey, turma, turmaCall, all),
+  };
+}
+
+function sendTelegramForTurma_(dateKey, turmaId, all, turmaCall) {
+  const turma = getTurmaByIdOrName_(turmaId, all.turmas);
+  if (!turma) throw new Error('Turma não encontrada.');
+  if (!turmaCall) throw new Error('Não existe chamada salva para esta turma nesta data.');
+
+  const text = buildTurmaReportText_(dateKey, turma, turmaCall, all);
+  return sendTelegramByText_({
+    reportId: `TURMA_${turma.TurmaID}_${dateKey}`,
+    tipo: 'turma',
+    dateKey,
+    turmaId: turma.TurmaID,
+    text,
+  });
+}
+
+function sendTelegramByText_({ reportId, tipo, dateKey, turmaId, text }) {
   const hash = textHash_(text);
   const existing = getReportLogById_(reportId);
 
@@ -255,16 +400,15 @@ function sendReport_(p) {
       ok: true,
       sent: false,
       alreadySent: true,
-      message: 'Relatório da turma já havia sido enviado.',
+      message: 'Relatório já havia sido enviado.',
       text,
     };
   }
 
   sendTelegram_(text);
-  markCallAsSent_(turmaCall.chamadaId, text);
   upsertReportLog_({
     reportId,
-    tipo: 'turma',
+    tipo,
     dateKey,
     turmaId,
     hash,
@@ -275,192 +419,188 @@ function sendReport_(p) {
   return {
     ok: true,
     sent: true,
-    message: 'Relatório da turma enviado ao Telegram.',
+    alreadySent: false,
+    message: tipo === 'geral' ? 'Relatório geral enviado ao Telegram.' : 'Relatório da turma enviado ao Telegram.',
     text,
   };
 }
 
-function addTurma_(p) {
-  ensureSheets_();
-  const nome = String(p.nome || '').trim();
-  const ordem = Number(p.ordem || 0) || 0;
-  if (!nome) throw new Error('Informe o nome da turma.');
+function buildTurmaReportText_(dateKey, turma, turmaCall, all) {
+  const lines = [];
+  lines.push(`*Relatório da turma*`);
+  lines.push(`Data: ${formatDateBR_(dateKey)}`);
+  lines.push(`Turma: ${turma.Nome}`);
+  lines.push(`Total de alunos: ${turmaCall.totalAlunos}`);
+  lines.push(`Presentes: ${turmaCall.presentes}`);
+  lines.push(`Ausentes: ${turmaCall.ausentes}`);
+  lines.push(`Presença: ${formatPercent_(turmaCall.percentual)}`);
+  lines.push(`Oferta: ${formatMoney_(parseMoney_(turmaCall.oferta))}`);
+  if (Number(turmaCall.visitantes || 0) > 0) lines.push(`Visitantes: ${turmaCall.visitantes}`);
+  if (String(turmaCall.visitantesTexto || '').trim()) lines.push(`Detalhe visitantes: ${turmaCall.visitantesTexto}`);
 
-  const planilha = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = getOrCreateSheet_(planilha, SHEETS.TURMAS, HEADERS.TURMAS);
-  const turmaId = buildId_('T');
-  sheet.appendRow([turmaId, nome, ordem, 'sim', new Date().toISOString()]);
+  const stats = getTopStatsForTurma_(turma.TurmaID, all);
+  if (stats.bestStudent) lines.push(`Melhor aluno: ${stats.bestStudent.Nome} (${formatPercent_(stats.bestStudent.Percentual)})`);
+  if (stats.mostAbsent) lines.push(`Mais faltas: ${stats.mostAbsent.Nome} (${stats.mostAbsent.TotalFaltas})`);
+  if (stats.inactiveCount) lines.push(`Inativos: ${stats.inactiveCount}`);
 
-  return { ok: true, message: 'Turma cadastrada com sucesso.', turmaId };
+  const presentNames = turmaCall.rows.filter(r => r.presenca === 'sim').map(r => r.nome);
+  const absentNames = turmaCall.rows.filter(r => r.presenca !== 'sim').map(r => r.nome);
+  if (presentNames.length) lines.push('');
+  if (presentNames.length) lines.push(`Presentes: ${presentNames.join(', ')}`);
+  if (absentNames.length) lines.push(`Ausentes: ${absentNames.join(', ')}`);
+
+  return lines.join('\n');
 }
 
-function addAluno_(p) {
-  ensureSheets_();
-  const nome = String(p.nome || '').trim();
-  const cpf = normalizeCpf_(p.cpf || '');
-  const turmaId = String(p.turmaId || '').trim();
-  if (!nome) throw new Error('Informe o nome do aluno.');
-  if (!turmaId) throw new Error('Informe a turma.');
+function buildGeneralReportText_(dateKey, geral, callsByTurma, all) {
+  const lines = [];
+  lines.push(`*Relatório geral*`);
+  lines.push(`Data: ${formatDateBR_(dateKey)}`);
+  lines.push(`Turmas com chamada: ${geral.totalTurmas}`);
+  lines.push(`Total de alunos: ${geral.totalAlunos}`);
+  lines.push(`Presentes: ${geral.presentes}`);
+  lines.push(`Ausentes: ${geral.ausentes}`);
+  lines.push(`Presença geral: ${formatPercent_(geral.percentual)}`);
+  lines.push(`Oferta total: ${formatMoney_(geral.ofertaTotal)}`);
+  if (geral.visitantesTotal > 0) lines.push(`Visitantes: ${geral.visitantesTotal}`);
+  lines.push('');
+  lines.push('*Resumo por turma:*');
 
-  if (!getTurmaById_(turmaId)) throw new Error('Turma não encontrada.');
+  const turmasOrdenadas = sortTurmas_(all.turmas).filter(t => callsByTurma[t.TurmaID]);
+  turmasOrdenadas.forEach(turma => {
+    const call = callsByTurma[turma.TurmaID];
+    lines.push(`• ${turma.Nome}: ${call.presentes}/${call.totalAlunos} presentes (${formatPercent_(call.percentual)})`);
+  });
 
-  const planilha = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = getOrCreateSheet_(planilha, SHEETS.ALUNOS, HEADERS.ALUNOS);
-  const alunoId = buildId_('A');
-  const now = new Date().toISOString();
-
-  sheet.appendRow([
-    alunoId, nome, cpf, turmaId, 'sim',
-    0, 0, 0, 0, 'ativo',
-    '', '', '', now, now
-  ]);
-
-  return { ok: true, message: 'Aluno cadastrado com sucesso.', alunoId };
-}
-
-function moveAluno_(p) {
-  ensureSheets_();
-  const alunoId = String(p.alunoId || '').trim();
-  const turmaId = String(p.turmaId || '').trim();
-  if (!alunoId) throw new Error('Aluno inválido.');
-  if (!turmaId) throw new Error('Turma destino inválida.');
-  if (!getTurmaById_(turmaId)) throw new Error('Turma destino não encontrada.');
-
-  const planilha = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = getOrCreateSheet_(planilha, SHEETS.ALUNOS, HEADERS.ALUNOS);
-  const values = sheet.getDataRange().getValues();
-  const header = values[0].map(String);
-  const idxByName = {};
-  header.forEach((name, idx) => idxByName[name] = idx);
-
-  let found = false;
-  for (let i = 1; i < values.length; i++) {
-    if (String(values[i][idxByName.AlunoID] || '') === alunoId) {
-      values[i][idxByName.RealocadoDe] = String(values[i][idxByName.TurmaID] || '');
-      values[i][idxByName.TurmaID] = turmaId;
-      values[i][idxByName.AtualizadoEm] = new Date().toISOString();
-      found = true;
-      break;
-    }
+  const top = getTopStudentsOverall_(all);
+  if (top.length) {
+    lines.push('');
+    lines.push('*Melhores alunos no período:*');
+    top.slice(0, 5).forEach((s, idx) => {
+      lines.push(`${idx + 1}. ${s.Nome} — ${s.TurmaNome} — ${formatPercent_(s.Percentual)}`);
+    });
   }
-  if (!found) throw new Error('Aluno não encontrado.');
 
-  sheet.getRange(2, 1, values.length - 1, header.length).setValues(values.slice(1));
-  return { ok: true, message: 'Aluno realocado com sucesso.' };
+  return lines.join('\n');
 }
 
-function toggleAluno_(p) {
-  ensureSheets_();
-  const alunoId = String(p.alunoId || '').trim();
-  const ativo = normalizeBool_(p.ativo);
-  if (!alunoId) throw new Error('Aluno inválido.');
-
-  const planilha = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = getOrCreateSheet_(planilha, SHEETS.ALUNOS, HEADERS.ALUNOS);
-  const values = sheet.getDataRange().getValues();
-  const header = values[0].map(String);
-  const idxId = header.indexOf('AlunoID');
-  const idxAtivo = header.indexOf('Ativo');
-  const idxStatus = header.indexOf('Status');
-  const idxAtualizadoEm = header.indexOf('AtualizadoEm');
-
-  let found = false;
-  for (let i = 1; i < values.length; i++) {
-    if (String(values[i][idxId]) === alunoId) {
-      values[i][idxAtivo] = ativo ? 'sim' : 'nao';
-      values[i][idxStatus] = ativo ? 'ativo' : 'inativo';
-      values[i][idxAtualizadoEm] = new Date().toISOString();
-      found = true;
-      break;
-    }
-  }
-  if (!found) throw new Error('Aluno não encontrado.');
-
-  sheet.getRange(2, 1, values.length - 1, header.length).setValues(values.slice(1));
-  return { ok: true, message: 'Status do aluno atualizado.' };
-}
-
-function loadAllData_() {
-  const planilha = SpreadsheetApp.openById(SPREADSHEET_ID);
-
-  const turmasSheet = getOrCreateSheet_(planilha, SHEETS.TURMAS, HEADERS.TURMAS);
-  const alunosSheet = getOrCreateSheet_(planilha, SHEETS.ALUNOS, HEADERS.ALUNOS);
-  const chamadasSheet = getOrCreateSheet_(planilha, SHEETS.CHAMADAS, HEADERS.CHAMADAS);
-  const presencasSheet = getOrCreateSheet_(planilha, SHEETS.PRESENCAS, HEADERS.PRESENCAS);
-  const relatoriosSheet = getOrCreateSheet_(planilha, SHEETS.RELATORIOS, HEADERS.RELATORIOS);
-
-  const turmas = sheetToObjects_(turmasSheet);
-  const alunos = sheetToObjects_(alunosSheet);
-  const chamadas = sheetToObjects_(chamadasSheet);
-  const presencas = sheetToObjects_(presencasSheet);
-  const relatorios = sheetToObjects_(relatoriosSheet);
-
-  const stats = computeStudentStats_(alunos, presencas, chamadas);
+function buildDailyGeneralSummary_(dateKey, all, callsByTurma) {
+  const calls = Object.values(callsByTurma || {});
+  const totalAlunos = calls.reduce((sum, c) => sum + Number(c.totalAlunos || 0), 0);
+  const presentes = calls.reduce((sum, c) => sum + Number(c.presentes || 0), 0);
+  const ausentes = calls.reduce((sum, c) => sum + Number(c.ausentes || 0), 0);
+  const ofertaTotal = calls.reduce((sum, c) => sum + parseMoney_(c.oferta), 0);
+  const visitantesTotal = calls.reduce((sum, c) => sum + Number(c.visitantes || 0), 0);
+  const percentual = totalAlunos ? round1_((presentes / totalAlunos) * 100) : 0;
 
   return {
-    turmas,
-    alunos: stats.alunos,
-    chamadas,
-    presencas,
-    relatorios,
-    stats,
+    dateKey,
+    totalTurmas: calls.length,
+    totalAlunos,
+    presentes,
+    ausentes,
+    percentual,
+    ofertaTotal,
+    visitantesTotal,
   };
 }
 
+function getTopStatsForTurma_(turmaId, all) {
+  const turmaAlunos = (all.alunos || []).filter(a => String(a.TurmaID || '') === String(turmaId || ''));
+  if (!turmaAlunos.length) {
+    return { bestStudent: null, mostAbsent: null, inactiveCount: 0 };
+  }
+
+  const sortedByPercent = turmaAlunos.slice().sort((a, b) => Number(b.Percentual || 0) - Number(a.Percentual || 0));
+  const sortedByAbsences = turmaAlunos.slice().sort((a, b) => Number(b.TotalFaltas || 0) - Number(a.TotalFaltas || 0));
+  const inactiveCount = turmaAlunos.filter(a => String(a.Status || '').toLowerCase() === 'inativo').length;
+  return {
+    bestStudent: sortedByPercent[0] || null,
+    mostAbsent: sortedByAbsences[0] || null,
+    inactiveCount,
+  };
+}
+
+function getTopStudentsOverall_(all) {
+  return (all.alunos || [])
+    .filter(a => Number(a.TotalPresencas || 0) + Number(a.TotalFaltas || 0) > 0)
+    .slice()
+    .sort((a, b) => Number(b.Percentual || 0) - Number(a.Percentual || 0));
+}
+
 function buildCallsByTurmaForDate_(dateKey, all) {
-  const turmas = sortTurmas_(all.turmas);
-  const alunos = all.alunos;
-  const chamadasDoDia = all.chamadas.filter(c => normalizeDateKey_(c.Data) === dateKey);
+  const roster = all.alunos || [];
+  const groupedRoster = groupBy_(roster, 'TurmaID');
+  const savedRows = getBaseRowsForDate_(dateKey);
+  const savedGrouped = groupBy_(savedRows, 'turmaId');
 
-  const presencasByCall = groupBy_(all.presencas, 'ChamadaID');
   const callsByTurma = {};
+  const turmas = sortTurmas_(all.turmas);
 
-  turmas.forEach((turma, index) => {
-    const turmaAlunos = alunos.filter(a => String(a.TurmaID || '') === String(turma.TurmaID || ''));
-    const call = chamadasDoDia.find(c => String(c.TurmaID || '') === String(turma.TurmaID || ''));
+  turmas.forEach(turma => {
+    const turmaRoster = sortAlunos_(groupedRoster[turma.TurmaID] || []);
+    const saved = savedGrouped[turma.TurmaID] || [];
+    const savedMap = {};
+    saved.forEach(row => {
+      const key = String(row.alunoId || row.AlunoID || row.nome || '').trim();
+      if (key) savedMap[key] = row;
+    });
 
-    if (call) {
-      const rows = (presencasByCall[call.ChamadaID] || []).map(row => ({
-        alunoId: String(row.AlunoID || ''),
-        nome: String(row.Nome || ''),
-        presenca: normalizePresence_(row.Presenca),
-        observacao: String(row.Observacao || ''),
-        statusAluno: String(row.StatusAluno || ''),
-      }));
-
-      callsByTurma[turma.TurmaID] = {
-        chamadaId: call.ChamadaID,
-        data: normalizeDateKey_(call.Data),
-        turmaId: String(call.TurmaID || ''),
-        turmaNome: turma.Nome,
-        oferta: String(call.Oferta || ''),
-        visitantes: Number(call.Visitantes || 0) || 0,
-        visitantesTexto: String(call.VisitantesTexto || ''),
-        totalAlunos: Number(call.TotalAlunos || 0) || turmaAlunos.length,
-        presentes: Number(call.Presentes || 0) || rows.filter(r => r.presenca === 'sim').length,
-        ausentes: Number(call.Ausentes || 0) || (turmaAlunos.length - rows.filter(r => r.presenca === 'sim').length),
-        percentual: Number(call.Percentual || 0) || 0,
-        enviadoTelegram: String(call.EnviadoTelegram || '').toLowerCase() === 'sim',
-        telegramEnviadoEm: String(call.TelegramEnviadoEm || ''),
-        rows: fillRowsFromRoster_(turmaAlunos, rows),
-        isSaved: true,
+    const rows = turmaRoster.map(aluno => {
+      const key = String(aluno.AlunoID || aluno.Nome || '').trim();
+      const found = savedMap[key] || savedMap[normalizeKey_(aluno.Nome)] || {};
+      return {
+        alunoId: aluno.AlunoID,
+        nome: aluno.Nome,
+        presenca: normalizePresence_(found.presenca || found.Presenca || found.PRESENCA || (found.ausencia ? 'nao' : 'nao')),
+        atraso: normalizeBool_(found.atraso || found.Atraso),
+        observacao: String(found.observacao || found.Observacao || '').trim(),
+        statusAluno: String(aluno.Status || 'ativo').trim(),
       };
-    } else {
+    });
+
+    const callMeta = findCallMeta_(turma.TurmaID, dateKey);
+    const presentes = rows.filter(r => r.presenca === 'sim').length;
+    const ausentes = rows.length - presentes;
+    const percentual = rows.length ? round1_((presentes / rows.length) * 100) : 0;
+
+    callsByTurma[turma.TurmaID] = {
+      chamadaId: callMeta?.ChamadaID || `${turma.TurmaID}_${dateKey}`,
+      data: dateKey,
+      turmaId: turma.TurmaID,
+      turmaNome: turma.Nome,
+      oferta: callMeta?.Oferta || '',
+      visitantes: Number(callMeta?.Visitantes || 0) || 0,
+      visitantesTexto: callMeta?.VisitantesTexto || '',
+      totalAlunos: rows.length,
+      presentes,
+      ausentes,
+      percentual,
+      enviadoTelegram: normalizeBool_(callMeta?.EnviadoTelegram),
+      telegramEnviadoEm: callMeta?.TelegramEnviadoEm || '',
+      rows,
+      isSaved: !!callMeta,
+    };
+  });
+
+  // Garante turmas cadastradas somente em meta, mesmo sem alunos na ReadBase.
+  (all.turmas || []).forEach(turma => {
+    if (!callsByTurma[turma.TurmaID]) {
       callsByTurma[turma.TurmaID] = {
         chamadaId: `${turma.TurmaID}_${dateKey}`,
         data: dateKey,
-        turmaId: String(turma.TurmaID || ''),
+        turmaId: turma.TurmaID,
         turmaNome: turma.Nome,
         oferta: '',
         visitantes: 0,
         visitantesTexto: '',
-        totalAlunos: turmaAlunos.length,
+        totalAlunos: 0,
         presentes: 0,
-        ausentes: turmaAlunos.length,
+        ausentes: 0,
         percentual: 0,
         enviadoTelegram: false,
         telegramEnviadoEm: '',
-        rows: fillRowsFromRoster_(turmaAlunos, []),
+        rows: [],
         isSaved: false,
       };
     }
@@ -469,267 +609,254 @@ function buildCallsByTurmaForDate_(dateKey, all) {
   return callsByTurma;
 }
 
-function buildDailyGeneralSummary_(dateKey, all, callsByTurma) {
-  const turmas = sortTurmas_(all.turmas);
-  const turmaSummaries = turmas.map(t => {
-    const call = callsByTurma[t.TurmaID];
-    return {
-      turmaId: t.TurmaID,
-      nome: t.Nome,
-      totalAlunos: call?.totalAlunos || 0,
-      presentes: call?.presentes || 0,
-      ausentes: call?.ausentes || 0,
-      percentual: call?.percentual || 0,
-      oferta: call?.oferta || '',
-      visitantes: call?.visitantes || 0,
-      isSaved: !!call?.isSaved,
-    };
-  });
+function getRosterForTurma_(turmaId, all) {
+  const alunos = (all.alunos || []).filter(a => String(a.TurmaID || '') === String(turmaId || ''));
+  return sortAlunos_(alunos);
+}
 
-  const totalAlunos = turmaSummaries.reduce((acc, item) => acc + (item.totalAlunos || 0), 0);
-  const presentes = turmaSummaries.reduce((acc, item) => acc + (item.presentes || 0), 0);
-  const ausentes = turmaSummaries.reduce((acc, item) => acc + (item.ausentes || 0), 0);
-  const percentual = totalAlunos ? round1_((presentes / totalAlunos) * 100) : 0;
-  const turmasSalvas = turmaSummaries.filter(t => t.isSaved).length;
-  const ofertaTotal = turmaSummaries.reduce((acc, item) => acc + parseMoney_(item.oferta), 0);
-  const visitantesTotal = turmaSummaries.reduce((acc, item) => acc + (Number(item.visitantes || 0) || 0), 0);
-
-  const melhores = all.stats.melhores || [];
-  const inativos = all.stats.inativos || [];
-  const faltandoMuito = all.stats.faltandoMuito || [];
-  const reativados = all.stats.reativados || [];
-
+function loadAllData_() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const turmas = mergeTurmas_(loadMetaClasses_(), loadTurmasFromReadBase_());
+  const studentsMeta = loadMetaStudents_();
+  const roster = loadRosterFromReadBase_();
+  const alunos = mergeRosterWithMeta_(roster, studentsMeta, turmas);
   return {
-    dateKey,
-    totalTurmas: turmas.length,
-    turmasSalvas,
-    totalAlunos,
-    presentes,
-    ausentes,
-    percentual,
-    ofertaTotal,
-    visitantesTotal,
-    turmaSummaries,
-    melhores,
-    inativos,
-    faltandoMuito,
-    reativados,
+    turmas,
+    alunos,
+    studentsMeta,
   };
 }
 
-function buildTurmaReportText_(dateKey, turma, turmaCall, all) {
-  const linhasPresentes = turmaCall.rows.filter(r => r.presenca === 'sim');
-  const linhasAusentes = turmaCall.rows.filter(r => r.presenca !== 'sim');
-  const melhor = getBestStudentForTurma_(turma.TurmaID, all);
-  const inativos = turmaCall.rows.filter(r => {
-    const aluno = findStudentById_(all.alunos, r.alunoId);
-    return String(aluno?.Status || '') === 'inativo';
-  });
+function loadTurmasFromReadBase_() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(READ_SHEET_NAME);
+  if (!sheet || sheet.getLastRow() < 2) return [];
 
-  return [
-    `📋 RELATÓRIO DA TURMA`,
-    `Turma: ${turma.Nome}`,
-    `Data: ${formatDateBR_(dateKey)}`,
-    ``,
-    `Total de alunos: ${turmaCall.totalAlunos}`,
-    `Presentes: ${turmaCall.presentes}`,
-    `Ausentes: ${turmaCall.ausentes}`,
-    `Presença: ${formatPercent_(turmaCall.percentual)}`,
-    `Oferta da classe: ${turmaCall.oferta || '-'}`,
-    `Visitantes: ${turmaCall.visitantes > 0 ? turmaCall.visitantes : 'não informado'}`,
-    turmaCall.visitantesTexto ? `Detalhe visitantes: ${turmaCall.visitantesTexto}` : '',
-    ``,
-    `Melhor aluno: ${melhor ? `${melhor.Nome} (${formatPercent_(melhor.Percentual)})` : '—'}`,
-    `Inativos: ${inativos.length ? inativos.map(r => r.nome).join(', ') : 'nenhum'}`,
-    `Faltando muito: ${all.stats.faltandoMuito.filter(a => String(a.TurmaID || '') === String(turma.TurmaID || '')).map(a => a.Nome).join(', ') || 'nenhum'}`,
-    ``,
-    `Presentes: ${linhasPresentes.map(r => r.nome).join(', ') || 'nenhum'}`,
-    `Ausentes: ${linhasAusentes.map(r => r.nome).join(', ') || 'nenhum'}`,
-  ].filter(Boolean).join('\n');
-}
-
-function buildGeneralReportText_(dateKey, geral, callsByTurma, all) {
-  const partes = [];
-  partes.push('📊 RELATÓRIO GERAL');
-  partes.push(`Data: ${formatDateBR_(dateKey)}`);
-  partes.push('');
-  partes.push(`Turmas salvas: ${geral.turmasSalvas}/${geral.totalTurmas}`);
-  partes.push(`Total de alunos: ${geral.totalAlunos}`);
-  partes.push(`Presentes: ${geral.presentes}`);
-  partes.push(`Ausentes: ${geral.ausentes}`);
-  partes.push(`Presença geral: ${formatPercent_(geral.percentual)}`);
-  partes.push(`Oferta total: ${formatMoney_(geral.ofertaTotal)}`);
-  partes.push(`Visitantes: ${geral.visitantesTotal}`);
-  partes.push('');
-  partes.push('Resumo por turma:');
-
-  geral.turmaSummaries.forEach(item => {
-    partes.push(`- ${item.nome}: ${item.presentes}/${item.totalAlunos} (${formatPercent_(item.percentual)}) | Oferta ${item.oferta || '-'} | Visitantes ${item.visitantes || 0}`);
-  });
-
-  partes.push('');
-  partes.push(`Melhores alunos: ${geral.melhores.length ? geral.melhores.map(a => `${a.Nome} (${formatPercent_(a.Percentual)})`).join(', ') : '—'}`);
-  partes.push(`Inativos: ${geral.inativos.length ? geral.inativos.map(a => a.Nome).join(', ') : 'nenhum'}`);
-  partes.push(`Faltando muito: ${geral.faltandoMuito.length ? geral.faltandoMuito.map(a => a.Nome).join(', ') : 'nenhum'}`);
-  partes.push(`Reativados: ${geral.reativados.length ? geral.reativados.map(a => a.Nome).join(', ') : 'nenhum'}`);
-
-  return partes.join('\n');
-}
-
-function getBestStudentForTurma_(turmaId, all) {
-  const candidates = all.stats.alunos
-    .filter(a => String(a.TurmaID || '') === String(turmaId || ''))
-    .filter(a => Number(a.Percentual || 0) > 0)
-    .sort((a, b) => Number(b.Percentual || 0) - Number(a.Percentual || 0) || String(a.Nome).localeCompare(String(b.Nome)));
-  return candidates[0] || null;
-}
-
-function computeStudentStats_(alunos, presencas, chamadas) {
-  const callById = {};
-  chamadas.forEach(c => {
-    callById[String(c.ChamadaID || '')] = c;
-  });
-
-  const recordsByAluno = {};
-  presencas.forEach(p => {
-    const alunoId = String(p.AlunoID || '').trim();
-    if (!alunoId) return;
-    if (!recordsByAluno[alunoId]) recordsByAluno[alunoId] = [];
-    recordsByAluno[alunoId].push({
-      data: normalizeDateKey_(p.Data),
-      callId: String(p.ChamadaID || ''),
-      presenca: normalizePresence_(p.Presenca),
-      turmaId: String(p.TurmaID || ''),
-      nome: String(p.Nome || ''),
-    });
-  });
-
-  const alunosComStats = alunos.map((a, index) => {
-    const alunoId = String(a.AlunoID || '').trim();
-    const registros = (recordsByAluno[alunoId] || []).slice().sort((x, y) => {
-      const dx = String(x.data || '');
-      const dy = String(y.data || '');
-      if (dx === dy) return String(x.callId || '').localeCompare(String(y.callId || ''));
-      return dx.localeCompare(dy);
-    });
-
-    let presentes = 0;
-    let ausentes = 0;
-    let runAusentes = 0;
-    let reativado = false;
-
-    registros.forEach(r => {
-      if (r.presenca === 'sim') {
-        presentes += 1;
-        if (runAusentes >= 4) reativado = true;
-        runAusentes = 0;
-      } else {
-        ausentes += 1;
-        runAusentes += 1;
-      }
-    });
-
-    const faltasConsecutivas = runAusentes;
-    const total = presentes + ausentes;
-    const percentual = total ? round1_((presentes / total) * 100) : 0;
-    const status = faltasConsecutivas >= 4 ? 'inativo' : 'ativo';
-    const faltandoMuito = faltasConsecutivas >= 2 || (total >= 4 && percentual < 70);
-    const ultimaPresenca = registros.length ? [...registros].reverse().find(r => r.presenca === 'sim')?.data || '' : '';
-    const ultimaAusencia = registros.length ? [...registros].reverse().find(r => r.presenca !== 'sim')?.data || '' : '';
-
-    return {
-      ...a,
-      PresenteTotal: presentes,
-      AusenteTotal: ausentes,
-      FaltasConsecutivas: faltasConsecutivas,
-      Percentual: percentual,
-      Status: status,
-      FaltandoMuito: faltandoMuito ? 'sim' : 'nao',
-      Reativado: reativado ? 'sim' : 'nao',
-      UltimaPresenca: ultimaPresenca,
-      UltimaAusencia: ultimaAusencia,
-      __sourceRow: index + 2,
-    };
-  });
-
-  return {
-    alunos: alunosComStats,
-    melhores: alunosComStats
-      .filter(a => String(a.Ativo || 'sim').toLowerCase() !== 'nao')
-      .filter(a => Number(a.Percentual || 0) > 0)
-      .sort((a, b) => Number(b.Percentual || 0) - Number(a.Percentual || 0) || String(a.Nome).localeCompare(String(b.Nome)))
-      .slice(0, 10),
-    inativos: alunosComStats.filter(a => String(a.Status || '') === 'inativo'),
-    faltandoMuito: alunosComStats.filter(a => String(a.FaltandoMuito || '') === 'sim'),
-    reativados: alunosComStats.filter(a => String(a.Reativado || '') === 'sim'),
-  };
-}
-
-function recalculateAndPersistStudentStats_() {
-  const all = loadAllData_();
-  const planilha = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = getOrCreateSheet_(planilha, SHEETS.ALUNOS, HEADERS.ALUNOS);
   const values = sheet.getDataRange().getValues();
-  if (values.length <= 1) return;
+  const headers = values[0].map(normalizeHeader_);
+  const idxAluno = findHeaderIndex_(headers, ['ALUNO', 'NOME']);
+  const idxClasse = findHeaderIndex_(headers, ['CLASSE', 'TURMA']);
+  if (idxAluno === -1 || idxClasse === -1) return [];
 
-  const header = values[0].map(String);
-  const idxByName = {};
-  header.forEach((name, idx) => idxByName[name] = idx);
-
-  const map = {};
-  all.stats.alunos.forEach(a => {
-    map[String(a.AlunoID || '')] = a;
-  });
-
+  const seen = new Map();
+  let order = 1;
   for (let i = 1; i < values.length; i++) {
-    const alunoId = String(values[i][idxByName.AlunoID] || '');
-    const s = map[alunoId];
-    if (!s) continue;
-    values[i][idxByName.FaltasConsecutivas] = s.FaltasConsecutivas;
-    values[i][idxByName.TotalPresencas] = s.PresenteTotal;
-    values[i][idxByName.TotalFaltas] = s.AusenteTotal;
-    values[i][idxByName.Percentual] = s.Percentual;
-    values[i][idxByName.Status] = s.Status;
-    values[i][idxByName.UltimaPresenca] = s.UltimaPresenca;
-    values[i][idxByName.UltimaAusencia] = s.UltimaAusencia;
-    values[i][idxByName.Ativo] = s.Status === 'inativo' ? 'nao' : (String(values[i][idxByName.Ativo] || 'sim').toLowerCase() === 'nao' ? 'nao' : 'sim');
-    values[i][idxByName.AtualizadoEm] = new Date().toISOString();
+    const nome = String(values[i][idxAluno] || '').trim();
+    const classe = String(values[i][idxClasse] || '').trim();
+    if (!nome || !classe) continue;
+    const turmaId = buildTurmaId_(classe);
+    if (!seen.has(turmaId)) {
+      seen.set(turmaId, {
+        TurmaID: turmaId,
+        Nome: classe,
+        Ordem: order++,
+        Ativa: 'sim',
+        CriadoEm: '',
+        AtualizadoEm: '',
+      });
+    }
+  }
+  return [...seen.values()];
+}
+
+function loadRosterFromReadBase_() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(READ_SHEET_NAME);
+  if (!sheet || sheet.getLastRow() < 2) return [];
+
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0].map(normalizeHeader_);
+  const idxAluno = findHeaderIndex_(headers, ['ALUNO', 'NOME']);
+  const idxClasse = findHeaderIndex_(headers, ['CLASSE', 'TURMA']);
+  const idxCpf = findHeaderIndex_(headers, ['CPF', 'DOCUMENTO']);
+  if (idxAluno === -1 || idxClasse === -1) {
+    throw new Error('Aba ReadBase precisa ter pelo menos as colunas ALUNO e CLASSE.');
   }
 
-  sheet.getRange(2, 1, values.length - 1, header.length).setValues(values.slice(1));
+  const seen = new Map();
+  const result = [];
+
+  for (let i = 1; i < values.length; i++) {
+    const nome = String(values[i][idxAluno] || '').trim();
+    const classe = String(values[i][idxClasse] || '').trim();
+    if (!nome || !classe) continue;
+
+    const cpf = idxCpf !== -1 ? normalizeCpf_(values[i][idxCpf]) : '';
+    const turmaId = buildTurmaId_(classe);
+    const alunoId = buildStudentId_(nome, turmaId, cpf, i + 1);
+    const key = `${alunoId}`;
+
+    if (!seen.has(key)) {
+      const item = {
+        AlunoID: alunoId,
+        Nome: nome,
+        CPF: cpf,
+        TurmaID: turmaId,
+        TurmaNome: classe,
+        Ativo: 'sim',
+        FaltasConsecutivas: 0,
+        TotalPresencas: 0,
+        TotalFaltas: 0,
+        Percentual: 0,
+        Status: 'ativo',
+        StatusManual: '',
+        UltimaPresenca: '',
+        UltimaAusencia: '',
+        RealocadoDe: '',
+        CriadoEm: '',
+        AtualizadoEm: '',
+      };
+      seen.set(key, item);
+      result.push(item);
+    }
+  }
+
+  return result;
 }
 
-function upsertCallRow_(call) {
-  const planilha = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = getOrCreateSheet_(planilha, SHEETS.CHAMADAS, HEADERS.CHAMADAS);
+function mergeTurmas_(metaTurmas, readTurmas) {
+  const map = new Map();
+  [...(readTurmas || []), ...(metaTurmas || [])].forEach((turma, index) => {
+    const turmaId = String(turma.TurmaID || buildTurmaId_(turma.Nome || '')).trim();
+    if (!turmaId) return;
+    if (!map.has(turmaId)) {
+      map.set(turmaId, {
+        TurmaID: turmaId,
+        Nome: String(turma.Nome || '').trim(),
+        Ordem: Number(turma.Ordem || index + 1) || index + 1,
+        Ativa: normalizeBool_(turma.Ativa) ? 'sim' : String(turma.Ativa || 'sim'),
+        CriadoEm: turma.CriadoEm || '',
+        AtualizadoEm: turma.AtualizadoEm || '',
+      });
+    } else {
+      const existing = map.get(turmaId);
+      existing.Nome = existing.Nome || String(turma.Nome || '').trim();
+      existing.Ordem = Number(existing.Ordem || turma.Ordem || index + 1) || index + 1;
+      existing.Ativa = existing.Ativa || (normalizeBool_(turma.Ativa) ? 'sim' : 'sim');
+    }
+  });
+  return [...map.values()];
+}
+
+function mergeRosterWithMeta_(roster, studentsMeta, turmas) {
+  const metaById = new Map((studentsMeta || []).map(s => [String(s.AlunoID || ''), s]));
+  const turmaById = new Map((turmas || []).map(t => [String(t.TurmaID || ''), t]));
+
+  const merged = (roster || []).map(st => {
+    const meta = metaById.get(String(st.AlunoID || '')) || {};
+    const turmaId = String(meta.TurmaID || st.TurmaID || '').trim();
+    const turma = turmaById.get(turmaId) || { Nome: st.TurmaNome || meta.TurmaNome || '', TurmaID: turmaId };
+
+    return {
+      AlunoID: String(st.AlunoID || meta.AlunoID || buildStudentId_(st.Nome, turmaId, st.CPF)),
+      Nome: String(st.Nome || meta.Nome || '').trim(),
+      CPF: String(st.CPF || meta.CPF || '').trim(),
+      TurmaID: turmaId,
+      TurmaNome: String(turma.Nome || st.TurmaNome || meta.TurmaNome || '').trim(),
+      Ativo: String(meta.Ativo || st.Ativo || 'sim'),
+      FaltasConsecutivas: Number(meta.FaltasConsecutivas ?? st.FaltasConsecutivas ?? 0) || 0,
+      TotalPresencas: Number(meta.TotalPresencas ?? st.TotalPresencas ?? 0) || 0,
+      TotalFaltas: Number(meta.TotalFaltas ?? st.TotalFaltas ?? 0) || 0,
+      Percentual: Number(meta.Percentual ?? st.Percentual ?? 0) || 0,
+      Status: String(meta.Status || st.Status || 'ativo').trim(),
+      StatusManual: String(meta.StatusManual || st.StatusManual || '').trim(),
+      UltimaPresenca: String(meta.UltimaPresenca || st.UltimaPresenca || '').trim(),
+      UltimaAusencia: String(meta.UltimaAusencia || st.UltimaAusencia || '').trim(),
+      RealocadoDe: String(meta.RealocadoDe || st.RealocadoDe || '').trim(),
+      CriadoEm: String(meta.CriadoEm || st.CriadoEm || '').trim(),
+      AtualizadoEm: String(meta.AtualizadoEm || st.AtualizadoEm || '').trim(),
+    };
+  });
+
+  // Garante que novos alunos da ReadBase entrem mesmo sem meta prévia.
+  const existingIds = new Set(merged.map(a => String(a.AlunoID || '')));
+  (studentsMeta || []).forEach(meta => {
+    const id = String(meta.AlunoID || '');
+    if (!id || existingIds.has(id)) return;
+    merged.push({
+      AlunoID: id,
+      Nome: String(meta.Nome || '').trim(),
+      CPF: String(meta.CPF || '').trim(),
+      TurmaID: String(meta.TurmaID || '').trim(),
+      TurmaNome: String(meta.TurmaNome || '').trim(),
+      Ativo: String(meta.Ativo || 'sim'),
+      FaltasConsecutivas: Number(meta.FaltasConsecutivas || 0) || 0,
+      TotalPresencas: Number(meta.TotalPresencas || 0) || 0,
+      TotalFaltas: Number(meta.TotalFaltas || 0) || 0,
+      Percentual: Number(meta.Percentual || 0) || 0,
+      Status: String(meta.Status || 'ativo').trim(),
+      StatusManual: String(meta.StatusManual || '').trim(),
+      UltimaPresenca: String(meta.UltimaPresenca || '').trim(),
+      UltimaAusencia: String(meta.UltimaAusencia || '').trim(),
+      RealocadoDe: String(meta.RealocadoDe || '').trim(),
+      CriadoEm: String(meta.CriadoEm || '').trim(),
+      AtualizadoEm: String(meta.AtualizadoEm || '').trim(),
+    });
+  });
+
+  return sortAlunos_(merged);
+}
+
+function loadMetaStudents_() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(META_STUDENTS_SHEET);
+  if (!sheet || sheet.getLastRow() < 2) return [];
   const values = sheet.getDataRange().getValues();
-  const header = values[0].map(String);
-  const idxByName = {};
-  header.forEach((name, idx) => idxByName[name] = idx);
+  const headers = values[0].map(String);
+  return values.slice(1).filter(row => row.some(v => String(v || '').trim() !== '')).map(row => {
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = row[i]);
+    return obj;
+  });
+}
+
+function loadMetaClasses_() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(META_CLASSES_SHEET);
+  if (!sheet || sheet.getLastRow() < 2) return [];
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0].map(String);
+  return values.slice(1).filter(row => row.some(v => String(v || '').trim() !== '')).map(row => {
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = row[i]);
+    return obj;
+  });
+}
+
+function upsertStudentMeta_(student) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = getOrCreateSheet_(ss, META_STUDENTS_SHEET, META_STUDENTS_HEADERS, true);
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0].map(String);
+  const idx = indexByHeader_(headers);
+  const id = String(student.AlunoID || '').trim();
+  const now = new Date().toISOString();
 
   let rowIndex = -1;
   for (let i = 1; i < values.length; i++) {
-    if (String(values[i][idxByName.ChamadaID] || '') === String(call.chamadaId || '')) {
+    if (String(values[i][idx.AlunoID] || '') === id) {
       rowIndex = i + 1;
       break;
     }
   }
 
   const row = [
-    call.chamadaId,
-    call.dateKey,
-    call.turmaId,
-    call.oferta,
-    call.visitantes,
-    call.visitantesTexto || '',
-    call.totalAlunos,
-    call.presentes,
-    call.ausentes,
-    call.percentual,
-    call.enviadoTelegram ? 'sim' : 'nao',
-    call.enviadoTelegram ? new Date().toISOString() : '',
-    rowIndex === -1 ? new Date().toISOString() : String(values[rowIndex - 1][idxByName.CriadoEm] || new Date().toISOString()),
-    new Date().toISOString(),
+    id,
+    student.Nome || '',
+    student.TurmaID || '',
+    student.TurmaNome || '',
+    student.Ativo || 'sim',
+    Number(student.FaltasConsecutivas || 0) || 0,
+    Number(student.TotalPresencas || 0) || 0,
+    Number(student.TotalFaltas || 0) || 0,
+    Number(student.Percentual || 0) || 0,
+    student.Status || 'ativo',
+    student.StatusManual || '',
+    student.UltimaPresenca || '',
+    student.UltimaAusencia || '',
+    student.RealocadoDe || '',
+    student.CriadoEm || now,
+    now,
   ];
 
   if (rowIndex === -1) {
@@ -739,74 +866,376 @@ function upsertCallRow_(call) {
   }
 }
 
-function replaceAttendanceRows_(chamadaId, dateKey, turmaId, rows) {
-  const planilha = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = getOrCreateSheet_(planilha, SHEETS.PRESENCAS, HEADERS.PRESENCAS);
+function recalculateAndPersistStudentStats_() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const baseRows = getBaseRowsAll_();
+  const roster = loadRosterFromReadBase_();
+  const studentsMeta = loadMetaStudents_();
+  const metaById = new Map(studentsMeta.map(s => [String(s.AlunoID || ''), s]));
+
+  // Organiza as ocorrências por aluno+turma.
+  const grouped = new Map();
+  baseRows.forEach(row => {
+    const alunoId = String(row.alunoId || '').trim();
+    if (!alunoId) return;
+    const key = `${alunoId}`;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(row);
+  });
+
+  // Recalcula para o que já existe na base.
+  const now = new Date().toISOString();
+  const mergedRoster = mergeRosterWithMeta_(roster, studentsMeta, loadTurmasFromReadBase_().concat(loadMetaClasses_()));
+
+  mergedRoster.forEach(st => {
+    const meta = metaById.get(String(st.AlunoID || '')) || {};
+    const studentRows = grouped.get(String(st.AlunoID || '')) || [];
+    studentRows.sort((a, b) => compareDateKey_(a.dateKey, b.dateKey));
+
+    let totalPresencas = 0;
+    let totalFaltas = 0;
+    let faltasConsecutivas = 0;
+    let ultimaPresenca = '';
+    let ultimaAusencia = '';
+
+    studentRows.forEach(item => {
+      if (normalizePresence_(item.presenca) === 'sim') {
+        totalPresencas++;
+        faltasConsecutivas = 0;
+        ultimaPresenca = item.dateKey;
+      } else {
+        totalFaltas++;
+        faltasConsecutivas++;
+        ultimaAusencia = item.dateKey;
+      }
+    });
+
+    const total = totalPresencas + totalFaltas;
+    const percentual = total ? round1_((totalPresencas / total) * 100) : 0;
+    const autoStatus = faltasConsecutivas >= 4 ? 'inativo' : 'ativo';
+    const finalStatus = String(meta.StatusManual || '').trim() || autoStatus;
+
+    upsertStudentMeta_({
+      AlunoID: st.AlunoID,
+      Nome: st.Nome,
+      TurmaID: st.TurmaID,
+      TurmaNome: st.TurmaNome,
+      Ativo: finalStatus === 'ativo' ? 'sim' : 'nao',
+      FaltasConsecutivas: faltasConsecutivas,
+      TotalPresencas: totalPresencas,
+      TotalFaltas: totalFaltas,
+      Percentual: percentual,
+      Status: finalStatus,
+      StatusManual: String(meta.StatusManual || '').trim(),
+      UltimaPresenca: ultimaPresenca,
+      UltimaAusencia: ultimaAusencia,
+      RealocadoDe: String(meta.RealocadoDe || '').trim(),
+      CriadoEm: String(meta.CriadoEm || now).trim(),
+      AtualizadoEm: now,
+    });
+  });
+}
+
+function replaceBaseRowsForCall_(dateKey, turmaId, normalizedRows, extra) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = getOrCreateSheet_(ss, BASE_SHEET_NAME, BASE_HEADERS, false);
 
   const values = sheet.getDataRange().getValues();
-  if (values.length > 1) {
-    const header = values[0].map(String);
-    const idxChamada = header.indexOf('ChamadaID');
-    const keep = [values[0]];
-    for (let i = 1; i < values.length; i++) {
-      if (String(values[i][idxChamada] || '') !== String(chamadaId || '')) {
-        keep.push(values[i]);
-      }
+  const header = values.length ? values[0].map(normalizeHeader_) : BASE_HEADERS.map(normalizeHeader_);
+  const idx = indexByHeader_(header);
+  const keep = [];
+
+  if (values.length) keep.push(values[0]);
+
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    const rowDateKey = normalizeDateFromBaseCell_(row[idx.DATA]);
+    const rowClass = String(row[idx.CLASSE] || '').trim();
+    if (rowDateKey === dateKey && normalizeKey_(rowClass) === normalizeKey_(getTurmaNameById_(turmaId))) {
+      continue;
     }
-    sheet.clearContents();
-    sheet.getRange(1, 1, keep.length, keep[0].length).setValues(keep);
+    keep.push(row);
   }
 
-  const now = new Date().toISOString();
-  const payload = rows.map(r => ([
-    chamadaId,
-    dateKey,
-    turmaId,
-    r.alunoId,
+  sheet.clearContents();
+  sheet.getRange(1, 1, 1, BASE_HEADERS.length).setValues([BASE_HEADERS]);
+
+  if (keep.length > 1) {
+    sheet.getRange(2, 1, keep.length - 1, keep[1].length).setValues(keep.slice(1));
+  }
+
+  const dataBr = formatDateBR_(dateKey);
+  const [year, month] = String(dateKey).split('-');
+  const mesTxt = monthToAbbrev_(month);
+  const rowsToAppend = normalizedRows.map(r => ([
+    dataBr,
+    Number(year),
+    mesTxt,
     r.nome,
-    r.presenca,
-    r.observacao || '',
-    r.statusAluno || '',
-    now,
+    getTurmaNameById_(turmaId),
+    r.presenca === 'sim' ? 1 : 0,
+    r.atraso ? 1 : 0,
+    r.presenca === 'nao' ? 1 : 0,
+    extra?.oferta || 'R$ 0,00',
   ]));
 
-  if (payload.length) {
-    sheet.getRange(sheet.getLastRow() + 1, 1, payload.length, payload[0].length).setValues(payload);
+  if (rowsToAppend.length) {
+    sheet.getRange(sheet.getLastRow() + 1, 1, rowsToAppend.length, rowsToAppend[0].length).setValues(rowsToAppend);
   }
 }
 
-function markCallAsSent_(chamadaId, text) {
-  const planilha = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = getOrCreateSheet_(planilha, SHEETS.CHAMADAS, HEADERS.CHAMADAS);
-  const values = sheet.getDataRange().getValues();
-  if (values.length <= 1) return;
+function getBaseRowsAll_() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(BASE_SHEET_NAME);
+  if (!sheet || sheet.getLastRow() < 2) return [];
 
-  const header = values[0].map(String);
-  const idxByName = {};
-  header.forEach((name, idx) => idxByName[name] = idx);
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0].map(normalizeHeader_);
+  const idx = indexByHeader_(headers);
+  const result = [];
 
   for (let i = 1; i < values.length; i++) {
-    if (String(values[i][idxByName.ChamadaID] || '') === String(chamadaId || '')) {
-      values[i][idxByName.EnviadoTelegram] = 'sim';
-      values[i][idxByName.TelegramEnviadoEm] = new Date().toISOString();
-      values[i][idxByName.AtualizadoEm] = new Date().toISOString();
+    const row = values[i];
+    const aluno = String(row[idx.ALUNO] || '').trim();
+    const classe = String(row[idx.CLASSE] || '').trim();
+    if (!aluno || !classe) continue;
+
+    const turmaId = buildTurmaId_(classe);
+    result.push({
+      dateKey: normalizeDateFromBaseCell_(row[idx.DATA]),
+      ano: row[idx.ANO],
+      mes: row[idx.MES],
+      nome: aluno,
+      turmaId,
+      turmaNome: classe,
+      presenca: normalizePresence_(row[idx.PRESENCA]),
+      atraso: normalizeBool_(row[idx.ATRASO]),
+      ausencia: normalizeBool_(row[idx.AUSENCIA]),
+      oferta: row[idx.OFERTA] || '',
+      alunoId: buildStudentId_(aluno, turmaId, ''),
+    });
+  }
+
+  return result;
+}
+
+function getBaseRowsForDate_(dateKey) {
+  return getBaseRowsAll_().filter(row => row.dateKey === dateKey);
+}
+
+function findCallMeta_(turmaId, dateKey) {
+  const reportId = `CALL_${turmaId}_${dateKey}`;
+  const log = getReportLogById_(reportId);
+  if (!log) return null;
+  return {
+    ChamadaID: reportId,
+    Data: formatDateBR_(dateKey),
+    TurmaID: turmaId,
+    Oferta: extractCallMetaField_(log.Texto, 'oferta') || '',
+    Visitantes: Number(extractCallMetaField_(log.Texto, 'visitantes') || 0) || 0,
+    VisitantesTexto: extractCallMetaField_(log.Texto, 'visitantesTexto') || '',
+    EnviadoTelegram: String(log.Enviado || 'nao'),
+    TelegramEnviadoEm: String(log.EnviadoEm || ''),
+  };
+}
+
+function upsertCallMeta_(chamadaId, dateKey, turmaId, oferta, visitantes, visitantesTexto, totalAlunos, presentes, ausentes, percentual, enviadoTelegram) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = getOrCreateSheet_(ss, REPORTS_SHEET, REPORTS_HEADERS, true);
+  const existing = getCallMetaRows_(sheet);
+  const reportId = `CALL_${turmaId}_${dateKey}`;
+  const hash = textHash_([dateKey, turmaId, oferta, visitantes, visitantesTexto, totalAlunos, presentes, ausentes, percentual].join('|'));
+  const now = new Date().toISOString();
+  const text = JSON.stringify({ chamadaId, dateKey, turmaId, oferta, visitantes, visitantesTexto, totalAlunos, presentes, ausentes, percentual });
+
+  let rowIndex = -1;
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0].map(String);
+  const idx = indexByHeader_(headers);
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][idx.RelatorioID] || '') === reportId) {
+      rowIndex = i + 1;
       break;
     }
   }
-  sheet.getRange(2, 1, values.length - 1, header.length).setValues(values.slice(1));
+
+  const row = [
+    reportId,
+    'chamada',
+    dateKey,
+    turmaId,
+    hash,
+    enviadoTelegram ? 'sim' : 'nao',
+    enviadoTelegram ? now : '',
+    text,
+    now,
+  ];
+
+  if (rowIndex === -1) {
+    sheet.appendRow(row);
+  } else {
+    sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
+  }
+}
+
+function getCallMetaRows_(sheet) {
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return [];
+  const headers = values[0].map(String);
+  return values.slice(1).map(row => {
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = row[i]);
+    return obj;
+  });
+}
+
+function markCallAsSent_(turmaId, dateKey, text) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = getOrCreateSheet_(ss, REPORTS_SHEET, REPORTS_HEADERS, true);
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return;
+
+  const headers = values[0].map(String);
+  const idx = indexByHeader_(headers);
+  const reportId = `CALL_${turmaId}_${dateKey}`;
+  const now = new Date().toISOString();
+
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][idx.RelatorioID] || '') === reportId) {
+      values[i][idx.Enviado] = 'sim';
+      values[i][idx.EnviadoEm] = now;
+      values[i][idx.Texto] = text || values[i][idx.Texto] || '';
+      sheet.getRange(i + 1, 1, 1, headers.length).setValues([values[i]]);
+      return;
+    }
+  }
+}
+
+function getReportLogById_(reportId) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(REPORTS_SHEET);
+  if (!sheet || sheet.getLastRow() < 2) return null;
+
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0].map(String);
+  const idx = indexByHeader_(headers);
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][idx.RelatorioID] || '') === String(reportId || '')) {
+      const obj = {};
+      headers.forEach((h, j) => obj[h] = values[i][j]);
+      return obj;
+    }
+  }
+  return null;
+}
+
+function extractCallMetaField_(text, field) {
+  try {
+    const obj = JSON.parse(String(text || '{}'));
+    return obj ? obj[field] : '';
+  } catch (err) {
+    return '';
+  }
+}
+
+function appendReadBaseStudent_(sheet, nome, turmaNome, cpf, alunoId, now) {
+  const headers = getReadBaseHeaders_();
+  const values = sheet.getDataRange().getValues();
+  if (values.length === 0) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+
+  const cols = getReadBaseHeaderIndexes_(sheet);
+  const row = new Array(Math.max(headers.length, cols.maxLen)).fill('');
+  if (cols.ALUNO !== -1) row[cols.ALUNO] = nome;
+  if (cols.NOME !== -1 && cols.ALUNO === -1) row[cols.NOME] = nome;
+  if (cols.CLASSE !== -1) row[cols.CLASSE] = turmaNome;
+  if (cols.TURMA !== -1 && cols.CLASSE === -1) row[cols.TURMA] = turmaNome;
+  if (cols.CPF !== -1) row[cols.CPF] = cpf;
+  if (cols.ALUNOID !== -1) row[cols.ALUNOID] = alunoId;
+  if (cols.CRiadoEm !== -1) row[cols.CRiadoEm] = now;
+
+  sheet.appendRow(row.slice(0, Math.max(headers.length, cols.maxLen)));
+}
+
+function getReadBaseHeaders_() {
+  return ['ALUNO', 'CLASSE', 'CPF', 'ALUNOID', 'CRIADOEM'];
+}
+
+function getReadBaseHeaderIndexes_(sheet) {
+  const values = sheet.getDataRange().getValues();
+  const headerRow = values.length ? values[0].map(normalizeHeader_) : [];
+  const find = (aliases) => findHeaderIndex_(headerRow, aliases);
+  const maxLen = Math.max(headerRow.length, 5);
+  return {
+    ALUNO: find(['ALUNO', 'NOME']),
+    NOME: find(['NOME']),
+    CLASSE: find(['CLASSE']),
+    TURMA: find(['TURMA']),
+    CPF: find(['CPF']),
+    ALUNOID: find(['ALUNOID', 'ALUNO_ID', 'ID']),
+    CRiadoEm: find(['CRIADOEM', 'CRIADO_EM', 'DATACRIACAO']),
+    maxLen,
+  };
+}
+
+function getTurmaNameById_(turmaId) {
+  const all = loadAllData_();
+  const turma = (all.turmas || []).find(t => String(t.TurmaID || '') === String(turmaId || ''));
+  return turma ? turma.Nome : String(turmaId || '');
+}
+
+function getTurmaByIdOrName_(turmaIdOrName, turmas) {
+  const target = String(turmaIdOrName || '').trim();
+  if (!target) return null;
+  const normalizedTarget = normalizeKey_(target);
+  return (turmas || []).find(t => normalizeKey_(String(t.TurmaID || '')) === normalizedTarget || normalizeKey_(String(t.Nome || '')) === normalizedTarget) || null;
+}
+
+function findStudentMetaById_(alunoId) {
+  return loadMetaStudents_().find(s => String(s.AlunoID || '') === String(alunoId || '')) || null;
+}
+
+function findMetaClassById_(turmaId) {
+  return loadMetaClasses_().find(t => String(t.TurmaID || '') === String(turmaId || '')) || null;
+}
+
+function updateMetaClass_(turmaId, patch) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = getOrCreateSheet_(ss, META_CLASSES_SHEET, META_CLASSES_HEADERS, true);
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) {
+    sheet.appendRow([turmaId, patch.Nome || '', patch.Ordem || 0, patch.Ativa || 'sim', patch.CriadoEm || new Date().toISOString(), patch.AtualizadoEm || new Date().toISOString()]);
+    return;
+  }
+
+  const headers = values[0].map(String);
+  const idx = indexByHeader_(headers);
+  const now = new Date().toISOString();
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][idx.TurmaID] || '') === String(turmaId || '')) {
+      values[i][idx.Nome] = patch.Nome ?? values[i][idx.Nome];
+      values[i][idx.Ordem] = patch.Ordem ?? values[i][idx.Ordem];
+      values[i][idx.Ativa] = patch.Ativa ?? values[i][idx.Ativa];
+      values[i][idx.AtualizadoEm] = patch.AtualizadoEm ?? now;
+      sheet.getRange(i + 1, 1, 1, headers.length).setValues([values[i]]);
+      return;
+    }
+  }
+  sheet.appendRow([turmaId, patch.Nome || '', patch.Ordem || 0, patch.Ativa || 'sim', patch.CriadoEm || now, patch.AtualizadoEm || now]);
 }
 
 function upsertReportLog_(log) {
-  const planilha = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = getOrCreateSheet_(planilha, SHEETS.RELATORIOS, HEADERS.RELATORIOS);
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = getOrCreateSheet_(ss, REPORTS_SHEET, REPORTS_HEADERS, true);
   const values = sheet.getDataRange().getValues();
-  const header = values[0].map(String);
-  const idxByName = {};
-  header.forEach((name, idx) => idxByName[name] = idx);
-
+  const headers = values[0].map(String);
+  const idx = indexByHeader_(headers);
+  const now = new Date().toISOString();
   let rowIndex = -1;
+
   for (let i = 1; i < values.length; i++) {
-    if (String(values[i][idxByName.RelatorioID] || '') === String(log.reportId || '')) {
+    if (String(values[i][idx.RelatorioID] || '') === String(log.reportId || '')) {
       rowIndex = i + 1;
       break;
     }
@@ -819,9 +1248,9 @@ function upsertReportLog_(log) {
     log.turmaId || '',
     log.hash,
     log.enviado,
-    new Date().toISOString(),
-    log.text,
-    new Date().toISOString(),
+    now,
+    log.text || '',
+    now,
   ];
 
   if (rowIndex === -1) {
@@ -831,98 +1260,36 @@ function upsertReportLog_(log) {
   }
 }
 
-function getReportLogById_(reportId) {
-  const planilha = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = getOrCreateSheet_(planilha, SHEETS.RELATORIOS, HEADERS.RELATORIOS);
-  const values = sheet.getDataRange().getValues();
-  if (values.length <= 1) return null;
-  const header = values[0].map(String);
-  const idxByName = {};
-  header.forEach((name, idx) => idxByName[name] = idx);
-
-  for (let i = 1; i < values.length; i++) {
-    if (String(values[i][idxByName.RelatorioID] || '') === String(reportId || '')) {
-      const obj = {};
-      header.forEach((name, idx) => obj[name] = values[i][idx]);
-      return obj;
-    }
-  }
-  return null;
+function ensureSheets_() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  getOrCreateSheet_(ss, READ_SHEET_NAME, getReadBaseHeaders_(), false);
+  getOrCreateSheet_(ss, BASE_SHEET_NAME, BASE_HEADERS, false);
+  getOrCreateSheet_(ss, META_STUDENTS_SHEET, META_STUDENTS_HEADERS, true);
+  getOrCreateSheet_(ss, META_CLASSES_SHEET, META_CLASSES_HEADERS, true);
+  getOrCreateSheet_(ss, REPORTS_SHEET, REPORTS_HEADERS, true);
 }
 
-function getTurmaById_(turmaId) {
-  const planilha = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = getOrCreateSheet_(planilha, SHEETS.TURMAS, HEADERS.TURMAS);
-  const values = sheet.getDataRange().getValues();
-  if (values.length <= 1) return null;
-  const header = values[0].map(String);
-  const idxByName = {};
-  header.forEach((name, idx) => idxByName[name] = idx);
+function getOrCreateSheet_(ss, name, headers, hidden) {
+  let sheet = ss.getSheetByName(name);
+  if (!sheet) sheet = ss.insertSheet(name);
 
-  for (let i = 1; i < values.length; i++) {
-    if (String(values[i][idxByName.TurmaID] || '') === String(turmaId || '')) {
-      const obj = {};
-      header.forEach((name, idx) => obj[name] = values[i][idx]);
-      return obj;
-    }
-  }
-  return null;
-}
-
-function getOrCreateSheet_(planilha, nome, headers) {
-  let sheet = planilha.getSheetByName(nome);
-  if (!sheet) sheet = planilha.insertSheet(nome);
-
-  if (sheet.getLastRow() === 0) {
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    sheet.setFrozenRows(1);
-    return sheet;
+  const maxCols = Math.max(headers.length, sheet.getMaxColumns());
+  if (sheet.getMaxColumns() < headers.length) {
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), headers.length - sheet.getMaxColumns());
   }
 
-  const first = sheet.getRange(1, 1, 1, headers.length).getValues()[0];
-  const empty = first.every(cell => String(cell || '').trim() === '');
-  if (empty) {
+  const firstRow = sheet.getLastRow() > 0 ? sheet.getRange(1, 1, 1, headers.length).getValues()[0] : [];
+  const isEmptyHeader = !firstRow.length || firstRow.every(v => String(v || '').trim() === '');
+  if (isEmptyHeader) {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     sheet.setFrozenRows(1);
+  }
+
+  if (hidden) {
+    try { sheet.hideSheet(); } catch (e) {}
   }
 
   return sheet;
-}
-
-function ensureSheets_() {
-  const planilha = SpreadsheetApp.openById(SPREADSHEET_ID);
-  Object.keys(SHEETS).forEach(key => {
-    getOrCreateSheet_(planilha, SHEETS[key], HEADERS[key]);
-  });
-}
-
-function sheetToObjects_(sheet) {
-  const values = sheet.getDataRange().getValues();
-  if (values.length <= 1) return [];
-  const headers = values[0].map(String);
-  return values.slice(1).filter(row => row.some(v => String(v || '').trim() !== '')).map(row => {
-    const obj = {};
-    headers.forEach((h, i) => obj[h] = row[i]);
-    return obj;
-  });
-}
-
-function fillRowsFromRoster_(roster, savedRows) {
-  const map = {};
-  savedRows.forEach(row => {
-    map[String(row.alunoId || '')] = row;
-  });
-
-  return sortAlunos_(roster).map(aluno => {
-    const saved = map[String(aluno.AlunoID || '')] || {};
-    return {
-      alunoId: aluno.AlunoID,
-      nome: aluno.Nome,
-      presenca: normalizePresence_(saved.presenca || 'nao'),
-      observacao: String(saved.observacao || ''),
-      statusAluno: String(aluno.Status || 'ativo'),
-    };
-  });
 }
 
 function sortTurmas_(turmas) {
@@ -936,32 +1303,135 @@ function sortTurmas_(turmas) {
 
 function sortAlunos_(alunos) {
   return (alunos || []).slice().sort((a, b) => {
-    const turmaCmp = String(a.TurmaID || '').localeCompare(String(b.TurmaID || ''));
-    if (turmaCmp !== 0) return turmaCmp;
-    const activeA = String(a.Status || 'ativo') === 'inativo' ? 1 : 0;
-    const activeB = String(b.Status || 'ativo') === 'inativo' ? 1 : 0;
-    if (activeA !== activeB) return activeA - activeB;
+    const ta = String(a.TurmaNome || a.TurmaID || '').localeCompare(String(b.TurmaNome || b.TurmaID || ''));
+    if (ta !== 0) return ta;
+    const ia = String(a.Status || 'ativo').toLowerCase() === 'inativo' ? 1 : 0;
+    const ib = String(b.Status || 'ativo').toLowerCase() === 'inativo' ? 1 : 0;
+    if (ia !== ib) return ia - ib;
     return String(a.Nome || '').localeCompare(String(b.Nome || ''));
   });
 }
 
 function groupBy_(items, key) {
   return (items || []).reduce((acc, item) => {
-    const val = String(item[key] || '');
+    const val = String(item?.[key] || '');
     if (!acc[val]) acc[val] = [];
     acc[val].push(item);
     return acc;
   }, {});
 }
 
+function normalizeHeader_(value) {
+  return String(value || '')
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '_');
+}
+
+function findHeaderIndex_(headers, aliases) {
+  const list = (aliases || []).map(normalizeHeader_);
+  for (let i = 0; i < headers.length; i++) {
+    if (list.includes(headers[i])) return i;
+  }
+  return -1;
+}
+
+function indexByHeader_(headers) {
+  const idx = {};
+  const lookup = (aliases) => findHeaderIndex_(headers, aliases);
+  idx.DATA = lookup(['DATA', 'DATE']);
+  idx.ANO = lookup(['ANO', 'YEAR']);
+  idx.MES = lookup(['MES', 'MÊS', 'MONTH']);
+  idx.ALUNO = lookup(['ALUNO', 'NOME', 'STUDENT']);
+  idx.CLASSE = lookup(['CLASSE', 'TURMA', 'CLASS']);
+  idx.PRESENCA = lookup(['PRESENCA', 'PRESENÇA', 'PRESENTE']);
+  idx.ATRASO = lookup(['ATRASO', 'LATE']);
+  idx.AUSENCIA = lookup(['AUSENCIA', 'AUSÊNCIA', 'FALTA']);
+  idx.OFERTA = lookup(['OFERTA', 'VALOR', 'R', 'R$']);
+
+  idx.AlunoID = lookup(['ALUNOID', 'ALUNO_ID', 'ID']);
+  idx.Nome = lookup(['NOME', 'ALUNO']);
+  idx.TurmaID = lookup(['TURMAID', 'TURMA_ID', 'CLASSE']);
+  idx.TurmaNome = lookup(['TURMANOME', 'TURMA_NOME', 'CLASSE']);
+  idx.Ativo = lookup(['ATIVO']);
+  idx.FaltasConsecutivas = lookup(['FALTASCONSECUTIVAS']);
+  idx.TotalPresencas = lookup(['TOTALPRESENCAS']);
+  idx.TotalFaltas = lookup(['TOTALFALTAS']);
+  idx.Percentual = lookup(['PERCENTUAL']);
+  idx.Status = lookup(['STATUS']);
+  idx.StatusManual = lookup(['STATUSMANUAL']);
+  idx.UltimaPresenca = lookup(['ULTIMAPRESENCA']);
+  idx.UltimaAusencia = lookup(['ULTIMAAUSENCIA']);
+  idx.RealocadoDe = lookup(['REALOCADODE']);
+  idx.CriadoEm = lookup(['CRIADOEM']);
+  idx.AtualizadoEm = lookup(['ATUALIZADOEM']);
+  idx.Visitantes = lookup(['VISITANTES']);
+  idx.VisitantesTexto = lookup(['VISITANTESTEXTO']);
+  idx.Enviado = lookup(['ENVIADO']);
+  idx.EnviadoEm = lookup(['ENVIADOEM']);
+  idx.Texto = lookup(['TEXTO']);
+  idx.RelatorioID = lookup(['RELATORIOID']);
+  idx.maxLen = headers.length;
+  return idx;
+}
+
 function normalizePresence_(value) {
   const v = String(value || '').toLowerCase().trim();
-  return (v === 'sim' || v === 'presente' || v === 'p' || v === '1') ? 'sim' : 'nao';
+  return (v === 'sim' || v === 'presente' || v === '1' || v === 'p' || v === 'true') ? 'sim' : 'nao';
 }
 
 function normalizeBool_(value) {
   const v = String(value || '').toLowerCase().trim();
   return v === 'sim' || v === 'true' || v === '1' || v === 'yes' || v === 'y';
+}
+
+function normalizeCpf_(value) {
+  return String(value || '').replace(/\D/g, '').padStart(11, '0').slice(-11);
+}
+
+function normalizeDateKey_(value) {
+  const str = String(value || '').trim();
+  if (!str) return todayKey_();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  const d = new Date(str);
+  if (isNaN(d.getTime())) return todayKey_();
+  return Utilities.formatDate(d, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+}
+
+function normalizeDateFromBaseCell_(value) {
+  if (value instanceof Date) {
+    return Utilities.formatDate(value, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+  const str = String(value || '').trim();
+  if (!str) return '';
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) {
+    const [dd, mm, yyyy] = str.split('/');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  const d = new Date(str);
+  if (isNaN(d.getTime())) return '';
+  return Utilities.formatDate(d, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+}
+
+function todayKey_() {
+  return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+}
+
+function formatDateBR_(dateKey) {
+  const d = new Date(`${dateKey}T00:00:00`);
+  if (isNaN(d.getTime())) return dateKey;
+  return Utilities.formatDate(d, Session.getScriptTimeZone(), 'dd/MM/yyyy');
+}
+
+function monthToAbbrev_(month) {
+  const map = {
+    '01': 'JAN.', '02': 'FEV.', '03': 'MAR.', '04': 'ABR.', '05': 'MAI.', '06': 'JUN.',
+    '07': 'JUL.', '08': 'AGO.', '09': 'SET.', '10': 'OUT.', '11': 'NOV.', '12': 'DEZ.'
+  };
+  return map[String(month || '').padStart(2, '0')] || String(month || '');
 }
 
 function parseMoney_(value) {
@@ -980,48 +1450,42 @@ function formatMoney_(value) {
 }
 
 function formatPercent_(value) {
-  return `${round1_(Number(value || 0))}%`;
+  return `${round1_(Number(value || 0)).toFixed(1).replace('.', ',')}%`;
 }
 
 function round1_(n) {
   return Math.round((Number(n || 0) + Number.EPSILON) * 10) / 10;
 }
 
-function buildId_(prefix) {
-  return `${prefix}_${Utilities.getUuid().slice(0, 8).toUpperCase()}`;
-}
-
-function normalizeCpf_(value) {
-  return String(value || '').replace(/\D/g, '').padStart(11, '0').slice(-11);
-}
-
-function normalizeDateKey_(value) {
-  const str = String(value || '').trim();
-  if (!str) return todayKey_();
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
-
-  const d = new Date(str);
-  if (isNaN(d.getTime())) return todayKey_();
-  return Utilities.formatDate(d, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-}
-
-function todayKey_() {
-  return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
-}
-
-function formatDateBR_(dateKey) {
-  const d = new Date(`${dateKey}T00:00:00`);
-  if (isNaN(d.getTime())) return dateKey;
-  return Utilities.formatDate(d, Session.getScriptTimeZone(), 'dd/MM/yyyy');
-}
-
 function textHash_(text) {
-  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, text);
-  return bytes.map(b => {
-    const v = (b + 256) % 256;
-    return ('0' + v.toString(16)).slice(-2);
-  }).join('');
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(text || ''));
+  return bytes.map(b => ('0' + ((b + 256) % 256).toString(16)).slice(-2)).join('');
+}
+
+function buildTurmaId_(nome) {
+  return `T_${normalizeKey_(nome) || Utilities.getUuid().slice(0, 8).toUpperCase()}`;
+}
+
+function buildStudentId_(nome, turmaId, cpf, rowNumber) {
+  const base = [nome, turmaId, cpf || '']
+    .map(v => normalizeKey_(String(v || '')))
+    .filter(Boolean)
+    .join('_');
+  return `A_${base || normalizeKey_(String(rowNumber || Utilities.getUuid())).slice(0, 20).toUpperCase()}`;
+}
+
+function normalizeKey_(value) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 80);
+}
+
+function compareDateKey_(a, b) {
+  return String(a || '').localeCompare(String(b || ''));
 }
 
 function sendTelegram_(text) {
@@ -1037,8 +1501,9 @@ function sendTelegram_(text) {
   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
   const payload = {
     chat_id: TELEGRAM_CHAT_ID,
-    text: text,
+    text: String(text || ''),
     disable_web_page_preview: true,
+    parse_mode: 'Markdown',
   };
 
   UrlFetchApp.fetch(url, {
