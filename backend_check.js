@@ -10,9 +10,9 @@
  * - relatorios
  */
 
-const SPREADSHEET_ID = 'COLE_AQUI_O_ID_DA_PLANILHA';
-const TELEGRAM_BOT_TOKEN = 'COLE_SEU_TOKEN_AQUI';
-const TELEGRAM_CHAT_ID = 'COLE_SEU_CHAT_ID_AQUI';
+const SPREADSHEET_ID = 'https://script.google.com/macros/s/AKfycbxqqMq1jnkQ3c_5KjEW7i6a0EZgXiy-hqduShtvpeRl-4olRKc6cEKFPAH1C42HZQ2kUw/exec';
+const TELEGRAM_BOT_TOKEN = '8675551330:AAH5G9TcjqoI-rjvCr-QBA1Q4Wsxkolu9hY';
+const TELEGRAM_CHAT_ID = '-5138652770';
 
 const SHEETS = {
   TURMAS: 'turmas',
