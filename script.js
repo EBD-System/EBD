@@ -294,9 +294,18 @@ function updateCallFromInputs() {
   call.oferta = document.getElementById('ofertaInput')?.value?.trim?.() ?? call.oferta;
 }
 
+function isInactiveStudent(row) {
+  return String(row?.statusAluno || '').trim().toLowerCase() === 'inativo';
+}
+
+function getActiveRows(call) {
+  return (call?.rows || []).filter((row) => !isInactiveStudent(row));
+}
+
 function computeLocalStats(call) {
-  const total = call.rows.length;
-  const presentes = call.rows.filter((r) => r.presenca === 'sim').length;
+  const activeRows = getActiveRows(call);
+  const total = activeRows.length;
+  const presentes = activeRows.filter((r) => r.presenca === 'sim').length;
   const ausentes = total - presentes;
   const percentual = total ? (presentes / total) * 100 : 0;
   return { total, presentes, ausentes, percentual };
@@ -331,8 +340,8 @@ function buildTurmaReportText() {
   if (!call || !turma) return 'Nenhuma turma selecionada.';
   const stats = computeLocalStats(call);
   const best = bestStudentForCurrentTurma();
-  const presentNames = call.rows.filter((r) => r.presenca === 'sim').map((r) => r.nome).join(', ') || 'nenhum';
-  const absentNames = call.rows.filter((r) => r.presenca !== 'sim').map((r) => r.nome).join(', ') || 'nenhum';
+  const presentNames = getActiveRows(call).filter((r) => r.presenca === 'sim').map((r) => r.nome).join(', ') || 'nenhum';
+  const absentNames = getActiveRows(call).filter((r) => r.presenca !== 'sim').map((r) => r.nome).join(', ') || 'nenhum';
   const inactiveNames = getAlunosForTurma(turma.TurmaID).filter((a) => String(a.Status || '') === 'inativo').map((a) => a.Nome).join(', ') || 'nenhum';
   const faltandoMuito = getAlunosForTurma(turma.TurmaID).filter((a) => String(a.FaltandoMuito || '') === 'sim').map((a) => a.Nome).join(', ') || 'nenhum';
 
@@ -550,6 +559,7 @@ function setAllPresence(presence) {
   const call = getCurrentCall();
   if (!call) return;
   call.rows.forEach((row) => {
+    if (isInactiveStudent(row)) return;
     row.presenca = presence === 'sim' ? 'sim' : 'nao';
   });
   state.dirty = true;

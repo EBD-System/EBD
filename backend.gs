@@ -425,15 +425,26 @@ function sendTelegramByText_({ reportId, tipo, dateKey, turmaId, text }) {
   };
 }
 
+
+function getActiveCallRows_(rows) {
+  return (rows || []).filter(r => String(r.statusAluno || '').trim().toLowerCase() !== 'inativo');
+}
+
 function buildTurmaReportText_(dateKey, turma, turmaCall, all) {
   const lines = [];
   lines.push(`*Relatório da turma*`);
   lines.push(`Data: ${formatDateBR_(dateKey)}`);
   lines.push(`Turma: ${turma.Nome}`);
-  lines.push(`Total de alunos: ${turmaCall.totalAlunos}`);
-  lines.push(`Presentes: ${turmaCall.presentes}`);
-  lines.push(`Ausentes: ${turmaCall.ausentes}`);
-  lines.push(`Presença: ${formatPercent_(turmaCall.percentual)}`);
+  const activeRows = getActiveCallRows_(turmaCall.rows);
+  const totalAtivos = activeRows.length;
+  const presentesAtivos = activeRows.filter(r => r.presenca === 'sim').length;
+  const ausentesAtivos = totalAtivos - presentesAtivos;
+  const percentualAtivos = totalAtivos ? round1_((presentesAtivos / totalAtivos) * 100) : 0;
+
+  lines.push(`Total de alunos: ${totalAtivos}`);
+  lines.push(`Presentes: ${presentesAtivos}`);
+  lines.push(`Ausentes: ${ausentesAtivos}`);
+  lines.push(`Presença: ${formatPercent_(percentualAtivos)}`);
   lines.push(`Oferta: ${formatMoney_(parseMoney_(turmaCall.oferta))}`);
   if (Number(turmaCall.visitantes || 0) > 0) lines.push(`Visitantes: ${turmaCall.visitantes}`);
   if (String(turmaCall.visitantesTexto || '').trim()) lines.push(`Detalhe visitantes: ${turmaCall.visitantesTexto}`);
@@ -443,8 +454,8 @@ function buildTurmaReportText_(dateKey, turma, turmaCall, all) {
   if (stats.mostAbsent) lines.push(`Mais faltas: ${stats.mostAbsent.Nome} (${stats.mostAbsent.TotalFaltas})`);
   if (stats.inactiveCount) lines.push(`Inativos: ${stats.inactiveCount}`);
 
-  const presentNames = turmaCall.rows.filter(r => r.presenca === 'sim').map(r => r.nome);
-  const absentNames = turmaCall.rows.filter(r => r.presenca !== 'sim').map(r => r.nome);
+  const presentNames = activeRows.filter(r => r.presenca === 'sim').map(r => r.nome);
+  const absentNames = activeRows.filter(r => r.presenca !== 'sim').map(r => r.nome);
   if (presentNames.length) lines.push('');
   if (presentNames.length) lines.push(`Presentes: ${presentNames.join(', ')}`);
   if (absentNames.length) lines.push(`Ausentes: ${absentNames.join(', ')}`);
@@ -469,7 +480,11 @@ function buildGeneralReportText_(dateKey, geral, callsByTurma, all) {
   const turmasOrdenadas = sortTurmas_(all.turmas).filter(t => callsByTurma[t.TurmaID]);
   turmasOrdenadas.forEach(turma => {
     const call = callsByTurma[turma.TurmaID];
-    lines.push(`• ${turma.Nome}: ${call.presentes}/${call.totalAlunos} presentes (${formatPercent_(call.percentual)})`);
+    const activeRows = getActiveCallRows_(call.rows);
+    const totalAtivos = activeRows.length;
+    const presentesAtivos = activeRows.filter(r => r.presenca === 'sim').length;
+    const percentualAtivos = totalAtivos ? round1_((presentesAtivos / totalAtivos) * 100) : 0;
+    lines.push(`• ${turma.Nome}: ${presentesAtivos}/${totalAtivos} presentes (${formatPercent_(percentualAtivos)})`);
   });
 
   const top = getTopStudentsOverall_(all);
@@ -486,9 +501,9 @@ function buildGeneralReportText_(dateKey, geral, callsByTurma, all) {
 
 function buildDailyGeneralSummary_(dateKey, all, callsByTurma) {
   const calls = Object.values(callsByTurma || {});
-  const totalAlunos = calls.reduce((sum, c) => sum + Number(c.totalAlunos || 0), 0);
-  const presentes = calls.reduce((sum, c) => sum + Number(c.presentes || 0), 0);
-  const ausentes = calls.reduce((sum, c) => sum + Number(c.ausentes || 0), 0);
+  const totalAlunos = calls.reduce((sum, c) => sum + getActiveCallRows_(c.rows).length, 0);
+  const presentes = calls.reduce((sum, c) => sum + getActiveCallRows_(c.rows).filter(r => r.presenca === 'sim').length, 0);
+  const ausentes = totalAlunos - presentes;
   const ofertaTotal = calls.reduce((sum, c) => sum + parseMoney_(c.oferta), 0);
   const visitantesTotal = calls.reduce((sum, c) => sum + Number(c.visitantes || 0), 0);
   const percentual = totalAlunos ? round1_((presentes / totalAlunos) * 100) : 0;
