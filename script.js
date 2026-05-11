@@ -308,6 +308,7 @@ function computeLocalStats(call) {
   const presentes = activeRows.filter((r) => r.presenca === 'sim').length;
   const ausentes = total - presentes;
   const percentual = total ? (presentes / total) * 100 : 0;
+
   return { total, presentes, ausentes, percentual };
 }
 
