@@ -1,8 +1,11 @@
 const APPS_SCRIPT_URL =
 'https://script.google.com/macros/s/AKfycbxqqMq1jnkQ3c_5KjEW7i6a0EZgXiy-hqduShtvpeRl-4olRKc6cEKFPAH1C42HZQ2kUw/exec';
 const STORAGE_KEY = 'prb_presenca_turmas_v2';
+const ROSTER_CACHE_KEY = 'prb_roster_cache_v1';
+const ROSTER_CACHE_VERSION = 1;
 
 const state = {
+  syncToken: 0,
   loading: false,
   dateKey: todayKey(),
   turmas: [],
@@ -171,6 +174,151 @@ function storageState() {
 
 function saveStorageState(next) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+}
+
+function readJsonStorage(key, fallback = null) {
+  try {
+    return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback;
+  } catch (err) {
+    return fallback;
+  }
+}
+
+function writeJsonStorage(key, value) {
+  localStorage.setItem(key, JSON.stringify(value));
+}
+
+function loadRosterCache() {
+  const cache = readJsonStorage(ROSTER_CACHE_KEY, null);
+  if (!cache || cache.version !== ROSTER_CACHE_VERSION) return null;
+  return cache;
+}
+
+function saveRosterCache() {
+  const snapshot = {
+    version: ROSTER_CACHE_VERSION,
+    savedAt: new Date().toISOString(),
+    dateKey: state.dateKey,
+    selectedTurmaId: state.selectedTurmaId || '',
+    turmas: state.turmas || [],
+    alunos: state.alunos || [],
+  };
+
+  writeJsonStorage(ROSTER_CACHE_KEY, snapshot);
+}
+
+function rosterFingerprintTurma(turma) {
+  return [
+    turma?.TurmaID ?? '',
+    turma?.Nome ?? '',
+    turma?.Ordem ?? '',
+  ].join('|');
+}
+
+function rosterFingerprintAluno(aluno) {
+  return [
+    aluno?.AlunoID ?? '',
+    aluno?.Nome ?? '',
+    aluno?.TurmaID ?? '',
+    aluno?.Status ?? '',
+    aluno?.Ativo ?? '',
+    aluno?.FaltandoMuito ?? '',
+    aluno?.Reativado ?? '',
+    aluno?.Percentual ?? '',
+    aluno?.TotalFaltas ?? '',
+    aluno?.FaltasConsecutivas ?? '',
+    aluno?.RealocadoDe ?? '',
+  ].join('|');
+}
+
+function mergeById(prevList = [], nextList = [], idField, fingerprintFn = null) {
+  const prevMap = new Map(
+    (prevList || []).map((item) => [String(item?.[idField] ?? ''), item])
+  );
+
+  return (nextList || []).map((nextItem) => {
+    const key = String(nextItem?.[idField] ?? '');
+    const prevItem = prevMap.get(key);
+
+    if (prevItem && fingerprintFn && fingerprintFn(prevItem) === fingerprintFn(nextItem)) {
+      return prevItem;
+    }
+
+    return prevItem ? { ...prevItem, ...nextItem } : nextItem;
+  });
+}
+
+function buildStudentRowFromAluno(aluno) {
+  return {
+    alunoId: aluno.AlunoID,
+    nome: aluno.Nome,
+    presenca: 'nao',
+    observacao: '',
+    statusAluno: aluno.Status || 'ativo',
+  };
+}
+
+function buildSyncedCall(turma, serverCall = null, draft = null) {
+  const roster = getAlunosForTurma(turma.TurmaID);
+  const serverRows = Array.isArray(serverCall?.rows) ? serverCall.rows : [];
+  const draftRows = Array.isArray(draft?.rows) ? draft.rows : [];
+
+  const serverRowsMap = new Map(
+    serverRows.map((row) => [String(row?.alunoId ?? ''), row])
+  );
+  const draftRowsMap = new Map(
+    draftRows.map((row) => [String(row?.alunoId ?? ''), row])
+  );
+
+  const rows = roster.map((aluno) => {
+    const base = buildStudentRowFromAluno(aluno);
+    const serverRow = serverRowsMap.get(String(aluno.AlunoID || '')) || null;
+    const draftRow = draftRowsMap.get(String(aluno.AlunoID || '')) || null;
+
+    const merged = {
+      ...base,
+      ...(serverRow || {}),
+      ...(draftRow || {}),
+    };
+
+    merged.alunoId = base.alunoId;
+    merged.nome = draftRow?.nome ?? serverRow?.nome ?? base.nome;
+    merged.statusAluno = draftRow?.statusAluno ?? serverRow?.statusAluno ?? base.statusAluno;
+
+    return merged;
+  });
+
+  return {
+    chamadaId: serverCall?.chamadaId || callKey(state.dateKey, turma.TurmaID),
+    data: serverCall?.data || state.dateKey,
+    turmaId: turma.TurmaID,
+    turmaNome: turma.Nome,
+    oferta: draft?.oferta ?? serverCall?.oferta ?? '',
+    visitantes: Number(draft?.visitantes ?? serverCall?.visitantes ?? 0) || 0,
+    visitantesTexto: draft?.visitantesTexto ?? serverCall?.visitantesTexto ?? '',
+    totalAlunos: rows.length,
+    presentes: serverCall?.presentes ?? 0,
+    ausentes: serverCall?.ausentes ?? rows.length,
+    percentual: serverCall?.percentual ?? 0,
+    enviadoTelegram: !!serverCall?.enviadoTelegram,
+    telegramEnviadoEm: serverCall?.telegramEnviadoEm || '',
+    rows,
+    isSaved: !!serverCall?.isSaved && !draft,
+  };
+}
+
+function hydrateRosterFromCache() {
+  const cache = loadRosterCache();
+  if (!cache) return false;
+
+  state.turmas = Array.isArray(cache.turmas) ? cache.turmas : [];
+  state.alunos = Array.isArray(cache.alunos) ? cache.alunos : [];
+
+  if (cache.selectedTurmaId) {
+    state.selectedTurmaId = cache.selectedTurmaId;
+  }
+
+  return state.turmas.length > 0 || state.alunos.length > 0;
 }
 
 function callKey(dateKey, turmaId) {
