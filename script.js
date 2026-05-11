@@ -58,6 +58,45 @@ const els = {
   geralReport: document.getElementById('geralReport'),
 };
 
+let loadingCount = 0;
+
+function ensureLoadingOverlay() {
+  if (document.getElementById('loadingOverlay')) return;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'loadingOverlay';
+  overlay.className = 'loading-overlay';
+  overlay.innerHTML = `
+    <div class="loading-card">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">Carregando...</div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+}
+
+function showLoading(message = 'Carregando...') {
+  ensureLoadingOverlay();
+
+  const overlay = document.getElementById('loadingOverlay');
+  const text = overlay.querySelector('.loading-text');
+
+  if (text) text.textContent = message;
+
+  loadingCount += 1;
+  overlay.classList.add('show');
+}
+
+function hideLoading() {
+  loadingCount = Math.max(0, loadingCount - 1);
+
+  if (loadingCount === 0) {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) overlay.classList.remove('show');
+  }
+}
+
 function todayKey() {
   const d = new Date();
   const tz = d.getTimezoneOffset() * 60000;
