@@ -993,32 +993,69 @@ function bindCallFieldValues() {
 }
 
 async function refreshFromBackend(showMessage = false) {
+  const syncToken = ++state.syncToken;
   state.loading = true;
-  const data = await apiGet({
-    action: 'init',
-    date: state.dateKey,
-  });
 
-  state.turmas = data.turmas || [];
-  state.alunos = data.alunos || [];
-  state.chamadasByTurma = data.callsByTurma || {};
-  state.resumoGeral = data.resumoGeral || null;
+  try {
+    const data = await apiGet({
+      action: 'init',
+      date: state.dateKey,
+    });
 
-  const storage = storageState();
-  const drafts = storage.drafts || {};
-  Object.values(state.chamadasByTurma).forEach((call) => {
-    if (!call) return;
-    if (!call.isSaved && drafts[call.chamadaId]) {
-      state.chamadasByTurma[call.turmaId] = restoreDraft(call);
+    if (syncToken !== state.syncToken) return;
+
+    const mergedRoster = {
+      turmas: mergeById(
+        state.turmas || [],
+        data.turmas || [],
+        'TurmaID',
+        rosterFingerprintTurma
+      ),
+      alunos: mergeById(
+        state.alunos || [],
+        data.alunos || [],
+        'AlunoID',
+        rosterFingerprintAluno
+      ),
+    };
+
+    state.turmas = mergedRoster.turmas;
+    state.alunos = mergedRoster.alunos;
+
+    const serverCalls = data.callsByTurma || {};
+    const drafts = storageState().drafts || {};
+    const nextCallsByTurma = {};
+
+    getTurmasSorted().forEach((turma) => {
+      const callId = callKey(state.dateKey, turma.TurmaID);
+      const serverCall = serverCalls[turma.TurmaID] || null;
+      const draft = drafts[callId] || null;
+
+      nextCallsByTurma[turma.TurmaID] = buildSyncedCall(turma, serverCall, draft);
+    });
+
+    state.chamadasByTurma = nextCallsByTurma;
+    state.resumoGeral = data.resumoGeral || null;
+
+    if (
+      !state.selectedTurmaId ||
+      !state.turmas.some((t) => String(t.TurmaID || '') === String(state.selectedTurmaId || ''))
+    ) {
+      state.selectedTurmaId = state.turmas[0]?.TurmaID || '';
     }
-  });
 
-  if (!state.selectedTurmaId || !state.turmas.some((t) => t.TurmaID === state.selectedTurmaId)) {
-    state.selectedTurmaId = state.turmas[0]?.TurmaID || '';
+    saveRosterCache();
+
+    if (showMessage) {
+      showSuccess('Dados atualizados.');
+    }
+
+    return data;
+  } finally {
+    if (syncToken === state.syncToken) {
+      state.loading = false;
+    }
   }
-
-  state.loading = false;
-  if (showMessage) showSuccess('Dados atualizados.');
 }
 
 function validateApiUrl() {
@@ -1035,27 +1072,35 @@ function normalizeCpfInput(event) {
 }
 
 async function bootstrap() {
+  const storage = storageState();
+  state.dateKey = storage.selectedDateKey || state.dateKey;
+  state.selectedTurmaId = storage.selectedTurmaId || '';
+
   els.dateInput.value = state.dateKey;
   els.showInactive.checked = true;
   els.searchInput.value = '';
 
-  const storage = storageState();
-  state.selectedTurmaId = storage.selectedTurmaId || '';
+  hydrateRosterFromCache();
+  renderAll();
 
   if (!validateApiUrl()) return;
 
-  showBusy('Carregando dados...');
-  await refreshFromBackend(false);
+  showBusy('Sincronizando dados com a planilha...');
 
-  if (!state.selectedTurmaId) {
-    state.selectedTurmaId = state.turmas[0]?.TurmaID || '';
+  try {
+    await refreshFromBackend(false);
+    renderAll();
+    clearFeedback();
+    showSuccess('Sistema pronto para uso.');
+  } catch (err) {
+    if (state.turmas.length || state.alunos.length) {
+      showSuccess('Dados locais carregados. A sincronização com a planilha falhou.');
+    } else {
+      showError(err.message || 'Falha ao carregar dados.');
+    }
   }
 
-  renderAll();
-  clearFeedback();
-
   state.initialized = true;
-  showSuccess('Sistema pronto para uso.');
 }
 
 els.dateInput.addEventListener('change', async (event) => {
