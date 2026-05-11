@@ -1111,35 +1111,33 @@ function normalizeCpfInput(event) {
 }
 
 async function bootstrap() {
-  const storage = storageState();
-  state.dateKey = storage.selectedDateKey || state.dateKey;
-  state.selectedTurmaId = storage.selectedTurmaId || '';
-
-  els.dateInput.value = state.dateKey;
-  els.showInactive.checked = true;
-  els.searchInput.value = '';
-
-  hydrateRosterFromCache();
-  renderAll();
-
-  if (!validateApiUrl()) return;
-
-  showBusy('Sincronizando dados com a planilha...');
+  ensureLoadingOverlay();
+  showLoading('Carregando dados...');
 
   try {
+    els.dateInput.value = state.dateKey;
+    els.showInactive.checked = true;
+    els.searchInput.value = '';
+
+    const storage = storageState();
+    state.selectedTurmaId = storage.selectedTurmaId || '';
+
+    if (!validateApiUrl()) return;
+
     await refreshFromBackend(false);
+
+    if (!state.selectedTurmaId) {
+      state.selectedTurmaId = state.turmas[0]?.TurmaID || '';
+    }
+
     renderAll();
     clearFeedback();
-    showSuccess('Sistema pronto para uso.');
-  } catch (err) {
-    if (state.turmas.length || state.alunos.length) {
-      showSuccess('Dados locais carregados. A sincronização com a planilha falhou.');
-    } else {
-      showError(err.message || 'Falha ao carregar dados.');
-    }
-  }
 
-  state.initialized = true;
+    state.initialized = true;
+    showSuccess('Sistema pronto para uso.');
+  } finally {
+    hideLoading();
+  }
 }
 
 els.dateInput.addEventListener('change', async (event) => {
