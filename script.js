@@ -810,22 +810,26 @@ async function sendReport(scope) {
     await saveCurrentCall({ silent: true });
   }
 
-  showBusy(scope === 'geral' ? 'Enviando relatório geral...' : 'Enviando relatório da turma...');
-  const result = await apiPost({
-    action: 'sendReport',
-    scope,
-    date: state.dateKey,
-    turmaId: turma ? turma.TurmaID : '',
-  });
+  showLoading(scope === 'geral' ? 'Enviando relatório geral...' : 'Enviando relatório da turma...');
+  try {
+    const result = await apiPost({
+      action: 'sendReport',
+      scope,
+      date: state.dateKey,
+      turmaId: turma ? turma.TurmaID : '',
+    });
 
-  if (result.text) {
-    if (scope === 'turma') els.turmaReport.value = result.text;
-    if (scope === 'geral') els.geralReport.value = result.text;
+    if (result.text) {
+      if (scope === 'turma') els.turmaReport.value = result.text;
+      if (scope === 'geral') els.geralReport.value = result.text;
+    }
+
+    showSuccess(result.message || 'Relatório enviado.');
+    await refreshFromBackend(false);
+    renderAll();
+  } finally {
+    hideLoading();
   }
-
-  showSuccess(result.message || 'Relatório enviado.');
-  await refreshFromBackend(false);
-  renderAll();
 }
 
 function moveStudent(alunoId) {
@@ -1199,3 +1203,4 @@ els.alunoForm.addEventListener('submit', (event) => {
 els.alunoCpf.addEventListener('input', normalizeCpfInput);
 
 document.addEventListener('DOMContentLoaded', bootstrap);
+
