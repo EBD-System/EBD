@@ -199,6 +199,10 @@ function getAlunosForTurma(turmaId) {
 
 function blankCallForTurma(turma) {
   const roster = getAlunosForTurma(turma.TurmaID);
+  const activeRoster = roster.filter((aluno) =>
+    String(aluno.Status || 'ativo').trim().toLowerCase() !== 'inativo'
+  );
+
   return {
     chamadaId: `${turma.TurmaID}_${state.dateKey}`,
     data: state.dateKey,
@@ -207,9 +211,9 @@ function blankCallForTurma(turma) {
     oferta: '',
     visitantes: 0,
     visitantesTexto: '',
-    totalAlunos: roster.length,
+    totalAlunos: activeRoster.length,
     presentes: 0,
-    ausentes: roster.length,
+    ausentes: activeRoster.length,
     percentual: 0,
     enviadoTelegram: false,
     telegramEnviadoEm: '',
@@ -223,7 +227,6 @@ function blankCallForTurma(turma) {
     isSaved: false,
   };
 }
-
 function restoreDraft(call) {
   const drafts = storageState().drafts || {};
   const draft = drafts[call.chamadaId];
@@ -294,12 +297,13 @@ function updateCallFromInputs() {
   call.oferta = document.getElementById('ofertaInput')?.value?.trim?.() ?? call.oferta;
 }
 
-function isInactiveStudent(row) {
-  return String(row?.statusAluno || '').trim().toLowerCase() === 'inativo';
+function isInactiveStudent(row, rosterMap = null) {
+  return studentStatusFromRow(row, rosterMap) === 'inativo';
 }
 
 function getActiveRows(call) {
-  return (call?.rows || []).filter((row) => !isInactiveStudent(row));
+  const rosterMap = currentStudentsMap();
+  return (call?.rows || []).filter((row) => !isInactiveStudent(row, rosterMap));
 }
 
 function computeLocalStats(call) {
@@ -333,6 +337,11 @@ function currentStudentsMap() {
     map[aluno.AlunoID] = aluno;
   });
   return map;
+}
+
+function studentStatusFromRow(row, rosterMap = null) {
+  const aluno = rosterMap && row?.alunoId ? rosterMap[row.alunoId] : null;
+  return String(aluno?.Status ?? row?.statusAluno ?? 'ativo').trim().toLowerCase();
 }
 
 function buildTurmaReportText() {
@@ -441,9 +450,11 @@ function renderSummary() {
 
   const turma = getCurrentTurma();
   const best = bestStudentForCurrentTurma();
-  const inactiveCount = getAlunosForTurma(call.turmaId).filter((a) => String(a.Status || '') === 'inativo').length;
-  const missingMuchCount = getAlunosForTurma(call.turmaId).filter((a) => String(a.FaltandoMuito || '') === 'sim').length;
-  const activeCount = getAlunosForTurma(call.turmaId).length - inactiveCount;
+  const activeCount = stats.total;
+  const inactiveCount = (call.rows || []).length - activeCount;
+  const missingMuchCount = getAlunosForTurma(call.turmaId).filter(
+    (a) => String(a.FaltandoMuito || '') === 'sim'
+  ).length;
 
   els.turmaMeta.textContent = [
     turma ? `Turma: ${turma.Nome}` : '',
