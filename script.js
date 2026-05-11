@@ -784,19 +784,23 @@ async function saveCurrentCall({ silent = false } = {}) {
     rowsJson: JSON.stringify(call.rows),
   };
 
-  if (!silent) showBusy('Salvando chamada...');
-  const result = await apiPost(payload);
+  if (!silent) showLoading('Salvando chamada...');
+  try {
+    const result = await apiPost(payload);
 
-  state.resumoGeral = result.resumoGeral || state.resumoGeral;
-  state.chamadasByTurma[turma.TurmaID] = result.turmaCall || call;
-  state.dirty = false;
-  clearDraft(call.chamadaId);
+    state.resumoGeral = result.resumoGeral || state.resumoGeral;
+    state.chamadasByTurma[turma.TurmaID] = result.turmaCall || call;
+    state.dirty = false;
+    clearDraft(call.chamadaId);
 
-  await refreshFromBackend(false);
-  state.selectedTurmaId = turma.TurmaID;
-  renderAll();
-  showSuccess(result.message || 'Chamada salva com sucesso.');
-  return result;
+    await refreshFromBackend(false);
+    state.selectedTurmaId = turma.TurmaID;
+    renderAll();
+    showSuccess(result.message || 'Chamada salva com sucesso.');
+    return result;
+  } finally {
+    if (!silent) hideLoading();
+  }
 }
 
 async function sendReport(scope) {
@@ -1032,8 +1036,8 @@ function bindCallFieldValues() {
 }
 
 async function refreshFromBackend(showMessage = false) {
-  const syncToken = ++state.syncToken;
   state.loading = true;
+  showLoading('Carregando dados...');
 
   try {
     const data = await apiGet({
@@ -1041,59 +1045,28 @@ async function refreshFromBackend(showMessage = false) {
       date: state.dateKey,
     });
 
-    if (syncToken !== state.syncToken) return;
-
-    const mergedRoster = {
-      turmas: mergeById(
-        state.turmas || [],
-        data.turmas || [],
-        'TurmaID',
-        rosterFingerprintTurma
-      ),
-      alunos: mergeById(
-        state.alunos || [],
-        data.alunos || [],
-        'AlunoID',
-        rosterFingerprintAluno
-      ),
-    };
-
-    state.turmas = mergedRoster.turmas;
-    state.alunos = mergedRoster.alunos;
-
-    const serverCalls = data.callsByTurma || {};
-    const drafts = storageState().drafts || {};
-    const nextCallsByTurma = {};
-
-    getTurmasSorted().forEach((turma) => {
-      const callId = callKey(state.dateKey, turma.TurmaID);
-      const serverCall = serverCalls[turma.TurmaID] || null;
-      const draft = drafts[callId] || null;
-
-      nextCallsByTurma[turma.TurmaID] = buildSyncedCall(turma, serverCall, draft);
-    });
-
-    state.chamadasByTurma = nextCallsByTurma;
+    state.turmas = data.turmas || [];
+    state.alunos = data.alunos || [];
+    state.chamadasByTurma = data.callsByTurma || {};
     state.resumoGeral = data.resumoGeral || null;
 
-    if (
-      !state.selectedTurmaId ||
-      !state.turmas.some((t) => String(t.TurmaID || '') === String(state.selectedTurmaId || ''))
-    ) {
+    const storage = storageState();
+    const drafts = storage.drafts || {};
+    Object.values(state.chamadasByTurma).forEach((call) => {
+      if (!call) return;
+      if (!call.isSaved && drafts[call.chamadaId]) {
+        state.chamadasByTurma[call.turmaId] = restoreDraft(call);
+      }
+    });
+
+    if (!state.selectedTurmaId || !state.turmas.some((t) => t.TurmaID === state.selectedTurmaId)) {
       state.selectedTurmaId = state.turmas[0]?.TurmaID || '';
     }
 
-    saveRosterCache();
-
-    if (showMessage) {
-      showSuccess('Dados atualizados.');
-    }
-
-    return data;
+    if (showMessage) showSuccess('Dados atualizados.');
   } finally {
-    if (syncToken === state.syncToken) {
-      state.loading = false;
-    }
+    state.loading = false;
+    hideLoading();
   }
 }
 
