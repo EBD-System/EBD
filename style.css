@@ -375,12 +375,12 @@ body.access-restricted .student__actions{
   border:1px solid transparent;
 }
 .badge-pill--active{
-  color: #1f8f4a;
+  color: #0f7a35;
   background: rgba(31, 143, 74, 0.12);
   border-color: rgba(31, 143, 74, 0.25);
 }
 .badge-pill--inactive{
-  color: #c62828;
+  color: #b00020;
   background: rgba(198, 40, 40, 0.12);
   border-color: rgba(198, 40, 40, 0.25);
 }
