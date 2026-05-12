@@ -143,6 +143,41 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+
+
+function normalizePresenceValue(value) {
+  const v = String(value || '').trim().toLowerCase();
+  if (['atrasado', 'atrasada', 'late', 'delay'].includes(v)) return 'atrasado';
+  if (['sim', 'presente', '1', 'p', 'true'].includes(v)) return 'sim';
+  return 'nao';
+}
+
+function isPresentLikeValue(value) {
+  return normalizePresenceValue(value) !== 'nao';
+}
+
+function isDelayedValue(value) {
+  return normalizePresenceValue(value) === 'atrasado';
+}
+
+function syncRowPresenceFields(row = {}) {
+  const delay = isDelayedValue(row.presenca) || normalizeBoolValue(row.atraso);
+  const presence = delay ? 'atrasado' : normalizePresenceValue(row.presenca);
+  row.presenca = presence;
+  row.atraso = delay;
+  return row;
+}
+
+function normalizeBoolValue(value) {
+  const v = String(value || '').toLowerCase().trim();
+  return v === 'sim' || v === 'true' || v === '1' || v === 'yes' || v === 'y';
+}
+
+function buildWhatsAppEditUrl(alunoNome, turmaNome) {
+  const phone = '5571981768164';
+  const message = `gostaria de editar o aluno ${String(alunoNome || '').trim()}, da classe ${String(turmaNome || '').trim()}.`;
+  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+}
 function setFeedback(type, message) {
   els.feedback.className = `feedback show ${type}`;
   els.feedback.textContent = message;
@@ -288,13 +323,14 @@ function mergeById(prevList = [], nextList = [], idField, fingerprintFn = null) 
 }
 
 function buildStudentRowFromAluno(aluno) {
-  return {
+  return syncRowPresenceFields({
     alunoId: aluno.AlunoID,
     nome: aluno.Nome,
     presenca: 'nao',
+    atraso: false,
     observacao: '',
     statusAluno: aluno.Status || 'ativo',
-  };
+  });
 }
 
 function buildSyncedCall(turma, serverCall = null, draft = null) {
@@ -314,11 +350,11 @@ function buildSyncedCall(turma, serverCall = null, draft = null) {
     const serverRow = serverRowsMap.get(String(aluno.AlunoID || '')) || null;
     const draftRow = draftRowsMap.get(String(aluno.AlunoID || '')) || null;
 
-    const merged = {
+    const merged = syncRowPresenceFields({
       ...base,
       ...(serverRow || {}),
       ...(draftRow || {}),
-    };
+    });
 
     merged.alunoId = base.alunoId;
     merged.nome = draftRow?.nome ?? serverRow?.nome ?? base.nome;
@@ -326,6 +362,10 @@ function buildSyncedCall(turma, serverCall = null, draft = null) {
 
     return merged;
   });
+
+  const presentCount = rows.filter((r) => isPresentLikeValue(r.presenca)).length;
+  const delayCount = rows.filter((r) => isDelayedValue(r.presenca)).length;
+  const absentCount = rows.length - presentCount;
 
   return {
     chamadaId: serverCall?.chamadaId || callKey(state.dateKey, turma.TurmaID),
@@ -336,9 +376,10 @@ function buildSyncedCall(turma, serverCall = null, draft = null) {
     visitantes: Number(draft?.visitantes ?? serverCall?.visitantes ?? 0) || 0,
     visitantesTexto: draft?.visitantesTexto ?? serverCall?.visitantesTexto ?? '',
     totalAlunos: rows.length,
-    presentes: serverCall?.presentes ?? 0,
-    ausentes: serverCall?.ausentes ?? rows.length,
-    percentual: serverCall?.percentual ?? 0,
+    presentes: presentCount,
+    atrasos: delayCount,
+    ausentes: absentCount,
+    percentual: rows.length ? (presentCount / rows.length) * 100 : 0,
     enviadoTelegram: !!serverCall?.enviadoTelegram,
     telegramEnviadoEm: serverCall?.telegramEnviadoEm || '',
     rows,
@@ -400,14 +441,16 @@ function blankCallForTurma(turma) {
     visitantesTexto: '',
     totalAlunos: activeRoster.length,
     presentes: 0,
+    atrasos: 0,
     ausentes: activeRoster.length,
     percentual: 0,
     enviadoTelegram: false,
     telegramEnviadoEm: '',
-    rows: roster.map((aluno) => ({
+    rows: roster.map((aluno) => syncRowPresenceFields({
       alunoId: aluno.AlunoID,
       nome: aluno.Nome,
       presenca: 'nao',
+      atraso: false,
       observacao: '',
       statusAluno: aluno.Status || 'ativo',
     })),
@@ -423,7 +466,7 @@ function restoreDraft(call) {
     oferta: draft.oferta ?? call.oferta,
     visitantes: draft.visitantes ?? call.visitantes,
     visitantesTexto: draft.visitantesTexto ?? call.visitantesTexto,
-    rows: Array.isArray(draft.rows) ? draft.rows : call.rows,
+    rows: Array.isArray(draft.rows) ? draft.rows.map((row) => syncRowPresenceFields({ ...row })) : call.rows,
     isSaved: !!draft.isSaved ? call.isSaved : call.isSaved,
   };
 }
@@ -435,10 +478,11 @@ function persistDraft(call) {
     oferta: call.oferta,
     visitantes: call.visitantes,
     visitantesTexto: call.visitantesTexto || '',
-    rows: call.rows.map((row) => ({
+    rows: call.rows.map((row) => syncRowPresenceFields({
       alunoId: row.alunoId,
       nome: row.nome,
       presenca: row.presenca,
+      atraso: row.atraso,
       observacao: row.observacao || '',
       statusAluno: row.statusAluno || '',
     })),
@@ -496,11 +540,12 @@ function getActiveRows(call) {
 function computeLocalStats(call) {
   const activeRows = getActiveRows(call);
   const total = activeRows.length;
-  const presentes = activeRows.filter((r) => r.presenca === 'sim').length;
+  const presentes = activeRows.filter((r) => isPresentLikeValue(r.presenca)).length;
+  const atrasos = activeRows.filter((r) => isDelayedValue(r.presenca)).length;
   const ausentes = total - presentes;
   const percentual = total ? (presentes / total) * 100 : 0;
 
-  return { total, presentes, ausentes, percentual };
+  return { total, presentes, atrasos, ausentes, percentual };
 }
 
 function bestStudentForCurrentTurma() {
@@ -537,8 +582,9 @@ function buildTurmaReportText() {
   if (!call || !turma) return 'Nenhuma turma selecionada.';
   const stats = computeLocalStats(call);
   const best = bestStudentForCurrentTurma();
-  const presentNames = getActiveRows(call).filter((r) => r.presenca === 'sim').map((r) => r.nome).join(', ') || 'nenhum';
-  const absentNames = getActiveRows(call).filter((r) => r.presenca !== 'sim').map((r) => r.nome).join(', ') || 'nenhum';
+  const presentNames = getActiveRows(call).filter((r) => isPresentLikeValue(r.presenca)).map((r) => r.nome).join(', ') || 'nenhum';
+  const delayedNames = getActiveRows(call).filter((r) => isDelayedValue(r.presenca)).map((r) => r.nome).join(', ') || 'nenhum';
+  const absentNames = getActiveRows(call).filter((r) => !isPresentLikeValue(r.presenca)).map((r) => r.nome).join(', ') || 'nenhum';
   const inactiveNames = getAlunosForTurma(turma.TurmaID).filter((a) => String(a.Status || '') === 'inativo').map((a) => a.Nome).join(', ') || 'nenhum';
   const faltandoMuito = getAlunosForTurma(turma.TurmaID).filter((a) => String(a.FaltandoMuito || '') === 'sim').map((a) => a.Nome).join(', ') || 'nenhum';
 
@@ -549,6 +595,7 @@ function buildTurmaReportText() {
     '',
     `Total de alunos: ${stats.total}`,
     `Presentes: ${stats.presentes}`,
+    `Atrasados: ${stats.atrasos}`,
     `Ausentes: ${stats.ausentes}`,
     `Presença: ${formatPercent(stats.percentual)}`,
     `Oferta da classe: ${call.oferta || '-'}`,
@@ -560,10 +607,10 @@ function buildTurmaReportText() {
     `Faltando muito: ${faltandoMuito}`,
     '',
     `Presentes: ${presentNames}`,
+    `Atrasados: ${delayedNames}`,
     `Ausentes: ${absentNames}`,
   ].filter(Boolean).join('\n');
 }
-
 function buildGeneralReportText() {
   const geral = state.resumoGeral;
   if (!geral) return 'Sem dados gerais carregados.';
@@ -574,6 +621,7 @@ function buildGeneralReportText() {
     `Turmas salvas: ${geral.turmasSalvas}/${geral.totalTurmas}`,
     `Total de alunos: ${geral.totalAlunos}`,
     `Presentes: ${geral.presentes}`,
+    `Atrasados: ${geral.atrasos || 0}`,
     `Ausentes: ${geral.ausentes}`,
     `Presença geral: ${formatPercent(geral.percentual)}`,
     `Oferta total: ${formatMoney(geral.ofertaTotal)}`,
@@ -594,7 +642,6 @@ function buildGeneralReportText() {
 
   return lines.join('\n');
 }
-
 function formatDateBR(dateKey) {
   const [y, m, d] = String(dateKey || todayKey()).split('-');
   return `${d}/${m}/${y}`;
@@ -647,12 +694,12 @@ function renderSummary() {
     turma ? `Turma: ${turma.Nome}` : '',
     `Ativos: ${activeCount}`,
     `Inativos: ${inactiveCount}`,
+    `Atrasos: ${stats.atrasos}`,
     `Faltando muito: ${missingMuchCount}`,
     best ? `Melhor aluno: ${best.Nome} (${formatPercent(best.Percentual)})` : 'Melhor aluno: —',
     call.isSaved ? 'Chamada salva no dia.' : 'Chamada ainda não salva.',
   ].filter(Boolean).join(' • ');
 }
-
 function renderReports() {
   els.turmaReport.value = buildTurmaReportText();
   els.geralReport.value = buildGeneralReportText();
@@ -690,6 +737,8 @@ function renderStudents() {
     const isInactive = String(aluno.Status || row.statusAluno || '') === 'inativo';
     const isFaltandoMuito = String(aluno.FaltandoMuito || '') === 'sim';
     const isReativado = String(aluno.Reativado || '') === 'sim';
+    const presence = normalizePresenceValue(row.presenca);
+    const isDelayed = presence === 'atrasado';
 
     article.dataset.alunoId = row.alunoId;
     article.classList.toggle('is-inactive', isInactive);
@@ -698,6 +747,7 @@ function renderStudents() {
     const badges = clone.querySelector('.student-badges');
     badges.innerHTML = [
       `<span class="badge-pill ${isInactive ? 'badge-pill--inactive' : 'badge-pill--active'}">${isInactive ? 'Inativo' : 'Ativo'}</span>`,
+      isDelayed ? '<span class="badge-pill badge-pill--warn">Atrasado(a)</span>' : '',
       isFaltandoMuito ? '<span class="badge-pill badge-pill--warn">Faltando muito</span>' : '',
       isReativado ? '<span class="badge-pill badge-pill--info">Reativado</span>' : '',
       aluno.RealocadoDe ? `<span class="badge-pill badge-pill--info">Veio de ${escapeHtml(aluno.RealocadoDe)}</span>` : '',
@@ -713,16 +763,20 @@ function renderStudents() {
 
     const presentBtn = clone.querySelector('[data-action="present"]');
     const absentBtn = clone.querySelector('[data-action="absent"]');
-    const moveBtn = clone.querySelector('[data-action="move"]');
+    const delayBtn = clone.querySelector('[data-action="delay"]');
+    const editBtn = clone.querySelector('[data-action="edit"]');
     const toggleBtn = clone.querySelector('[data-action="toggle"]');
     const noteInput = clone.querySelector('.student-observacao');
 
-    presentBtn.classList.toggle('is-selected-present', row.presenca === 'sim');
-    absentBtn.classList.toggle('is-selected-absent', row.presenca !== 'sim');
+    presentBtn.classList.toggle('is-selected-present', presence === 'sim');
+    absentBtn.classList.toggle('is-selected-absent', presence === 'nao');
+    delayBtn.classList.toggle('is-selected-delay', presence === 'atrasado');
+    toggleBtn.textContent = isInactive ? 'Ativar' : 'Inativar';
 
     presentBtn.addEventListener('click', () => setStudentPresence(row.alunoId, 'sim'));
     absentBtn.addEventListener('click', () => setStudentPresence(row.alunoId, 'nao'));
-    moveBtn.addEventListener('click', () => moveStudent(row.alunoId));
+    delayBtn.addEventListener('click', () => setStudentPresence(row.alunoId, 'atrasado'));
+    editBtn.addEventListener('click', () => editStudentOnWhatsApp(row.alunoId));
     toggleBtn.addEventListener('click', () => toggleStudentStatus(row.alunoId));
 
     noteInput.value = row.observacao || '';
@@ -734,7 +788,6 @@ function renderStudents() {
     els.studentsList.appendChild(clone);
   });
 }
-
 function markDirty() {
   const call = getCurrentCall();
   if (!call) return;
@@ -748,24 +801,24 @@ function setStudentPresence(alunoId, presence) {
   if (!call) return;
   const row = call.rows.find((r) => r.alunoId === alunoId);
   if (!row) return;
-  row.presenca = presence === 'sim' ? 'sim' : 'nao';
+  row.presenca = normalizePresenceValue(presence);
+  row.atraso = row.presenca === 'atrasado';
   state.dirty = true;
   persistDraft(call);
   renderAll();
 }
-
 function setAllPresence(presence) {
   const call = getCurrentCall();
   if (!call) return;
   call.rows.forEach((row) => {
     if (isInactiveStudent(row)) return;
-    row.presenca = presence === 'sim' ? 'sim' : 'nao';
+    row.presenca = normalizePresenceValue(presence);
+    row.atraso = row.presenca === 'atrasado';
   });
   state.dirty = true;
   persistDraft(call);
   renderAll();
 }
-
 async function saveCurrentCall({ silent = false } = {}) {
   const turma = getCurrentTurma();
   const call = getCurrentCall();
@@ -883,6 +936,18 @@ function toggleStudentStatus(alunoId) {
     .catch((err) => showError(err.message || 'Falha ao atualizar status.'));
 }
 
+function editStudentOnWhatsApp(alunoId) {
+  const call = getCurrentCall();
+  const row = call?.rows?.find((item) => item.alunoId === alunoId);
+  const turma = getCurrentTurma();
+  if (!row || !turma) {
+    showError('Não foi possível montar a mensagem de edição.');
+    return;
+  }
+
+  const url = buildWhatsAppEditUrl(row.nome, turma.Nome);
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
 async function addTurma(event) {
   event.preventDefault();
   const nome = els.turmaNome.value.trim();
@@ -950,6 +1015,7 @@ function clearCurrentCall() {
   if (!ok) return;
   call.rows.forEach((row) => {
     row.presenca = 'nao';
+    row.atraso = false;
     row.observacao = '';
   });
   call.oferta = '';
@@ -959,7 +1025,6 @@ function clearCurrentCall() {
   persistDraft(call);
   renderAll();
 }
-
 async function saveAndAdvance() {
   const currentIndex = getTurmasSorted().findIndex((t) => t.TurmaID === state.selectedTurmaId);
   await saveCurrentCall();

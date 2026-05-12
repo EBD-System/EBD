@@ -134,8 +134,9 @@ function saveCall_(p) {
 
   const normalizedRows = roster.map(aluno => {
     const payload = byAlunoId[aluno.AlunoID] || {};
-    const presenca = normalizePresence_(payload.presenca ?? payload.PRESENCA ?? payload.presencaStatus);
-    const atraso = normalizeBool_(payload.atraso ?? payload.atraso ?? payload.Atraso);
+    const presencaRaw = normalizePresence_(payload.presenca ?? payload.PRESENCA ?? payload.presencaStatus);
+    const atraso = normalizeBool_(payload.atraso ?? payload.Atraso) || String(payload.presenca || '').toLowerCase().trim() === 'atrasado';
+    const presenca = atraso ? 'nao' : presencaRaw;
     return {
       alunoId: aluno.AlunoID,
       nome: aluno.Nome,
@@ -148,7 +149,7 @@ function saveCall_(p) {
     };
   });
 
-  const presentes = normalizedRows.filter(r => r.presenca === 'sim').length;
+  const presentes = normalizedRows.filter(r => isPresenceLikeRow_(r)).length;
   const ausentes = normalizedRows.length - presentes;
   const percentual = normalizedRows.length ? round1_((presentes / normalizedRows.length) * 100) : 0;
 
@@ -443,7 +444,8 @@ function buildTurmaReportText_(dateKey, turma, turmaCall, all) {
   lines.push(`Turma: ${turma.Nome}`);
   const activeRows = getActiveCallRows_(turmaCall.rows);
   const totalAtivos = activeRows.length;
-  const presentesAtivos = activeRows.filter(r => r.presenca === 'sim').length;
+  const presentesAtivos = activeRows.filter(r => isPresenceLikeRow_(r)).length;
+  const atrasosAtivos = activeRows.filter(r => isDelayedRow_(r)).length;
   const ausentesAtivos = totalAtivos - presentesAtivos;
   const percentualAtivos = totalAtivos ? round1_((presentesAtivos / totalAtivos) * 100) : 0;
 
@@ -460,10 +462,12 @@ function buildTurmaReportText_(dateKey, turma, turmaCall, all) {
   if (stats.mostAbsent) lines.push(`Mais faltas: ${stats.mostAbsent.Nome} (${stats.mostAbsent.TotalFaltas})`);
   if (stats.inactiveCount) lines.push(`Inativos: ${stats.inactiveCount}`);
 
-  const presentNames = activeRows.filter(r => r.presenca === 'sim').map(r => r.nome);
-  const absentNames = activeRows.filter(r => r.presenca !== 'sim').map(r => r.nome);
+  const presentNames = activeRows.filter(r => isPresenceLikeRow_(r)).map(r => r.nome);
+  const delayedNames = activeRows.filter(r => isDelayedRow_(r)).map(r => r.nome);
+  const absentNames = activeRows.filter(r => !isPresenceLikeRow_(r)).map(r => r.nome);
   if (presentNames.length) lines.push('');
   if (presentNames.length) lines.push(`Presentes: ${presentNames.join(', ')}`);
+  if (delayedNames.length) lines.push(`Atrasados: ${delayedNames.join(', ')}`);
   if (absentNames.length) lines.push(`Ausentes: ${absentNames.join(', ')}`);
 
   return lines.join('\n');
@@ -488,9 +492,10 @@ function buildGeneralReportText_(dateKey, geral, callsByTurma, all) {
     const call = callsByTurma[turma.TurmaID];
     const activeRows = getActiveCallRows_(call.rows);
     const totalAtivos = activeRows.length;
-    const presentesAtivos = activeRows.filter(r => r.presenca === 'sim').length;
+    const presentesAtivos = activeRows.filter(r => isPresenceLikeRow_(r)).length;
+    const atrasosAtivos = activeRows.filter(r => isDelayedRow_(r)).length;
     const percentualAtivos = totalAtivos ? round1_((presentesAtivos / totalAtivos) * 100) : 0;
-    lines.push(`• ${turma.Nome}: ${presentesAtivos}/${totalAtivos} presentes (${formatPercent_(percentualAtivos)})`);
+    lines.push(`• ${turma.Nome}: ${presentesAtivos}/${totalAtivos} presentes (${formatPercent_(percentualAtivos)}) | atrasos ${atrasosAtivos}`);
   });
 
   const top = getTopStudentsOverall_(all);
@@ -508,7 +513,8 @@ function buildGeneralReportText_(dateKey, geral, callsByTurma, all) {
 function buildDailyGeneralSummary_(dateKey, all, callsByTurma) {
   const calls = Object.values(callsByTurma || {});
   const totalAlunos = calls.reduce((sum, c) => sum + getActiveCallRows_(c.rows).length, 0);
-  const presentes = calls.reduce((sum, c) => sum + getActiveCallRows_(c.rows).filter(r => r.presenca === 'sim').length, 0);
+  const presentes = calls.reduce((sum, c) => sum + getActiveCallRows_(c.rows).filter(r => isPresenceLikeRow_(r)).length, 0);
+  const atrasos = calls.reduce((sum, c) => sum + getActiveCallRows_(c.rows).filter(r => isDelayedRow_(r)).length, 0);
   const ausentes = totalAlunos - presentes;
   const ofertaTotal = calls.reduce((sum, c) => sum + parseMoney_(c.oferta), 0);
   const visitantesTotal = calls.reduce((sum, c) => sum + Number(c.visitantes || 0), 0);
@@ -521,6 +527,7 @@ function buildDailyGeneralSummary_(dateKey, all, callsByTurma) {
     presentes,
     ausentes,
     percentual,
+    atrasos,
     ofertaTotal,
     visitantesTotal,
   };
@@ -570,18 +577,21 @@ function buildCallsByTurmaForDate_(dateKey, all) {
     const rows = turmaRoster.map(aluno => {
       const key = String(aluno.AlunoID || aluno.Nome || '').trim();
       const found = savedMap[key] || savedMap[normalizeKey_(aluno.Nome)] || {};
+      const atraso = normalizeBool_(found.atraso || found.Atraso);
+      const presenca = atraso ? 'atrasado' : normalizePresence_(found.presenca || found.Presenca || found.PRESENCA || (found.ausencia ? 'nao' : 'nao'));
       return {
         alunoId: aluno.AlunoID,
         nome: aluno.Nome,
-        presenca: normalizePresence_(found.presenca || found.Presenca || found.PRESENCA || (found.ausencia ? 'nao' : 'nao')),
-        atraso: normalizeBool_(found.atraso || found.Atraso),
+        presenca,
+        atraso,
         observacao: String(found.observacao || found.Observacao || '').trim(),
         statusAluno: String(aluno.Status || 'ativo').trim(),
       };
     });
 
     const callMeta = findCallMeta_(turma.TurmaID, dateKey);
-    const presentes = rows.filter(r => r.presenca === 'sim').length;
+    const presentes = rows.filter(r => isPresenceLikeRow_(r)).length;
+    const atrasos = rows.filter(r => isDelayedRow_(r)).length;
     const ausentes = rows.length - presentes;
     const percentual = rows.length ? round1_((presentes / rows.length) * 100) : 0;
 
@@ -595,6 +605,7 @@ function buildCallsByTurmaForDate_(dateKey, all) {
       visitantesTexto: callMeta?.VisitantesTexto || '',
       totalAlunos: rows.length,
       presentes,
+      atrasos,
       ausentes,
       percentual,
       enviadoTelegram: normalizeBool_(callMeta?.EnviadoTelegram),
@@ -617,6 +628,7 @@ function buildCallsByTurmaForDate_(dateKey, all) {
         visitantesTexto: '',
         totalAlunos: 0,
         presentes: 0,
+        atrasos: 0,
         ausentes: 0,
         percentual: 0,
         enviadoTelegram: false,
@@ -920,7 +932,7 @@ function recalculateAndPersistStudentStats_() {
     let ultimaAusencia = '';
 
     studentRows.forEach(item => {
-      if (normalizePresence_(item.presenca) === 'sim') {
+      if (isPresenceLikeRow_(item)) {
         totalPresencas++;
         faltasConsecutivas = 0;
         ultimaPresenca = item.dateKey;
@@ -1040,6 +1052,8 @@ function getBaseRowsAll_() {
     if (!aluno || !classe) continue;
 
     const turmaId = buildTurmaId_(classe);
+    const atraso = normalizeBool_(row[idx.ATRASO]);
+    const presenca = atraso ? 'atrasado' : normalizePresence_(row[idx.PRESENCA]);
     result.push({
       dateKey: normalizeDateFromBaseCell_(row[idx.DATA]),
       ano: row[idx.ANO],
@@ -1047,8 +1061,8 @@ function getBaseRowsAll_() {
       nome: aluno,
       turmaId,
       turmaNome: classe,
-      presenca: normalizePresence_(row[idx.PRESENCA]),
-      atraso: normalizeBool_(row[idx.ATRASO]),
+      presenca,
+      atraso,
       ausencia: normalizeBool_(row[idx.AUSENCIA]),
       oferta: row[idx.OFERTA] || '',
       alunoId: buildStudentId_(aluno, turmaId, ''),
@@ -1416,6 +1430,16 @@ function indexByHeader_(headers) {
   return idx;
 }
 
+
+
+function isDelayedRow_(row) {
+  return String(row?.presenca || '').toLowerCase().trim() === 'atrasado' || normalizeBool_(row?.atraso);
+}
+
+function isPresenceLikeRow_(row) {
+  const presenca = String(row?.presenca || '').toLowerCase().trim();
+  return presenca === 'sim' || presenca === 'atrasado' || normalizeBool_(row?.atraso);
+}
 function normalizePresence_(value) {
   const v = String(value || '').toLowerCase().trim();
   return (v === 'sim' || v === 'presente' || v === '1' || v === 'p' || v === 'true') ? 'sim' : 'nao';

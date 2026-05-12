@@ -440,6 +440,11 @@ textarea:focus{
   background:rgba(194,64,64,.10);
   border:1px solid rgba(194,64,64,.20);
 }
+.btn--delay{
+  color:#8c4fb9;
+  background:rgba(140,79,185,.10);
+  border:1px solid rgba(140,79,185,.20);
+}
 .btn.is-selected-present{
   background:linear-gradient(135deg, #2bc67a, #1c9d5a);
   color:#fff;
@@ -447,6 +452,13 @@ textarea:focus{
 .btn.is-selected-absent{
   background:linear-gradient(135deg, #d85b5b, #b83737);
   color:#fff;
+}
+.btn.is-selected-delay{
+  background:linear-gradient(135deg, #9f5be0, #7a33b2);
+  color:#fff;
+}
+.btn--wide{
+  grid-column:1 / -1;
 }
 .feedback{
   display:none;
