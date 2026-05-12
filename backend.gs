@@ -178,7 +178,7 @@ function saveCall_(p) {
     false
   );
 
-  recalculateAndPersistStudentStats_();
+  recalculateAndPersistStudentStats_(); // PESADO
 
   const allAfter = loadAllData_();
   const callsByTurma = buildCallsByTurmaForDate_(dateKey, allAfter);
