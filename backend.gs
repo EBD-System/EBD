@@ -152,11 +152,17 @@ function saveCall_(p) {
   const ausentes = normalizedRows.length - presentes;
   const percentual = normalizedRows.length ? round1_((presentes / normalizedRows.length) * 100) : 0;
 
-  replaceBaseRowsForCall_(dateKey, turma.TurmaID, normalizedRows, {
+  replaceBaseRowsForCall_(
+  dateKey,
+  turma.TurmaID,
+  turma.Nome,
+  normalizedRows,
+  {
     oferta,
     visitantes,
     visitantesTexto,
-  });
+  }
+);
 
   upsertCallMeta_(
     chamadaId,
