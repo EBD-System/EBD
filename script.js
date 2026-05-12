@@ -785,10 +785,10 @@ function renderStudents() {
     article.dataset.alunoId = row.alunoId;
     article.classList.toggle('is-inactive', isInactive);
 
-    clone.querySelector('.student-name').textContent = row.nome;
+    const statusLabel = isInactive ? 'Inativo' : 'Ativo';
+    clone.querySelector('.student-name').textContent = `${statusLabel} - ${row.nome}`;
     const badges = clone.querySelector('.student-badges');
     badges.innerHTML = [
-      `<span class="badge-pill ${isInactive ? 'badge-pill--inactive' : 'badge-pill--active'}">${isInactive ? 'Inativo' : 'Ativo'}</span>`,
       isDelayed ? '<span class="badge-pill badge-pill--warn">Atrasado(a)</span>' : '',
       isFaltandoMuito ? '<span class="badge-pill badge-pill--warn">Faltando muito</span>' : '',
       isReativado ? '<span class="badge-pill badge-pill--info">Reativado</span>' : '',
@@ -887,10 +887,15 @@ async function saveCurrentCall({ silent = false } = {}) {
     state.chamadasByTurma[turma.TurmaID] = result.turmaCall || call;
     state.dirty = false;
     clearDraft(call.chamadaId);
-
-    await refreshFromBackend(false);
     state.selectedTurmaId = turma.TurmaID;
     renderAll();
+
+    // Recarrega os dados em segundo plano para manter o estado sincronizado,
+    // sem prender a interface caso a leitura demore ou falhe.
+    refreshFromBackend(false, { silent: true }).catch((err) => {
+      console.warn('Falha ao atualizar dados após salvar:', err);
+    });
+
     showSuccess(result.message || 'Chamada salva com sucesso.');
     return result;
   } finally {
@@ -1174,9 +1179,9 @@ function bindCallFieldValues() {
   }
 }
 
-async function refreshFromBackend(showMessage = false) {
+async function refreshFromBackend(showMessage = false, { silent = false } = {}) {
   state.loading = true;
-  showLoading('Carregando dados...');
+  if (!silent) showLoading('Carregando dados...');
 
   try {
     const data = await apiGet({
@@ -1205,7 +1210,7 @@ async function refreshFromBackend(showMessage = false) {
     if (showMessage) showSuccess('Dados atualizados.');
   } finally {
     state.loading = false;
-    hideLoading();
+    if (!silent) hideLoading();
   }
 }
 
