@@ -959,9 +959,13 @@ function recalculateAndPersistStudentStats_() {
 
 function replaceBaseRowsForCall_(dateKey, turmaId, turmaNome, normalizedRows, extra) {
 
-  Logger.log('INICIANDO SALVAMENTO SIMPLES');
+  Logger.log('INICIANDO SALVAMENTO');
+
+  Logger.log('SPREADSHEET_ID: ' + SPREADSHEET_ID);
 
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+  Logger.log('PLANILHA ABERTA: ' + ss.getName());
 
   const sheet = getOrCreateSheet_(
     ss,
@@ -970,8 +974,12 @@ function replaceBaseRowsForCall_(dateKey, turmaId, turmaNome, normalizedRows, ex
     false
   );
 
+  Logger.log('ABA ENCONTRADA: ' + sheet.getName());
+
+  Logger.log('ÚLTIMA LINHA ANTES: ' + sheet.getLastRow());
+
   if (!normalizedRows || !normalizedRows.length) {
-    Logger.log('SEM LINHAS PARA SALVAR');
+    Logger.log('SEM LINHAS');
     return;
   }
 
@@ -993,11 +1001,16 @@ function replaceBaseRowsForCall_(dateKey, turmaId, turmaNome, normalizedRows, ex
     extra?.oferta || 'R$ 0,00',
   ]));
 
-  Logger.log(`ADICIONANDO ${rowsToAppend.length} LINHAS`);
+  Logger.log('LINHAS PARA INSERIR:');
+  Logger.log(JSON.stringify(rowsToAppend, null, 2));
+
+  const startRow = sheet.getLastRow() + 1;
+
+  Logger.log('START ROW: ' + startRow);
 
   sheet
     .getRange(
-      sheet.getLastRow() + 1,
+      startRow,
       1,
       rowsToAppend.length,
       rowsToAppend[0].length
@@ -1006,9 +1019,10 @@ function replaceBaseRowsForCall_(dateKey, turmaId, turmaNome, normalizedRows, ex
 
   SpreadsheetApp.flush();
 
+  Logger.log('ÚLTIMA LINHA DEPOIS: ' + sheet.getLastRow());
+
   Logger.log('SALVAMENTO FINALIZADO');
 }
-
 function getBaseRowsAll_() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName(BASE_SHEET_NAME);
