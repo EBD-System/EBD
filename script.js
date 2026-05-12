@@ -17,7 +17,6 @@ const state = {
   showInactive: true,
   dirty: false,
   initialized: false,
-  accessMode: 'full',
 };
 
 const els = {
@@ -57,10 +56,6 @@ const els = {
   studentTemplate: document.getElementById('studentTemplate'),
   turmaReport: document.getElementById('turmaReport'),
   geralReport: document.getElementById('geralReport'),
-  callPanel: document.getElementById('callPanel'),
-  reportPanel: document.getElementById('reportPanel'),
-  cadastroPanel: document.getElementById('cadastroPanel'),
-  actionsPanel: document.getElementById('actionsPanel'),
 };
 
 let loadingCount = 0;
@@ -148,35 +143,6 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
-function getUrlCode() {
-  try {
-    return new URLSearchParams(window.location.search).get('code');
-  } catch (err) {
-    return null;
-  }
-}
-
-function normalizeAccessCode(value) {
-  return String(value || '').trim().toLowerCase();
-}
-
-function resolveAccessMode() {
-  const code = normalizeAccessCode(getUrlCode());
-  const fullCodes = new Set(['50292230']);
-  const restrictedCodes = new Set(['ninha', 'professor1', 'professor2']);
-  if (fullCodes.has(code)) return 'full';
-  if (restrictedCodes.has(code)) return 'restricted';
-  return 'restricted';
-}
-
-function isRestrictedMode() {
-  return state.accessMode === 'restricted';
-}
-
-function setVisible(el, visible) {
-  if (!el) return;
-  el.hidden = !visible;
-}
 
 
 function normalizePresenceValue(value) {
@@ -614,7 +580,6 @@ function buildTurmaReportText() {
   const call = getCurrentCall();
   const turma = getCurrentTurma();
   if (!call || !turma) return 'Nenhuma turma selecionada.';
-
   const stats = computeLocalStats(call);
   const best = bestStudentForCurrentTurma();
   const presentNames = getActiveRows(call).filter((r) => isPresentLikeValue(r.presenca)).map((r) => r.nome).join(', ') || 'nenhum';
@@ -623,7 +588,7 @@ function buildTurmaReportText() {
   const inactiveNames = getAlunosForTurma(turma.TurmaID).filter((a) => String(a.Status || '') === 'inativo').map((a) => a.Nome).join(', ') || 'nenhum';
   const faltandoMuito = getAlunosForTurma(turma.TurmaID).filter((a) => String(a.FaltandoMuito || '') === 'sim').map((a) => a.Nome).join(', ') || 'nenhum';
 
-  const lines = [
+  return [
     '📋 RELATÓRIO DA TURMA',
     `Turma: ${turma.Nome}`,
     `Data: ${formatDateBR(state.dateKey)}`,
@@ -637,27 +602,16 @@ function buildTurmaReportText() {
     `Visitantes: ${Number(call.visitantes || 0) > 0 ? call.visitantes : 'não informado'}`,
     call.visitantesTexto ? `Detalhe visitantes: ${call.visitantesTexto}` : '',
     '',
-  ];
-
-  if (!isRestrictedMode()) {
-    lines.push(
-      `Melhor aluno: ${best ? `${best.Nome} (${formatPercent(best.Percentual)})` : '—'}`,
-      `Inativos: ${inactiveNames}`,
-      `Faltando muito: ${faltandoMuito}`,
-      ''
-    );
-  }
-
-  lines.push(
+    `Melhor aluno: ${best ? `${best.Nome} (${formatPercent(best.Percentual)})` : '—'}`,
+    `Inativos: ${inactiveNames}`,
+    `Faltando muito: ${faltandoMuito}`,
+    '',
     `Presentes: ${presentNames}`,
     `Atrasados: ${delayedNames}`,
-    `Ausentes: ${absentNames}`
-  );
-
-  return lines.filter(Boolean).join('\\n');
+    `Ausentes: ${absentNames}`,
+  ].filter(Boolean).join('\n');
 }
 function buildGeneralReportText() {
-  if (isRestrictedMode()) return 'Relatório geral indisponível neste acesso.';
   const geral = state.resumoGeral;
   if (!geral) return 'Sem dados gerais carregados.';
   const lines = [
@@ -693,30 +647,6 @@ function formatDateBR(dateKey) {
   return `${d}/${m}/${y}`;
 }
 
-function applyAccessMode() {
-  const restricted = isRestrictedMode();
-  setVisible(els.reportPanel, !restricted);
-  setVisible(els.cadastroPanel, !restricted);
-  setVisible(els.sendTurmaBtn, !restricted);
-  setVisible(els.sendGeralBtn, !restricted);
-  setVisible(els.saveNextBtn, !restricted);
-  setVisible(els.copyTurmaBtn, !restricted);
-  setVisible(els.copyGeralBtn, !restricted);
-  setVisible(els.markAllPresentBtn, !restricted);
-  setVisible(els.markAllAbsentBtn, !restricted);
-  setVisible(els.reloadBtn, !restricted);
-  setVisible(els.clearBtn, !restricted);
-
-  if (els.actionsPanel) {
-    els.actionsPanel.querySelectorAll('button').forEach((button) => {
-      if (button.id === 'saveBtn') return;
-      if (button.id === 'sendTurmaBtn' || button.id === 'sendGeralBtn' || button.id === 'saveNextBtn') {
-        button.hidden = restricted;
-      }
-    });
-  }
-}
-
 function renderTurmaSelects() {
   const options = getTurmasSorted().map((turma) => `<option value="${escapeHtml(turma.TurmaID)}">${escapeHtml(turma.Nome)}</option>`).join('');
   els.turmaSelect.innerHTML = options || '<option value="">Nenhuma turma cadastrada</option>';
@@ -740,7 +670,7 @@ function renderSummary() {
     els.summary.percentual.textContent = '0%';
     els.summary.oferta.textContent = 'R$ 0,00';
     els.summary.visitantes.textContent = '0';
-    els.turmaMeta.innerHTML = 'Selecione uma turma para carregar a chamada.';
+    els.turmaMeta.textContent = 'Selecione uma turma para carregar a chamada.';
     return;
   }
 
@@ -759,23 +689,6 @@ function renderSummary() {
   const missingMuchCount = getAlunosForTurma(call.turmaId).filter(
     (a) => String(a.FaltandoMuito || '') === 'sim'
   ).length;
-
-  if (isRestrictedMode()) {
-    const savedHtml = call.isSaved
-      ? '<span style="color:#1f7a1f;font-weight:700;">Chamada salva</span>'
-      : '<span style="color:#c1121f;font-weight:700;">Chamada não salva</span>';
-    els.turmaMeta.innerHTML = [
-      turma ? `Turma: ${escapeHtml(turma.Nome)}` : '',
-      `Total: ${stats.total}`,
-      `Presentes: ${stats.presentes}`,
-      `Ausentes: ${stats.ausentes}`,
-      `Presença: ${formatPercent(stats.percentual)}`,
-      `Oferta: ${formatMoney(call.oferta)}`,
-      `Visitantes: ${String(Number(call.visitantes || 0))}`,
-      savedHtml,
-    ].filter(Boolean).join(' • ');
-    return;
-  }
 
   els.turmaMeta.textContent = [
     turma ? `Turma: ${turma.Nome}` : '',
@@ -844,8 +757,6 @@ function renderStudents() {
     const faltas = Number(aluno.TotalFaltas || 0);
     const run = Number(aluno.FaltasConsecutivas || 0);
 
-    const statsEl = clone.querySelector('.student__stats');
-    const noteEl = clone.querySelector('.student__note');
     clone.querySelector('.student-percent').textContent = `Presença individual: ${formatPercent(percent)}`;
     clone.querySelector('.student-absence').textContent = `Faltas: ${faltas}`;
     clone.querySelector('.student-run').textContent = `Faltas seguidas: ${run}`;
@@ -867,14 +778,6 @@ function renderStudents() {
     delayBtn.addEventListener('click', () => setStudentPresence(row.alunoId, 'atrasado'));
     editBtn.addEventListener('click', () => editStudentOnWhatsApp(row.alunoId));
     toggleBtn.addEventListener('click', () => toggleStudentStatus(row.alunoId));
-
-    if (isRestrictedMode()) {
-      if (statsEl) statsEl.hidden = true;
-      if (noteEl) noteEl.hidden = true;
-      if (badges) badges.hidden = true;
-      editBtn.hidden = true;
-      toggleBtn.hidden = true;
-    }
 
     noteInput.value = row.observacao || '';
     noteInput.addEventListener('input', (event) => {
@@ -1145,7 +1048,6 @@ function loadSelectedTurma() {
 }
 
 function renderAll() {
-  applyAccessMode();
   renderTurmaSelects();
   loadSelectedTurma();
   renderSummary();
@@ -1255,7 +1157,6 @@ async function bootstrap() {
   showLoading('Carregando dados...');
 
   try {
-    state.accessMode = resolveAccessMode();
     els.dateInput.value = state.dateKey;
     els.showInactive.checked = true;
     els.searchInput.value = '';
@@ -1275,11 +1176,7 @@ async function bootstrap() {
     clearFeedback();
 
     state.initialized = true;
-    if (isRestrictedMode()) {
-      showError('Acesso limitado: chamada, oferta, visitantes e salvamento.');
-    } else {
-      showSuccess('Sistema pronto para uso.');
-    }
+    showSuccess('Sistema pronto para uso.');
   } finally {
     hideLoading();
   }
