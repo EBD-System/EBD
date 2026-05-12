@@ -17,6 +17,13 @@ const state = {
   showInactive: true,
   dirty: false,
   initialized: false,
+  accessCode: '',
+  accessMode: 'restricted',
+};
+
+const ACCESS_CODES = {
+  full: new Set(['50292230']),
+  restricted: new Set(['ninha', 'professor1', 'professor2']),
 };
 
 const els = {
@@ -143,6 +150,29 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+function getAccessCodeFromUrl() {
+  try {
+    return String(new URLSearchParams(window.location.search).get('code') || '').trim().toLowerCase();
+  } catch (err) {
+    return '';
+  }
+}
+
+function resolveAccessMode(code) {
+  const normalized = String(code || '').trim().toLowerCase();
+  if (ACCESS_CODES.full.has(normalized)) return 'full';
+  if (ACCESS_CODES.restricted.has(normalized)) return 'restricted';
+  return 'restricted';
+}
+
+function isRestrictedMode() {
+  return state.accessMode !== 'full';
+}
+
+function applyAccessMode() {
+  document.body.classList.toggle('access-restricted', isRestrictedMode());
+  document.body.classList.toggle('access-full', !isRestrictedMode());
+}
 
 
 function normalizePresenceValue(value) {
@@ -577,6 +607,8 @@ function studentStatusFromRow(row, rosterMap = null) {
 }
 
 function buildTurmaReportText() {
+  if (isRestrictedMode()) return 'Relatório oculto neste modo.';
+
   const call = getCurrentCall();
   const turma = getCurrentTurma();
   if (!call || !turma) return 'Nenhuma turma selecionada.';
@@ -612,6 +644,7 @@ function buildTurmaReportText() {
   ].filter(Boolean).join('\n');
 }
 function buildGeneralReportText() {
+  if (isRestrictedMode()) return 'Relatório oculto neste modo.';
   const geral = state.resumoGeral;
   if (!geral) return 'Sem dados gerais carregados.';
   const lines = [
@@ -663,6 +696,8 @@ function renderTurmaSelects() {
 
 function renderSummary() {
   const call = getCurrentCall();
+  els.turmaMeta.className = 'turma-meta';
+
   if (!call) {
     els.summary.total.textContent = '0';
     els.summary.presentes.textContent = '0';
@@ -670,7 +705,8 @@ function renderSummary() {
     els.summary.percentual.textContent = '0%';
     els.summary.oferta.textContent = 'R$ 0,00';
     els.summary.visitantes.textContent = '0';
-    els.turmaMeta.textContent = 'Selecione uma turma para carregar a chamada.';
+    els.turmaMeta.textContent = isRestrictedMode() ? 'Chamada não salva.' : 'Selecione uma turma para carregar a chamada.';
+    if (isRestrictedMode()) els.turmaMeta.classList.add('turma-meta--warn');
     return;
   }
 
@@ -681,6 +717,12 @@ function renderSummary() {
   els.summary.percentual.textContent = formatPercent(stats.percentual);
   els.summary.oferta.textContent = formatMoney(call.oferta);
   els.summary.visitantes.textContent = String(Number(call.visitantes || 0));
+
+  if (isRestrictedMode()) {
+    els.turmaMeta.textContent = call.isSaved ? 'Chamada salva.' : 'Chamada não salva.';
+    els.turmaMeta.classList.add(call.isSaved ? 'turma-meta--ok' : 'turma-meta--warn');
+    return;
+  }
 
   const turma = getCurrentTurma();
   const best = bestStudentForCurrentTurma();
@@ -857,6 +899,9 @@ async function saveCurrentCall({ silent = false } = {}) {
 }
 
 async function sendReport(scope) {
+  if (isRestrictedMode()) {
+    throw new Error('Ação indisponível neste modo.');
+  }
   const turma = getCurrentTurma();
   if (scope === 'turma' && !turma) throw new Error('Selecione uma turma.');
   if (state.dirty) {
@@ -886,6 +931,10 @@ async function sendReport(scope) {
 }
 
 function moveStudent(alunoId) {
+  if (isRestrictedMode()) {
+    showError('Ação indisponível neste modo.');
+    return;
+  }
   const turmaAtual = getCurrentTurma();
   const turmas = getTurmasSorted().filter((t) => !turmaAtual || t.TurmaID !== turmaAtual.TurmaID);
   if (!turmas.length) {
@@ -918,6 +967,10 @@ function moveStudent(alunoId) {
 }
 
 function toggleStudentStatus(alunoId) {
+  if (isRestrictedMode()) {
+    showError('Ação indisponível neste modo.');
+    return;
+  }
   const aluno = state.alunos.find((a) => a.AlunoID === alunoId);
   if (!aluno) return;
   const ativo = String(aluno.Ativo || 'sim').toLowerCase() === 'nao';
@@ -949,6 +1002,10 @@ function editStudentOnWhatsApp(alunoId) {
   window.open(url, '_blank', 'noopener,noreferrer');
 }
 async function addTurma(event) {
+  if (isRestrictedMode()) {
+    showError('Ação indisponível neste modo.');
+    return;
+  }
   event.preventDefault();
   const nome = els.turmaNome.value.trim();
   const ordem = els.turmaOrdem.value.trim() || '0';
@@ -973,6 +1030,10 @@ async function addTurma(event) {
 }
 
 async function addAluno(event) {
+  if (isRestrictedMode()) {
+    showError('Ação indisponível neste modo.');
+    return;
+  }
   event.preventDefault();
   const nome = els.alunoNome.value.trim();
   const cpf = onlyDigits(els.alunoCpf.value).slice(0, 11);
@@ -1009,6 +1070,10 @@ function copyText(text) {
 }
 
 function clearCurrentCall() {
+  if (isRestrictedMode()) {
+    showError('Ação indisponível neste modo.');
+    return;
+  }
   const call = getCurrentCall();
   if (!call) return;
   const ok = window.confirm('Limpar a chamada desta turma nesta data? Isso só altera a tela atual até salvar novamente.');
@@ -1026,6 +1091,10 @@ function clearCurrentCall() {
   renderAll();
 }
 async function saveAndAdvance() {
+  if (isRestrictedMode()) {
+    showError('Ação indisponível neste modo.');
+    return;
+  }
   const currentIndex = getTurmasSorted().findIndex((t) => t.TurmaID === state.selectedTurmaId);
   await saveCurrentCall();
   const next = getTurmasSorted()[(currentIndex + 1) % getTurmasSorted().length];
@@ -1048,6 +1117,7 @@ function loadSelectedTurma() {
 }
 
 function renderAll() {
+  applyAccessMode();
   renderTurmaSelects();
   loadSelectedTurma();
   renderSummary();
@@ -1157,6 +1227,10 @@ async function bootstrap() {
   showLoading('Carregando dados...');
 
   try {
+    state.accessCode = getAccessCodeFromUrl();
+    state.accessMode = resolveAccessMode(state.accessCode);
+    applyAccessMode();
+
     els.dateInput.value = state.dateKey;
     els.showInactive.checked = true;
     els.searchInput.value = '';
