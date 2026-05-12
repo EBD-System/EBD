@@ -1,273 +1,510 @@
-# Sistema de Presença por Turmas
+# Sistema de Chamada e Presença de Turmas
 
-Sistema de chamada em **uma única página**, pronto para ser hospedado no **GitHub Pages**, com integração com **Google Sheets**, **Google Apps Script** e envio de relatórios para **Telegram**.
+Sistema web para gerenciamento de chamada, controle de presença, relatórios e administração de turmas/alunos, com sincronização via Google Apps Script e persistência local no navegador.
+
+Este documento descreve a estrutura do script principal, suas responsabilidades e o papel de cada função no fluxo da aplicação.
+
+---
 
 ## Visão geral
 
-O sistema foi pensado para controlar a presença de alunos por turma, usando uma planilha já existente para leitura dos alunos e outra aba para gravação das chamadas.
+A aplicação foi desenvolvida para apoiar a rotina de controle de presença em turmas, oferecendo:
 
-### Fluxo principal
+- seleção de data e turma;
+- marcação individual e em massa de presença;
+- cadastro de turmas e alunos;
+- movimentação de alunos entre turmas;
+- ativação/inativação de alunos;
+- relatórios textuais por turma e gerais;
+- rascunhos automáticos no navegador;
+- cache local do cadastro;
+- envio de dados para backend via Google Apps Script.
 
-1. O front-end abre no GitHub Pages.
-2. A página consulta o Apps Script.
-3. O Apps Script lê os alunos da aba **ReadBase**.
-4. A chamada é montada na tela por turma.
-5. Ao salvar, os dados são gravados na aba **Base**.
-6. O relatório da turma e o relatório geral podem ser enviados para o Telegram.
-7. Ao recarregar a página, o sistema carrega os dados já salvos no Sheets.
-
----
-
-## Estrutura dos arquivos
-
-### `index.html`
-É a estrutura da página.
-Contém:
-- seletor de data
-- seletor de turma
-- busca de aluno
-- resumo da chamada
-- lista de alunos
-- campos de oferta e visitantes
-- botões de salvar, enviar e avançar
-
-### `style.css`
-É o visual da aplicação.
-Define:
-- layout responsivo
-- cores branco e azul fraco
-- cartões, botões e campos
-- aparência no celular e no computador
-
-### `script.js`
-É a lógica do front-end.
-Responsável por:
-- carregar turmas e alunos
-- montar a chamada
-- marcar presença e ausência
-- salvar rascunho no navegador
-- calcular resumo local
-- enviar dados ao backend
-
-### `backend.gs`
-É o backend no Google Apps Script.
-Responsável por:
-- ler a aba `ReadBase`
-- gravar a chamada na aba `Base`
-- salvar histórico
-- calcular estatísticas
-- identificar inativos após 4 faltas
-- gerar relatórios
-- enviar mensagens para o Telegram
-
-### `README.md`
-Este arquivo explica como o sistema funciona e como configurá-lo.
+O script organiza toda a lógica da interface, estado local, sincronização e geração de relatórios.
 
 ---
 
-## Como o sistema foi adaptado
+## Arquitetura do script
 
-O sistema foi ajustado para usar sua planilha existente.
+O código está dividido em blocos funcionais:
 
-### Leitura dos alunos
-Os alunos são lidos da aba:
+1. **Constantes e estado global**
+2. **Utilitários de interface e formatação**
+3. **Comunicação com backend**
+4. **Persistência local**
+5. **Regras de chamada e presença**
+6. **Geração de relatórios**
+7. **Renderização da interface**
+8. **Ações do usuário**
+9. **Inicialização e eventos**
 
-- `ReadBase`
-
-### Gravação da chamada
-A chamada é salva na aba:
-
-- `Base`
-
-Isso permite:
-- reaproveitar os alunos já cadastrados
-- evitar recadastrar tudo novamente
-- manter histórico de presença por data e turma
+Essa separação facilita manutenção, debug e evolução do sistema.
 
 ---
 
-## Configurações principais
-
-### No `script.js`
-Você deve colocar a URL do Web App do Apps Script:
-
-```javascript
-const APPS_SCRIPT_URL = 'SUA_URL_DO_WEB_APP_AQUI';
-```
-
-### No `backend.gs`
-Você deve colocar:
-
-```javascript
-const SPREADSHEET_ID = 'ID_DA_SUA_PLANILHA';
-const TELEGRAM_BOT_TOKEN = 'SEU_TOKEN_DO_BOT';
-const TELEGRAM_CHAT_ID = 'SEU_CHAT_ID';
-```
-
----
-
-## Importante sobre as variáveis
-
-### `SPREADSHEET_ID`
-É o ID da planilha Google Sheets.
-Não é a URL do Apps Script.
-
-Exemplo:
-```txt
-https://docs.google.com/spreadsheets/d/1bB3SJnkDnjOb-Ro7d7fxWBzMoTp1DzAPHLQcR6LGysM/edit
-```
-
-O ID é:
-```txt
-1bB3SJnkDnjOb-Ro7d7fxWBzMoTp1DzAPHLQcR6LGysM
-```
+## Constantes principais
 
 ### `APPS_SCRIPT_URL`
-É a URL publicada do Web App.
-
-Exemplo:
-```txt
-https://script.google.com/macros/s/SEU_ID/exec
-```
+URL base do Web App do Google Apps Script usado como backend.
 
 ### `STORAGE_KEY`
-É usado no navegador para salvar rascunho local da chamada.
+Chave principal do `localStorage` usada para salvar estado da aplicação e rascunhos.
 
-Você não precisa alterar isso.
+### `ROSTER_CACHE_KEY`
+Chave dedicada ao cache local de turmas e alunos.
 
----
-
-## Como funciona a chamada
-
-1. Escolha a data.
-2. Selecione a turma.
-3. O sistema carrega os alunos da turma.
-4. Marque presença ou ausência.
-5. Preencha oferta e visitantes, se houver.
-6. Clique em salvar chamada.
-7. Clique em enviar relatório da turma.
-8. No final, envie o relatório geral.
+### `ROSTER_CACHE_VERSION`
+Versão do cache. Serve para invalidar dados antigos quando a estrutura muda.
 
 ---
 
-## Regras de presença
+## Estado global
 
-### Presença individual
-Cada aluno tem seu próprio controle de presença.
+### `state`
+Objeto central da aplicação. Guarda o estado atual da tela e dos dados.
 
-### Percentual individual
-O sistema calcula a presença de cada aluno com base no histórico salvo.
+Principais campos:
 
-### Regra de 4 faltas
-Se o aluno faltar 4 domingos seguidos:
-- ele pode ser marcado como inativo
-- ele aparece no final da lista
-- pode ser reativado, recadastrado ou realocado
+- `syncToken`: controle interno de sincronização.
+- `loading`: indica se a aplicação está carregando.
+- `dateKey`: data atualmente selecionada.
+- `turmas`: lista de turmas carregadas.
+- `alunos`: lista de alunos carregados.
+- `chamadasByTurma`: chamadas carregadas por turma.
+- `resumoGeral`: resumo consolidado do backend.
+- `selectedTurmaId`: turma selecionada no momento.
+- `search`: termo de busca aplicado na lista de alunos.
+- `showInactive`: controla se alunos inativos aparecem na tela.
+- `dirty`: indica alterações ainda não salvas.
+- `initialized`: indica se a aplicação já foi inicializada.
 
-### Melhor aluno
-O melhor aluno é o que tiver maior percentual de presença.
+### `els`
+Mapa com referências para elementos do DOM usados pela interface, como:
 
-### Alunos com mais faltas
-O sistema identifica:
-- alunos com mais faltas
-- alunos faltando muito
-- alunos inativos
-- alunos reativados
-
----
-
-## Estrutura recomendada das abas
-
-### Aba `ReadBase`
-Usada para leitura dos alunos já cadastrados.
-
-Campos esperados:
-- `DATA`
-- `ANO`
-- `MÊS`
-- `ALUNO`
-- `CLASSE`
-- `PRESENÇA`
-- `ATRASO`
-- `AUSÊNCIA`
-- `OFERTA`
-
-### Aba `Base`
-Usada para registrar a chamada salva.
-
-Ela armazena:
-- data
-- aluno
-- classe
-- presença
-- atraso
-- ausência
-- oferta
+- inputs de data, turma e aluno;
+- botões de ação;
+- área de feedback;
+- cards de resumo;
+- listas de alunos;
+- campos de relatório;
+- templates de renderização.
 
 ---
 
-## Integração com Telegram
+## Sistema de carregamento e feedback
 
-O relatório pode ser enviado ao Telegram automaticamente pelo backend.
+### `ensureLoadingOverlay()`
+Cria a overlay de carregamento se ela ainda não existir no DOM.
 
-O texto enviado inclui:
-- total de alunos
-- presentes
-- ausentes
-- porcentagem de presença
-- oferta da classe
-- visitantes
-- resumo por turma
-- resumo geral
+### `showLoading(message = 'Carregando...')`
+Exibe a overlay de loading e atualiza o texto exibido ao usuário.
 
----
+### `hideLoading()`
+Reduz o contador interno de carregamento e oculta a overlay quando não há mais operações pendentes.
 
-## Como publicar
+### `setFeedback(type, message)`
+Define uma mensagem de feedback na interface com um tipo visual específico.
 
-### 1. GitHub Pages
-Coloque estes arquivos no repositório:
-- `index.html`
-- `style.css`
-- `script.js`
+### `clearFeedback()`
+Remove qualquer mensagem exibida no bloco de feedback.
 
-### 2. Google Apps Script
-Crie um projeto no Apps Script e cole o conteúdo do `backend.gs`.
+### `showBusy(message)`
+Exibe uma mensagem de operação em andamento.
 
-### 3. Publique como Web App
-No Apps Script:
-- implante como **Web App**
-- permita acesso conforme necessário
-- copie a URL gerada
+### `showSuccess(message)`
+Exibe uma mensagem de sucesso.
 
-### 4. Conecte o front ao backend
-Cole a URL do Web App em `APPS_SCRIPT_URL` dentro do `script.js`.
-
-### 5. Configure a planilha
-Coloque o ID da planilha em `SPREADSHEET_ID` no `backend.gs`.
-
-### 6. Configure Telegram
-Coloque o token e o chat ID do bot no `backend.gs`.
+### `showError(message)`
+Exibe uma mensagem de erro.
 
 ---
 
-## Comportamento esperado
+## Funções utilitárias
 
-Depois de configurado, o sistema deve:
-- abrir diretamente no GitHub Pages
-- carregar as turmas da sua planilha
-- carregar os alunos da turma selecionada
-- salvar a chamada sem perder dados
-- manter o estado ao recarregar
-- registrar histórico
-- enviar relatórios para o Telegram
+### `todayKey()`
+Retorna a data atual no formato `YYYY-MM-DD`, ajustada ao fuso local.
+
+### `onlyDigits(value)`
+Remove todos os caracteres não numéricos de uma string.
+
+### `formatCpf(value)`
+Formata automaticamente um CPF parcial ou completo no padrão `000.000.000-00`.
+
+### `formatMoney(value)`
+Formata um número como moeda brasileira (`R$ 0,00`).
+
+### `formatPercent(value)`
+Formata um número como percentual com uma casa decimal, respeitando o padrão brasileiro.
+
+### `escapeHtml(value)`
+Escapa caracteres HTML para evitar que texto inserido na interface gere interpretação indevida de tags.
+
+### `formatDateBR(dateKey)`
+Converte uma data do formato `YYYY-MM-DD` para `DD/MM/YYYY`.
 
 ---
 
-## Observações finais
+## Comunicação com o backend
 
-Este sistema foi desenhado para:
-- ser rápido no uso durante a chamada
-- funcionar bem no celular
-- preservar dados no Google Sheets
-- evitar duplicação de registros
-- manter histórico por data, turma e aluno
+### `apiUrl(params = {})`
+Monta a URL final do Web App adicionando parâmetros na query string.
+
+### `apiGet(params = {})`
+Executa uma requisição `GET` para o backend e valida a resposta JSON.
+
+### `apiPost(params = {})`
+Executa uma requisição `POST` com `FormData` para o backend.
+
+### `validateApiUrl()`
+Verifica se a URL do Apps Script foi configurada corretamente antes de iniciar a aplicação.
+
+---
+
+## Persistência local
+
+### `storageState()`
+Lê e retorna o objeto principal armazenado no `localStorage`.
+
+### `saveStorageState(next)`
+Salva o estado principal no `localStorage`.
+
+### `readJsonStorage(key, fallback = null)`
+Lê um valor JSON do `localStorage` e devolve um fallback se houver erro.
+
+### `writeJsonStorage(key, value)`
+Grava um valor serializado em JSON no `localStorage`.
+
+### `loadRosterCache()`
+Carrega o cache local de turmas e alunos, validando a versão.
+
+### `saveRosterCache()`
+Salva uma cópia local do cadastro atual de turmas e alunos.
+
+### `hydrateRosterFromCache()`
+Restaura turmas e alunos a partir do cache local.
+
+### `persistDraft(call)`
+Salva um rascunho local da chamada atual para evitar perda de dados.
+
+### `restoreDraft(call)`
+Reaplica um rascunho salvo sobre uma chamada carregada do backend.
+
+### `clearDraft(callId)`
+Remove o rascunho local de uma chamada após o salvamento.
+
+---
+
+## Mesclagem e sincronização de dados
+
+### `rosterFingerprintTurma(turma)`
+Gera uma assinatura textual da turma para detectar alterações estruturais.
+
+### `rosterFingerprintAluno(aluno)`
+Gera uma assinatura textual do aluno para comparação de mudanças no cadastro.
+
+### `mergeById(prevList = [], nextList = [], idField, fingerprintFn = null)`
+Mescla duas listas por ID, preservando objetos antigos quando não há mudança real.
+
+### `buildStudentRowFromAluno(aluno)`
+Converte um aluno cadastrado em uma linha padrão de chamada.
+
+### `buildSyncedCall(turma, serverCall = null, draft = null)`
+Reconstrói uma chamada completa mesclando:
+
+- dados da turma;
+- dados do servidor;
+- rascunho local;
+- cadastro de alunos.
+
+---
+
+## Controle da turma e da chamada atual
+
+### `callKey(dateKey, turmaId)`
+Cria uma chave única para a chamada usando data e turma.
+
+### `setCurrentCall(call)`
+Define a chamada atual no estado global.
+
+### `getCurrentTurma()`
+Retorna a turma atualmente selecionada.
+
+### `getCurrentCall()`
+Retorna a chamada atual. Se ela não existir, cria uma chamada vazia automaticamente.
+
+### `updateCallFromInputs()`
+Sincroniza alguns dados da chamada com os campos da interface.
+
+### `getTurmasSorted()`
+Retorna a lista de turmas ordenada por ordem numérica e depois por nome.
+
+### `getAlunosForTurma(turmaId)`
+Retorna os alunos de uma turma, ordenando ativos e inativos de forma consistente.
+
+### `blankCallForTurma(turma)`
+Cria uma chamada vazia para uma turma selecionada, com linhas para todos os alunos.
+
+### `loadSelectedTurma()`
+Garante que a turma selecionada esteja carregada com sua chamada correspondente.
+
+---
+
+## Regras de status e presença
+
+### `studentStatusFromRow(row, rosterMap = null)`
+Determina o status do aluno a partir da linha da chamada ou do cadastro.
+
+### `isInactiveStudent(row, rosterMap = null)`
+Verifica se o aluno deve ser tratado como inativo.
+
+### `getActiveRows(call)`
+Filtra apenas as linhas válidas para contagem, ignorando alunos inativos.
+
+### `computeLocalStats(call)`
+Calcula estatísticas locais da chamada:
+
+- total;
+- presentes;
+- ausentes;
+- percentual de presença.
+
+### `getCurrentStats()`
+Retorna as estatísticas da chamada atual.
+
+### `currentStudentsMap()`
+Cria um mapa rápido `AlunoID → aluno` para uso interno da aplicação.
+
+### `bestStudentForCurrentTurma()`
+Retorna o aluno com maior percentual de presença na turma atual.
+
+---
+
+## Geração de relatórios
+
+### `buildTurmaReportText()`
+Monta o relatório textual completo da turma com:
+
+- nome da turma;
+- data;
+- total de alunos;
+- presentes;
+- ausentes;
+- percentual;
+- oferta;
+- visitantes;
+- melhor aluno;
+- alunos inativos;
+- alunos faltando muito;
+- lista de presentes e ausentes.
+
+### `buildGeneralReportText()`
+Monta um relatório consolidado de todas as turmas, com resumo geral e destaques.
+
+### `renderReports()`
+Atualiza os campos de texto dos relatórios na interface.
+
+---
+
+## Renderização da interface
+
+### `renderTurmaSelects()`
+Popula os selects de turma em toda a interface.
+
+### `renderSummary()`
+Atualiza os cards com números principais da chamada, como total, presença, oferta e visitantes.
+
+### `renderStudents()`
+Renderiza a lista de alunos da turma atual com:
+
+- nome;
+- badges de status;
+- percentual individual;
+- faltas;
+- faltas consecutivas;
+- botões de ação;
+- campo de observação.
+
+### `bindCallFieldValues()`
+Sincroniza os inputs de oferta, visitantes e texto de visitantes com a chamada atual e registra eventos de edição.
+
+### `renderAll()`
+Executa a renderização completa da tela chamando os principais renderizadores.
+
+---
+
+## Manipulação da chamada
+
+### `markDirty()`
+Marca a chamada como alterada, salva um rascunho local e atualiza os relatórios.
+
+### `setStudentPresence(alunoId, presence)`
+Altera a presença de um aluno específico.
+
+### `setAllPresence(presence)`
+Marca todos os alunos ativos como presentes ou ausentes.
+
+### `clearCurrentCall()`
+Limpa os dados da chamada atual na interface, sem apagar imediatamente do backend.
+
+### `saveAndAdvance()`
+Salva a chamada atual e avança automaticamente para a próxima turma.
+
+### `copyText(text)`
+Copia um texto para a área de transferência.
+
+### `normalizeCpfInput(event)`
+Formata o CPF enquanto o usuário digita.
+
+---
+
+## Operações com o backend
+
+### `saveCurrentCall({ silent = false } = {})`
+Envia a chamada atual para o backend e limpa o rascunho local após salvar.
+
+### `sendReport(scope)`
+Envia um relatório para o backend, seja da turma ou geral.
+
+### `refreshFromBackend(showMessage = false)`
+Atualiza turmas, alunos, chamadas e resumo geral a partir do servidor.
+
+### `moveStudent(alunoId)`
+Move um aluno para outra turma usando o backend.
+
+### `toggleStudentStatus(alunoId)`
+Alterna o status ativo/inativo de um aluno.
+
+### `addTurma(event)`
+Cadastra uma nova turma.
+
+### `addAluno(event)`
+Cadastra um novo aluno.
+
+---
+
+## Inicialização
+
+### `bootstrap()`
+Executa a inicialização completa da aplicação:
+
+- prepara a tela;
+- define a data atual;
+- restaura o estado local;
+- valida a URL do backend;
+- carrega dados do servidor;
+- renderiza a interface;
+- sinaliza que o sistema está pronto.
+
+---
+
+## Eventos registrados na interface
+
+O script registra listeners para:
+
+- alteração da data;
+- troca da turma selecionada;
+- escolha da turma do aluno;
+- busca na lista;
+- exibição de inativos;
+- botão de recarregar;
+- limpar chamada;
+- salvar chamada;
+- enviar relatório da turma;
+- enviar relatório geral;
+- salvar e avançar;
+- marcar todos como presentes;
+- marcar todos como ausentes;
+- copiar relatórios;
+- envio dos formulários de turma e aluno;
+- formatação automática de CPF;
+- carregamento inicial da página.
+
+---
+
+## Funcionalidades principais do sistema
+
+### Controle de presença
+- marcação individual;
+- marcação em massa;
+- estatísticas automáticas;
+- controle de alunos ativos/inativos.
+
+### Gestão de alunos e turmas
+- cadastro;
+- movimentação entre turmas;
+- ativação e inativação;
+- ordenação por turma e nome.
+
+### Relatórios
+- relatório por turma;
+- relatório geral consolidado;
+- destaque de melhores alunos;
+- contagem de visitantes e oferta.
+
+### Persistência e segurança
+- cache local;
+- rascunhos automáticos;
+- recuperação de dados após recarga;
+- escape de HTML para segurança.
+
+### Sincronização
+- integração com Google Apps Script;
+- leitura e gravação remota;
+- atualização após envio;
+- reaproveitamento de dados locais.
+
+---
+
+## Tecnologias utilizadas
+
+- JavaScript Vanilla
+- HTML5
+- CSS3
+- Fetch API
+- LocalStorage
+- Google Apps Script
+
+---
+
+## Fluxo geral da aplicação
+
+```txt
+Usuário interage com a interface
+↓
+Estado local é atualizado
+↓
+Rascunho é salvo automaticamente
+↓
+Interface é re-renderizada
+↓
+Dados são sincronizados com o backend
+↓
+Resumo geral é atualizado
+```
+
+---
+
+## Observações técnicas
+
+- O sistema foi projetado para evitar perda de dados por meio de rascunhos automáticos.
+- A lógica de exibição separa alunos ativos e inativos sem excluir os dados do cadastro.
+- A chamada pode ser recuperada mesmo após atualização da página, desde que o rascunho local esteja disponível.
+- O backend é tratado como fonte de verdade após sincronização.
+- A interface foi estruturada para permitir operação rápida durante a rotina de aula.
+
+---
+
+## Resumo final
+
+Este script concentra toda a lógica principal do sistema de presença, unindo:
+
+- cadastro de turmas e alunos;
+- controle de presença;
+- geração de relatórios;
+- cache local;
+- integração com Apps Script;
+- feedback visual;
+- persistência de rascunhos.
+
+O resultado é uma aplicação voltada para uso prático em ambiente de aula, com foco em velocidade, organização e confiabilidade.
+
