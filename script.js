@@ -175,7 +175,7 @@ function normalizeBoolValue(value) {
 
 function buildWhatsAppEditUrl(alunoNome, turmaNome) {
   const phone = '5571981768164';
-  const message = `gostaria de editar o aluno ${String(alunoNome || '').trim()}, da classe ${String(turmaNome || '').trim()}.`;
+  const message = `Olá, eu gostaria de editar o aluno [${String(alunoNome || '').trim()}], da classe [${String(turmaNome || '').trim()}].`;
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }
 function setFeedback(type, message) {
