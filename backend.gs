@@ -951,52 +951,56 @@ function recalculateAndPersistStudentStats_() {
   });
 }
 
-function replaceBaseRowsForCall_(dateKey, turmaId, normalizedRows, extra) {
+function replaceBaseRowsForCall_(dateKey, turmaId, turmaNome, normalizedRows, extra) {
+
+  Logger.log('INICIANDO SALVAMENTO SIMPLES');
+
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = getOrCreateSheet_(ss, BASE_SHEET_NAME, BASE_HEADERS, false);
 
-  const values = sheet.getDataRange().getValues();
-  const header = values.length ? values[0].map(normalizeHeader_) : BASE_HEADERS.map(normalizeHeader_);
-  const idx = indexByHeader_(header);
-  const keep = [];
+  const sheet = getOrCreateSheet_(
+    ss,
+    BASE_SHEET_NAME,
+    BASE_HEADERS,
+    false
+  );
 
-  if (values.length) keep.push(values[0]);
-
-  for (let i = 1; i < values.length; i++) {
-    const row = values[i];
-    const rowDateKey = normalizeDateFromBaseCell_(row[idx.DATA]);
-    const rowClass = String(row[idx.CLASSE] || '').trim();
-    if (rowDateKey === dateKey && normalizeKey_(rowClass) === normalizeKey_(getTurmaNameById_(turmaId))) {
-      continue;
-    }
-    keep.push(row);
+  if (!normalizedRows || !normalizedRows.length) {
+    Logger.log('SEM LINHAS PARA SALVAR');
+    return;
   }
 
-  sheet.clearContents();
-  sheet.getRange(1, 1, 1, BASE_HEADERS.length).setValues([BASE_HEADERS]);
-
-  if (keep.length > 1) {
-    sheet.getRange(2, 1, keep.length - 1, keep[1].length).setValues(keep.slice(1));
-  }
+  const [year, month] = String(dateKey).split('-');
 
   const dataBr = formatDateBR_(dateKey);
-  const [year, month] = String(dateKey).split('-');
+
   const mesTxt = monthToAbbrev_(month);
-  const rowsToAppend = normalizedRows.map(r => ([
+
+  const rowsToAppend = normalizedRows.map((r) => ([
     dataBr,
     Number(year),
     mesTxt,
     r.nome,
-    getTurmaNameById_(turmaId),
+    turmaNome || getTurmaNameById_(turmaId),
     r.presenca === 'sim' ? 1 : 0,
     r.atraso ? 1 : 0,
     r.presenca === 'nao' ? 1 : 0,
     extra?.oferta || 'R$ 0,00',
   ]));
 
-  if (rowsToAppend.length) {
-    sheet.getRange(sheet.getLastRow() + 1, 1, rowsToAppend.length, rowsToAppend[0].length).setValues(rowsToAppend);
-  }
+  Logger.log(`ADICIONANDO ${rowsToAppend.length} LINHAS`);
+
+  sheet
+    .getRange(
+      sheet.getLastRow() + 1,
+      1,
+      rowsToAppend.length,
+      rowsToAppend[0].length
+    )
+    .setValues(rowsToAppend);
+
+  SpreadsheetApp.flush();
+
+  Logger.log('SALVAMENTO FINALIZADO');
 }
 
 function getBaseRowsAll_() {
@@ -1534,3 +1538,17 @@ function json_(obj) {
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
