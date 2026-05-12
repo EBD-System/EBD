@@ -432,17 +432,18 @@ textarea:focus{
 }
 .btn--present{
   color:var(--success);
-  background:rgba(35,139,87,.10);
+  background:transparent;
   border:1px solid rgba(35,139,87,.20);
 }
 .btn--absent{
   color:var(--danger);
-  background:rgba(194,64,64,.10);
+  background:transparent;
   border:1px solid rgba(194,64,64,.20);
 }
+
 .btn--delay{
   color:#8c4fb9;
-  background:rgba(140,79,185,.10);
+  background:transparent;
   border:1px solid rgba(140,79,185,.20);
 }
 .btn.is-selected-present{
