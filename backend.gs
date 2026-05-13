@@ -25,7 +25,7 @@ const META_STUDENTS_SHEET = '__ALUNOS_META';
 const META_CLASSES_SHEET = '__TURMAS_META';
 const REPORTS_SHEET = '__RELATORIOS';
 
-const BASE_HEADERS = ['DATA', 'ANO', 'MÊS', 'ALUNO', 'CLASSE', 'PRESENÇA', 'ATRASO', 'AUSÊNCIA', 'OFERTA'];
+const BASE_HEADERS = ['DATA', 'ANO', 'MÊS', 'ALUNO', 'CLASSE', 'PRESENÇA', 'ATRASO', 'AUSÊNCIA', 'OFERTA', 'VISITANTES'];
 const META_STUDENTS_HEADERS = [
   'AlunoID', 'Nome', 'TurmaID', 'TurmaNome', 'Ativo',
   'FaltasConsecutivas', 'TotalPresencas', 'TotalFaltas', 'Percentual',
