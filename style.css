@@ -359,11 +359,23 @@ body.access-restricted .student__actions{
 }
 .student-name{
   font-size:1.03rem;
+  line-height:1.25;
+}
+.student-status{
+  font-weight:900;
+}
+.student-status--active{
+  color:var(--success);
+}
+.student-status--inactive{
+  color:var(--danger);
 }
 .student-badges{
   display:flex;
   flex-wrap:wrap;
   gap:8px;
+  min-height:30px;
+  align-items:center;
 }
 .badge-pill{
   display:inline-flex;
@@ -375,14 +387,14 @@ body.access-restricted .student__actions{
   border:1px solid transparent;
 }
 .badge-pill--active{
-  color: #0f7a35;
-  background: rgba(31, 143, 74, 0.12);
-  border-color: rgba(31, 143, 74, 0.25);
+  color:var(--success);
+  background:rgba(35,139,87,.10);
+  border-color:rgba(35,139,87,.18);
 }
 .badge-pill--inactive{
-  color: #b00020;
-  background: rgba(198, 40, 40, 0.12);
-  border-color: rgba(198, 40, 40, 0.25);
+  color:var(--danger);
+  background:rgba(194,64,64,.10);
+  border-color:rgba(194,64,64,.18);
 }
 .badge-pill--warn{
   color:var(--warning);

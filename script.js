@@ -786,7 +786,7 @@ function renderStudents() {
     article.classList.toggle('is-inactive', isInactive);
 
     const statusLabel = isInactive ? 'Inativo' : 'Ativo';
-    clone.querySelector('.student-name').textContent = `${statusLabel} - ${row.nome}`;
+    clone.querySelector('.student-name').innerHTML = `<span class="student-status ${isInactive ? 'student-status--inactive' : 'student-status--active'}">${statusLabel}</span> - ${escapeHtml(row.nome)}`;
     const badges = clone.querySelector('.student-badges');
     badges.innerHTML = [
       isDelayed ? '<span class="badge-pill badge-pill--warn">Atrasado(a)</span>' : '',
