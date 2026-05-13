@@ -95,6 +95,7 @@ function init_(params) {
     alunos: sortAlunos_(all.alunos),
     callsByTurma,
     resumoGeral: geral,
+    baseRowsCount: getBaseRowsCount_(),
     timestamps: { now: new Date().toISOString() },
   };
 }
@@ -153,17 +154,17 @@ function saveCall_(p) {
   const ausentes = normalizedRows.length - presentes;
   const percentual = normalizedRows.length ? round1_((presentes / normalizedRows.length) * 100) : 0;
 
-  replaceBaseRowsForCall_(
-  dateKey,
-  turma.TurmaID,
-  turma.Nome,
-  normalizedRows,
-  {
-    oferta,
-    visitantes,
-    visitantesTexto,
-  }
-);
+  const baseWrite = replaceBaseRowsForCall_(
+    dateKey,
+    turma.TurmaID,
+    turma.Nome,
+    normalizedRows,
+    {
+      oferta,
+      visitantes,
+      visitantesTexto,
+    }
+  );
 
   upsertCallMeta_(
     chamadaId,
@@ -200,6 +201,7 @@ function saveCall_(p) {
     turmaCall,
     resumoGeral: geral,
     telegram,
+    baseWrite,
   };
 }
 
@@ -970,35 +972,24 @@ function recalculateAndPersistStudentStats_() {
 }
 
 function replaceBaseRowsForCall_(dateKey, turmaId, turmaNome, normalizedRows, extra) {
-
   Logger.log('INICIANDO SALVAMENTO');
-
   Logger.log('SPREADSHEET_ID: ' + SPREADSHEET_ID);
 
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-
   Logger.log('PLANILHA ABERTA: ' + ss.getName());
 
-  const sheet = getOrCreateSheet_(
-    ss,
-    BASE_SHEET_NAME,
-    BASE_HEADERS,
-    false
-  );
-
+  const sheet = getOrCreateSheet_(ss, BASE_SHEET_NAME, BASE_HEADERS, false);
   Logger.log('ABA ENCONTRADA: ' + sheet.getName());
 
+  const beforeRows = Math.max(0, sheet.getLastRow() - 1);
   Logger.log('ÚLTIMA LINHA ANTES: ' + sheet.getLastRow());
 
   if (!normalizedRows || !normalizedRows.length) {
-    Logger.log('SEM LINHAS');
-    return;
+    throw new Error('Não há linhas para salvar.');
   }
 
   const [year, month] = String(dateKey).split('-');
-
   const dataBr = formatDateBR_(dateKey);
-
   const mesTxt = monthToAbbrev_(month);
 
   const rowsToAppend = normalizedRows.map((r) => ([
@@ -1017,23 +1008,27 @@ function replaceBaseRowsForCall_(dateKey, turmaId, turmaNome, normalizedRows, ex
   Logger.log(JSON.stringify(rowsToAppend, null, 2));
 
   const startRow = sheet.getLastRow() + 1;
-
   Logger.log('START ROW: ' + startRow);
 
-  sheet
-    .getRange(
-      startRow,
-      1,
-      rowsToAppend.length,
-      rowsToAppend[0].length
-    )
-    .setValues(rowsToAppend);
-
+  sheet.getRange(startRow, 1, rowsToAppend.length, rowsToAppend[0].length).setValues(rowsToAppend);
   SpreadsheetApp.flush();
 
+  const afterRows = Math.max(0, sheet.getLastRow() - 1);
   Logger.log('ÚLTIMA LINHA DEPOIS: ' + sheet.getLastRow());
-
   Logger.log('SALVAMENTO FINALIZADO');
+
+  return {
+    beforeRows,
+    afterRows,
+    insertedRows: Math.max(0, afterRows - beforeRows),
+  };
+}
+
+function getBaseRowsCount_() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(BASE_SHEET_NAME);
+  if (!sheet || sheet.getLastRow() < 2) return 0;
+  return sheet.getLastRow() - 1;
 }
 function getBaseRowsAll_() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);

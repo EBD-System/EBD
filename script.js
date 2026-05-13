@@ -19,6 +19,7 @@ const state = {
   initialized: false,
   accessCode: '',
   accessMode: 'restricted',
+  baseRowsCount: 0,
 };
 
 const ACCESS_CODES = {
@@ -296,6 +297,15 @@ function loadRosterCache() {
   const cache = readJsonStorage(ROSTER_CACHE_KEY, null);
   if (!cache || cache.version !== ROSTER_CACHE_VERSION) return null;
   return cache;
+}
+
+
+function withTimeout(promise, ms, errorMessage) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(errorMessage || 'Tempo excedido.')), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 function saveRosterCache() {
@@ -868,6 +878,7 @@ async function saveCurrentCall({ silent = false } = {}) {
     throw new Error('Selecione uma turma antes de salvar.');
   }
 
+  const beforeRows = Number(state.baseRowsCount || 0);
   const payload = {
     action: 'saveCall',
     date: state.dateKey,
@@ -881,8 +892,16 @@ async function saveCurrentCall({ silent = false } = {}) {
 
   if (!silent) showLoading('Salvando chamada...');
   try {
-    const result = await apiPost(payload);
+    const result = await withTimeout(apiPost(payload), 45000, 'O salvamento demorou demais. Verifique sua conexão e tente novamente.');
 
+    const afterRows = Number(result.baseWrite?.afterRows ?? beforeRows);
+    const insertedRows = Number(result.baseWrite?.insertedRows ?? (afterRows - beforeRows));
+
+    if (afterRows <= beforeRows || insertedRows <= 0) {
+      throw new Error('A resposta chegou, mas a planilha não aumentou. O salvamento não pôde ser confirmado.');
+    }
+
+    state.baseRowsCount = afterRows;
     state.resumoGeral = result.resumoGeral || state.resumoGeral;
     state.chamadasByTurma[turma.TurmaID] = result.turmaCall || call;
     state.dirty = false;
@@ -890,8 +909,7 @@ async function saveCurrentCall({ silent = false } = {}) {
     state.selectedTurmaId = turma.TurmaID;
     renderAll();
 
-    // Recarrega os dados em segundo plano para manter o estado sincronizado,
-    // sem prender a interface caso a leitura demore ou falhe.
+    // Atualiza os dados em segundo plano sem bloquear a confirmação visual.
     refreshFromBackend(false, { silent: true }).catch((err) => {
       console.warn('Falha ao atualizar dados após salvar:', err);
     });
@@ -1193,6 +1211,7 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
     state.alunos = data.alunos || [];
     state.chamadasByTurma = data.callsByTurma || {};
     state.resumoGeral = data.resumoGeral || null;
+    state.baseRowsCount = Number(data.baseRowsCount || state.baseRowsCount || 0);
 
     const storage = storageState();
     const drafts = storage.drafts || {};
