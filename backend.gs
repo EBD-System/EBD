@@ -993,16 +993,17 @@ function replaceBaseRowsForCall_(dateKey, turmaId, turmaNome, normalizedRows, ex
   const mesTxt = monthToAbbrev_(month);
 
   const rowsToAppend = normalizedRows.map((r) => ([
-    dataBr,
-    Number(year),
-    mesTxt,
-    r.nome,
-    turmaNome || getTurmaNameById_(turmaId),
-    r.presenca === 'sim' ? 1 : 0,
-    r.atraso ? 1 : 0,
-    r.presenca === 'nao' ? 1 : 0,
-    extra?.oferta || 'R$ 0,00',
-  ]));
+  dataBr,
+  Number(year),
+  mesTxt,
+  r.nome,
+  turmaNome || getTurmaNameById_(turmaId),
+  r.presenca === 'sim' ? 1 : 0,
+  r.atraso ? 1 : 0,
+  r.presenca === 'nao' ? 1 : 0,
+  extra?.oferta || 'R$ 0,00',
+  Number(extra?.visitantes || 0),
+]));
 
   Logger.log('LINHAS PARA INSERIR:');
   Logger.log(JSON.stringify(rowsToAppend, null, 2));
@@ -1310,11 +1311,41 @@ function upsertReportLog_(log) {
 
 function ensureSheets_() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
   getOrCreateSheet_(ss, READ_SHEET_NAME, getReadBaseHeaders_(), false);
-  getOrCreateSheet_(ss, BASE_SHEET_NAME, BASE_HEADERS, false);
+
+  const baseSheet = getOrCreateSheet_(ss, BASE_SHEET_NAME, BASE_HEADERS, false);
+
+  ensureBaseHeaders_(baseSheet, BASE_HEADERS);
+
   getOrCreateSheet_(ss, META_STUDENTS_SHEET, META_STUDENTS_HEADERS, true);
   getOrCreateSheet_(ss, META_CLASSES_SHEET, META_CLASSES_HEADERS, true);
   getOrCreateSheet_(ss, REPORTS_SHEET, REPORTS_HEADERS, true);
+}
+
+function ensureBaseHeaders_(sheet, headers) {
+  if (!sheet) return;
+
+  const currentCols = sheet.getLastColumn();
+
+  if (currentCols < headers.length) {
+    sheet.insertColumnsAfter(
+      Math.max(currentCols, 1),
+      headers.length - currentCols
+    );
+
+    const missingHeaders = headers.slice(currentCols);
+
+    if (missingHeaders.length) {
+      sheet
+        .getRange(1, currentCols + 1, 1, missingHeaders.length)
+        .setValues([missingHeaders]);
+    }
+  }
+
+  if (sheet.getFrozenRows() < 1) {
+    sheet.setFrozenRows(1);
+  }
 }
 
 function getOrCreateSheet_(ss, name, headers, hidden) {
