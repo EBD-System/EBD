@@ -67,6 +67,8 @@ const els = {
 };
 
 let loadingCount = 0;
+let loadingWatchdog = null;
+let loadingWatchdogMessage = 'A operação demorou demais. Tente novamente.';
 
 function ensureLoadingOverlay() {
   if (document.getElementById('loadingOverlay')) return;
@@ -84,7 +86,26 @@ function ensureLoadingOverlay() {
   document.body.appendChild(overlay);
 }
 
-function showLoading(message = 'Carregando...') {
+function scheduleLoadingWatchdog(timeoutMs = 35000, message = loadingWatchdogMessage) {
+  if (loadingWatchdog) clearTimeout(loadingWatchdog);
+  loadingWatchdogMessage = message || loadingWatchdogMessage;
+  loadingWatchdog = setTimeout(() => {
+    loadingWatchdog = null;
+    loadingCount = 0;
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) overlay.classList.remove('show');
+    showError(loadingWatchdogMessage);
+  }, Math.max(5000, Number(timeoutMs) || 35000));
+}
+
+function clearLoadingWatchdog() {
+  if (loadingWatchdog) {
+    clearTimeout(loadingWatchdog);
+    loadingWatchdog = null;
+  }
+}
+
+function showLoading(message = 'Carregando...', timeoutMs = 35000) {
   ensureLoadingOverlay();
 
   const overlay = document.getElementById('loadingOverlay');
@@ -94,15 +115,29 @@ function showLoading(message = 'Carregando...') {
 
   loadingCount += 1;
   overlay.classList.add('show');
+  scheduleLoadingWatchdog(timeoutMs, 'A operação demorou demais e foi cancelada. Tente novamente.');
 }
 
-function hideLoading() {
+function hideLoading(force = false) {
+  if (force) {
+    loadingCount = 0;
+    clearLoadingWatchdog();
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) overlay.classList.remove('show');
+    return;
+  }
+
   loadingCount = Math.max(0, loadingCount - 1);
 
   if (loadingCount === 0) {
+    clearLoadingWatchdog();
     const overlay = document.getElementById('loadingOverlay');
     if (overlay) overlay.classList.remove('show');
   }
+}
+
+function forceHideLoading() {
+  hideLoading(true);
 }
 
 function todayKey() {
@@ -237,36 +272,68 @@ function apiUrl(params = {}) {
   return url.toString();
 }
 
-async function apiGet(params = {}) {
-  const response = await fetch(apiUrl(params), {
-    method: 'GET',
-    mode: 'cors',
-    cache: 'no-store',
-  });
-  const data = await response.json();
+async function parseJsonResponse(response) {
+  const text = await response.text();
+  let data;
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch (err) {
+    throw new Error(text || `HTTP ${response.status}`);
+  }
+
   if (!response.ok || data.ok === false) {
     throw new Error(data.message || `HTTP ${response.status}`);
   }
+
   return data;
 }
 
-async function apiPost(params = {}) {
+async function apiGet(params = {}, { timeoutMs = 30000 } = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), Math.max(5000, Number(timeoutMs) || 30000));
+  try {
+    const response = await fetch(apiUrl(params), {
+      method: 'GET',
+      mode: 'cors',
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+    return await parseJsonResponse(response);
+  } catch (err) {
+    if (err?.name === 'AbortError') {
+      throw new Error('A requisição demorou demais. Verifique sua conexão e tente novamente.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
   const formData = new FormData();
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null) formData.append(key, value);
   });
 
-  const response = await fetch(APPS_SCRIPT_URL, {
-    method: 'POST',
-    mode: 'cors',
-    cache: 'no-store',
-    body: formData,
-  });
-  const data = await response.json();
-  if (!response.ok || data.ok === false) {
-    throw new Error(data.message || `HTTP ${response.status}`);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), Math.max(5000, Number(timeoutMs) || 30000));
+  try {
+    const response = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      mode: 'cors',
+      cache: 'no-store',
+      body: formData,
+      signal: controller.signal,
+    });
+    return await parseJsonResponse(response);
+  } catch (err) {
+    if (err?.name === 'AbortError') {
+      throw new Error('O salvamento demorou demais. Verifique sua conexão e tente novamente.');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
   }
-  return data;
 }
 
 function storageState() {
@@ -890,9 +957,9 @@ async function saveCurrentCall({ silent = false } = {}) {
     rowsJson: JSON.stringify(call.rows),
   };
 
-  if (!silent) showLoading('Salvando chamada...');
+  if (!silent) showLoading('Salvando chamada...', 30000);
   try {
-    const result = await withTimeout(apiPost(payload), 45000, 'O salvamento demorou demais. Verifique sua conexão e tente novamente.');
+    const result = await apiPost(payload, { timeoutMs: 25000 });
 
     const afterRows = Number(result.baseWrite?.afterRows ?? beforeRows);
     const insertedRows = Number(result.baseWrite?.insertedRows ?? (afterRows - beforeRows));
@@ -916,6 +983,9 @@ async function saveCurrentCall({ silent = false } = {}) {
 
     showSuccess(result.message || 'Chamada salva com sucesso.');
     return result;
+  } catch (err) {
+    if (!silent) forceHideLoading();
+    throw err;
   } finally {
     if (!silent) hideLoading();
   }
@@ -1205,7 +1275,7 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
     const data = await apiGet({
       action: 'init',
       date: state.dateKey,
-    });
+    }, { timeoutMs: 25000 });
 
     state.turmas = data.turmas || [];
     state.alunos = data.alunos || [];
