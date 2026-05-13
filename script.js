@@ -938,14 +938,17 @@ function setAllPresence(presence) {
   persistDraft(call);
   renderAll();
 }
+
 async function saveCurrentCall({ silent = false } = {}) {
   const turma = getCurrentTurma();
   const call = getCurrentCall();
+
   if (!turma || !call) {
     throw new Error('Selecione uma turma antes de salvar.');
   }
 
   const beforeRows = Number(state.baseRowsCount || 0);
+
   const payload = {
     action: 'saveCall',
     date: state.dateKey,
@@ -957,42 +960,102 @@ async function saveCurrentCall({ silent = false } = {}) {
     rowsJson: JSON.stringify(call.rows),
   };
 
-  if (!silent) showLoading('Salvando chamada...', 30000);
-  
+  if (!silent) {
+    showLoading('Salvando chamada...', 30000);
+  }
+
+  // Segurança:
+  // se o Apps Script travar ou o fetch ficar pendurado,
+  // recarrega automaticamente a página.
   const autoReloadTimer = setTimeout(() => {
-          window.location.reload();
+    location.href = location.href.split('#')[0];
   }, 7000);
-  
+
   try {
-    const result = await apiPost(payload, { timeoutMs: 25000 });
-
-    const afterRows = Number(result.baseWrite?.afterRows ?? beforeRows);
-    const insertedRows = Number(result.baseWrite?.insertedRows ?? (afterRows - beforeRows));
-
-    if (afterRows <= beforeRows || insertedRows <= 0) {
-      throw new Error('A resposta chegou, mas a planilha não aumentou. O salvamento não pôde ser confirmado.');
-    }
-
-    state.baseRowsCount = afterRows;
-    state.resumoGeral = result.resumoGeral || state.resumoGeral;
-    state.chamadasByTurma[turma.TurmaID] = result.turmaCall || call;
-    state.dirty = false;
-    clearDraft(call.chamadaId);
-    state.selectedTurmaId = turma.TurmaID;
-    renderAll();
-
-    // Atualiza os dados em segundo plano sem bloquear a confirmação visual.
-    refreshFromBackend(false, { silent: true }).catch((err) => {
-      console.warn('Falha ao atualizar dados após salvar:', err);
+    const result = await apiPost(payload, {
+      timeoutMs: 25000,
     });
 
-    showSuccess(result.message || 'Chamada salva com sucesso.');
+    const afterRows = Number(
+      result?.baseWrite?.afterRows ?? beforeRows
+    );
+
+    const insertedRows = Number(
+      result?.baseWrite?.insertedRows ??
+      (afterRows - beforeRows)
+    );
+
+    // Confirmação REAL de salvamento
+    if (
+      !result?.ok ||
+      afterRows <= beforeRows ||
+      insertedRows <= 0
+    ) {
+      throw new Error(
+        'A resposta chegou, mas a planilha não aumentou.'
+      );
+    }
+
+    // Atualiza estado local
+    state.baseRowsCount = afterRows;
+    state.resumoGeral =
+      result.resumoGeral || state.resumoGeral;
+
+    state.chamadasByTurma[turma.TurmaID] =
+      result.turmaCall || call;
+
+    state.dirty = false;
+
+    clearDraft(call.chamadaId);
+
+    state.selectedTurmaId = turma.TurmaID;
+
+    renderAll();
+
+    // Atualiza cache/dados em segundo plano
+    refreshFromBackend(false, {
+      silent: true,
+    }).catch((err) => {
+      console.warn(
+        'Falha ao atualizar dados após salvar:',
+        err
+      );
+    });
+
+    // Cancela o reload automático
+    clearTimeout(autoReloadTimer);
+
+    if (!silent) {
+      forceHideLoading();
+    }
+
+    showSuccess(
+      result.message || 'Chamada salva com sucesso.'
+    );
+
     return result;
+
   } catch (err) {
-    if (!silent) forceHideLoading();
+
+    console.error('Erro ao salvar chamada:', err);
+
+    clearTimeout(autoReloadTimer);
+
+    if (!silent) {
+      forceHideLoading();
+    }
+
+    showError(
+      err?.message || 'Erro ao salvar chamada.'
+    );
+
     throw err;
+
   } finally {
-    if (!silent) hideLoading();
+
+    if (!silent) {
+      hideLoading();
+    }
   }
 }
 
