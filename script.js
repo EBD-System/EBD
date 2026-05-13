@@ -17,7 +17,6 @@ const state = {
   showInactive: true,
   dirty: false,
   initialized: false,
-  autosaveTimer: null,
   accessCode: '',
   accessMode: 'restricted',
   baseRowsCount: 0,
@@ -104,28 +103,6 @@ function clearLoadingWatchdog() {
     clearTimeout(loadingWatchdog);
     loadingWatchdog = null;
   }
-}
-
-function clearAutosaveTimer() {
-  if (state.autosaveTimer) {
-    clearTimeout(state.autosaveTimer);
-    state.autosaveTimer = null;
-  }
-}
-
-function scheduleAutosaveCurrentCall(delayMs = 1200) {
-  if (!state.initialized) return;
-  if (state.loading) return;
-  clearAutosaveTimer();
-  state.autosaveTimer = setTimeout(async () => {
-    state.autosaveTimer = null;
-    if (!state.dirty || state.loading || isRestrictedMode()) return;
-    try {
-      await saveCurrentCall({ silent: true });
-    } catch (err) {
-      console.warn('Autosalvamento da chamada falhou:', err);
-    }
-  }, Math.max(300, Number(delayMs) || 1200));
 }
 
 function showLoading(message = 'Carregando...', timeoutMs = 35000) {
@@ -656,8 +633,6 @@ function updateCallFromInputs() {
   if (!call) return;
   call.data = state.dateKey;
   call.oferta = document.getElementById('ofertaInput')?.value?.trim?.() ?? call.oferta;
-  call.visitantes = Number(document.getElementById('visitantesInput')?.value || 0) || 0;
-  call.visitantesTexto = document.getElementById('visitantesTextoInput')?.value?.trim?.() ?? call.visitantesTexto;
 }
 
 function isInactiveStudent(row, rosterMap = null) {
@@ -938,7 +913,6 @@ function markDirty() {
   state.dirty = true;
   persistDraft(call);
   renderReports();
-  scheduleAutosaveCurrentCall();
 }
 
 function setStudentPresence(alunoId, presence) {
@@ -951,7 +925,6 @@ function setStudentPresence(alunoId, presence) {
   state.dirty = true;
   persistDraft(call);
   renderAll();
-  scheduleAutosaveCurrentCall();
 }
 function setAllPresence(presence) {
   const call = getCurrentCall();
@@ -964,14 +937,11 @@ function setAllPresence(presence) {
   state.dirty = true;
   persistDraft(call);
   renderAll();
-  scheduleAutosaveCurrentCall();
 }
 
 async function saveCurrentCall({ silent = false } = {}) {
   const turma = getCurrentTurma();
   const call = getCurrentCall();
-
-  updateCallFromInputs();
 
   if (!turma || !call) {
     throw new Error('Selecione uma turma antes de salvar.');
@@ -1349,11 +1319,9 @@ function bindCallFieldValues() {
       const current = getCurrentCall();
       if (!current) return;
       current.oferta = event.target.value;
-      persistDraft(current);
       markDirty();
       renderSummary();
       renderReports();
-      scheduleAutosaveCurrentCall();
     });
   }
 
@@ -1363,11 +1331,9 @@ function bindCallFieldValues() {
       const current = getCurrentCall();
       if (!current) return;
       current.visitantes = Number(event.target.value || 0) || 0;
-      persistDraft(current);
       markDirty();
       renderSummary();
       renderReports();
-      scheduleAutosaveCurrentCall();
     });
   }
 
@@ -1377,16 +1343,13 @@ function bindCallFieldValues() {
       const current = getCurrentCall();
       if (!current) return;
       current.visitantesTexto = event.target.value;
-      persistDraft(current);
       markDirty();
       renderReports();
-      scheduleAutosaveCurrentCall();
     });
   }
 }
 
 async function refreshFromBackend(showMessage = false, { silent = false } = {}) {
-  clearAutosaveTimer();
   state.loading = true;
   if (!silent) showLoading('Carregando dados...');
 
@@ -1406,7 +1369,7 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
     const drafts = storage.drafts || {};
     Object.values(state.chamadasByTurma).forEach((call) => {
       if (!call) return;
-      if (drafts[call.chamadaId]) {
+      if (!call.isSaved && drafts[call.chamadaId]) {
         state.chamadasByTurma[call.turmaId] = restoreDraft(call);
       }
     });
@@ -1450,8 +1413,6 @@ async function bootstrap() {
 
     const storage = storageState();
     state.selectedTurmaId = storage.selectedTurmaId || '';
-    state.dateKey = storage.selectedDateKey || state.dateKey;
-    els.dateInput.value = state.dateKey;
 
     if (!validateApiUrl()) return;
 
@@ -1472,18 +1433,7 @@ async function bootstrap() {
 }
 
 els.dateInput.addEventListener('change', async (event) => {
-  const nextDate = event.target.value || todayKey();
-  if (nextDate === state.dateKey) return;
-
-  if (state.dirty && !isRestrictedMode()) {
-    try {
-      await saveCurrentCall({ silent: true });
-    } catch (err) {
-      console.warn('Falha ao salvar antes de trocar a data:', err);
-    }
-  }
-
-  state.dateKey = nextDate;
+  state.dateKey = event.target.value || todayKey();
   const storage = storageState();
   storage.selectedDateKey = state.dateKey;
   saveStorageState(storage);
