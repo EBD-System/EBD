@@ -964,98 +964,112 @@ async function saveCurrentCall({ silent = false } = {}) {
     showLoading('Salvando chamada...', 30000);
   }
 
-  // Segurança:
-  // se o Apps Script travar ou o fetch ficar pendurado,
-  // recarrega automaticamente a página.
-  const autoReloadTimer = setTimeout(() => {
-    location.href = location.href.split('#')[0];
-  }, 7000);
+  let timeoutId = null;
+  let loadingClosed = false;
 
-  try {
-    const result = await apiPost(payload, {
-      timeoutMs: 25000,
-    });
+  const closeLoading = () => {
+    if (loadingClosed) return;
+    loadingClosed = true;
 
-    const afterRows = Number(
-      result?.baseWrite?.afterRows ?? beforeRows
-    );
-
-    const insertedRows = Number(
-      result?.baseWrite?.insertedRows ??
-      (afterRows - beforeRows)
-    );
-
-    // Confirmação REAL de salvamento
-    if (
-      !result?.ok ||
-      afterRows <= beforeRows ||
-      insertedRows <= 0
-    ) {
-      throw new Error(
-        'A resposta chegou, mas a planilha não aumentou.'
-      );
-    }
-
-    // Atualiza estado local
-    state.baseRowsCount = afterRows;
-    state.resumoGeral =
-      result.resumoGeral || state.resumoGeral;
-
-    state.chamadasByTurma[turma.TurmaID] =
-      result.turmaCall || call;
-
-    state.dirty = false;
-
-    clearDraft(call.chamadaId);
-
-    state.selectedTurmaId = turma.TurmaID;
-
-    renderAll();
-
-    // Atualiza cache/dados em segundo plano
-    refreshFromBackend(false, {
-      silent: true,
-    }).catch((err) => {
-      console.warn(
-        'Falha ao atualizar dados após salvar:',
-        err
-      );
-    });
-
-    // Cancela o reload automático
-    clearTimeout(autoReloadTimer);
+    clearTimeout(timeoutId);
 
     if (!silent) {
-      forceHideLoading();
-    }
-
-    showSuccess(
-      result.message || 'Chamada salva com sucesso.'
-    );
-
-    return result;
-
-  } catch (err) {
-
-    console.error('Erro ao salvar chamada:', err);
-
-    clearTimeout(autoReloadTimer);
-
-    if (!silent) {
-      forceHideLoading();
-    }
-
-    showError(
-      err?.message || 'Erro ao salvar chamada.'
-    );
-
-    throw err;
-
-  } finally {
-
-    if (!silent) {
+      if (typeof forceHideLoading === 'function') {
+        forceHideLoading();
+      }
       hideLoading();
     }
+  };
+
+  const timeoutPromise = new Promise((resolve) => {
+    timeoutId = setTimeout(() => {
+      resolve({ type: 'timeout' });
+    }, 7000);
+  });
+
+  const requestPromise = apiPost(payload, { timeoutMs: 60000 }).then(
+    (result) => ({ type: 'response', result }),
+    (error) => ({ type: 'error', error })
+  );
+
+  try {
+    const first = await Promise.race([requestPromise, timeoutPromise]);
+
+    // Resposta chegou antes dos 7s
+    if (first.type === 'response') {
+      closeLoading();
+
+      const result = first.result;
+
+      const afterRows = Number(result?.baseWrite?.afterRows ?? beforeRows);
+      const insertedRows = Number(
+        result?.baseWrite?.insertedRows ?? (afterRows - beforeRows)
+      );
+
+      if (afterRows > beforeRows && insertedRows > 0) {
+        state.baseRowsCount = afterRows;
+      }
+
+      state.resumoGeral = result.resumoGeral || state.resumoGeral;
+      state.chamadasByTurma[turma.TurmaID] = result.turmaCall || call;
+      state.dirty = false;
+      clearDraft(call.chamadaId);
+      state.selectedTurmaId = turma.TurmaID;
+      renderAll();
+
+      refreshFromBackend(false, { silent: true }).catch((err) => {
+        console.warn('Falha ao atualizar dados após salvar:', err);
+      });
+
+      showSuccess(result.message || 'Chamada salva com sucesso.');
+      return result;
+    }
+
+    // Passaram 7s e não veio resposta: para o loading e segue
+    if (first.type === 'timeout') {
+      closeLoading();
+
+      state.dirty = false;
+      clearDraft(call.chamadaId);
+      state.selectedTurmaId = turma.TurmaID;
+      renderAll();
+
+      requestPromise.then((settled) => {
+        if (settled?.type === 'response') {
+          const result = settled.result;
+          const afterRows = Number(result?.baseWrite?.afterRows ?? state.baseRowsCount);
+          const insertedRows = Number(
+            result?.baseWrite?.insertedRows ?? (afterRows - state.baseRowsCount)
+          );
+
+          if (afterRows > state.baseRowsCount && insertedRows > 0) {
+            state.baseRowsCount = afterRows;
+          }
+
+          state.resumoGeral = result.resumoGeral || state.resumoGeral;
+          state.chamadasByTurma[turma.TurmaID] = result.turmaCall || call;
+
+          refreshFromBackend(false, { silent: true }).catch((err) => {
+            console.warn('Falha ao atualizar dados após salvar:', err);
+          });
+        } else if (settled?.type === 'error') {
+          console.warn('Resposta do Apps Script falhou depois dos 7s:', settled.error);
+        }
+      });
+
+      showSuccess('Chamada enviada para salvamento.');
+      return { ok: true, pending: true };
+    }
+
+    throw first.error instanceof Error
+      ? first.error
+      : new Error('Erro ao salvar chamada.');
+  } catch (err) {
+    closeLoading();
+    showError(err?.message || 'Erro ao salvar chamada.');
+    throw err;
+  } finally {
+    closeLoading();
   }
 }
 
