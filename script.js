@@ -17,6 +17,7 @@ const state = {
   showInactive: true,
   dirty: false,
   initialized: false,
+  autosaveTimer: null,
   accessCode: '',
   accessMode: 'restricted',
   baseRowsCount: 0,
@@ -103,6 +104,28 @@ function clearLoadingWatchdog() {
     clearTimeout(loadingWatchdog);
     loadingWatchdog = null;
   }
+}
+
+function clearAutosaveTimer() {
+  if (state.autosaveTimer) {
+    clearTimeout(state.autosaveTimer);
+    state.autosaveTimer = null;
+  }
+}
+
+function scheduleAutosaveCurrentCall(delayMs = 1200) {
+  if (!state.initialized) return;
+  if (state.loading) return;
+  clearAutosaveTimer();
+  state.autosaveTimer = setTimeout(async () => {
+    state.autosaveTimer = null;
+    if (!state.dirty || state.loading || isRestrictedMode()) return;
+    try {
+      await saveCurrentCall({ silent: true });
+    } catch (err) {
+      console.warn('Autosalvamento da chamada falhou:', err);
+    }
+  }, Math.max(300, Number(delayMs) || 1200));
 }
 
 function showLoading(message = 'Carregando...', timeoutMs = 35000) {
@@ -915,6 +938,7 @@ function markDirty() {
   state.dirty = true;
   persistDraft(call);
   renderReports();
+  scheduleAutosaveCurrentCall();
 }
 
 function setStudentPresence(alunoId, presence) {
@@ -927,6 +951,7 @@ function setStudentPresence(alunoId, presence) {
   state.dirty = true;
   persistDraft(call);
   renderAll();
+  scheduleAutosaveCurrentCall();
 }
 function setAllPresence(presence) {
   const call = getCurrentCall();
@@ -939,6 +964,7 @@ function setAllPresence(presence) {
   state.dirty = true;
   persistDraft(call);
   renderAll();
+  scheduleAutosaveCurrentCall();
 }
 
 async function saveCurrentCall({ silent = false } = {}) {
@@ -1327,6 +1353,7 @@ function bindCallFieldValues() {
       markDirty();
       renderSummary();
       renderReports();
+      scheduleAutosaveCurrentCall();
     });
   }
 
@@ -1340,6 +1367,7 @@ function bindCallFieldValues() {
       markDirty();
       renderSummary();
       renderReports();
+      scheduleAutosaveCurrentCall();
     });
   }
 
@@ -1352,11 +1380,13 @@ function bindCallFieldValues() {
       persistDraft(current);
       markDirty();
       renderReports();
+      scheduleAutosaveCurrentCall();
     });
   }
 }
 
 async function refreshFromBackend(showMessage = false, { silent = false } = {}) {
+  clearAutosaveTimer();
   state.loading = true;
   if (!silent) showLoading('Carregando dados...');
 
@@ -1442,7 +1472,18 @@ async function bootstrap() {
 }
 
 els.dateInput.addEventListener('change', async (event) => {
-  state.dateKey = event.target.value || todayKey();
+  const nextDate = event.target.value || todayKey();
+  if (nextDate === state.dateKey) return;
+
+  if (state.dirty && !isRestrictedMode()) {
+    try {
+      await saveCurrentCall({ silent: true });
+    } catch (err) {
+      console.warn('Falha ao salvar antes de trocar a data:', err);
+    }
+  }
+
+  state.dateKey = nextDate;
   const storage = storageState();
   storage.selectedDateKey = state.dateKey;
   saveStorageState(storage);
