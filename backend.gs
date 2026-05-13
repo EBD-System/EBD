@@ -25,7 +25,7 @@ const META_STUDENTS_SHEET = '__ALUNOS_META';
 const META_CLASSES_SHEET = '__TURMAS_META';
 const REPORTS_SHEET = '__RELATORIOS';
 
-const BASE_HEADERS = ['DATA', 'ANO', 'MÊS', 'ALUNO', 'CLASSE', 'PRESENÇA', 'ATRASO', 'AUSÊNCIA', 'OFERTA'];
+const BASE_HEADERS = ['DATA', 'ANO', 'MÊS', 'ALUNO', 'CLASSE', 'PRESENÇA', 'ATRASO', 'AUSÊNCIA', 'OFERTA', 'VISITANTES', 'VISITANTES_TEXTO'];
 const META_STUDENTS_HEADERS = [
   'AlunoID', 'Nome', 'TurmaID', 'TurmaNome', 'Ativo',
   'FaltasConsecutivas', 'TotalPresencas', 'TotalFaltas', 'Percentual',
@@ -592,19 +592,24 @@ function buildCallsByTurmaForDate_(dateKey, all) {
     });
 
     const callMeta = findCallMeta_(turma.TurmaID, dateKey);
+    const baseMeta = saved[saved.length - 1] || null;
     const presentes = rows.filter(r => isPresenceLikeRow_(r)).length;
     const atrasos = rows.filter(r => isDelayedRow_(r)).length;
     const ausentes = rows.length - presentes;
     const percentual = rows.length ? round1_((presentes / rows.length) * 100) : 0;
+
+    const oferta = String(callMeta?.Oferta ?? baseMeta?.oferta ?? '').trim();
+    const visitantes = Number(callMeta?.Visitantes ?? baseMeta?.visitantes ?? 0) || 0;
+    const visitantesTexto = String(callMeta?.VisitantesTexto ?? baseMeta?.visitantesTexto ?? '').trim();
 
     callsByTurma[turma.TurmaID] = {
       chamadaId: callMeta?.ChamadaID || `${turma.TurmaID}_${dateKey}`,
       data: dateKey,
       turmaId: turma.TurmaID,
       turmaNome: turma.Nome,
-      oferta: callMeta?.Oferta || '',
-      visitantes: Number(callMeta?.Visitantes || 0) || 0,
-      visitantesTexto: callMeta?.VisitantesTexto || '',
+      oferta,
+      visitantes,
+      visitantesTexto,
       totalAlunos: rows.length,
       presentes,
       atrasos,
@@ -991,19 +996,25 @@ function replaceBaseRowsForCall_(dateKey, turmaId, turmaNome, normalizedRows, ex
   const [year, month] = String(dateKey).split('-');
   const dataBr = formatDateBR_(dateKey);
   const mesTxt = monthToAbbrev_(month);
+  const turmaNomeFinal = turmaNome || getTurmaNameById_(turmaId);
 
-  const rowsToAppend = normalizedRows.map((r) => ([
-  dataBr,
-  Number(year),
-  mesTxt,
-  r.nome,
-  turmaNome || getTurmaNameById_(turmaId),
-  r.presenca === 'sim' ? 1 : 0,
-  r.atraso ? 1 : 0,
-  r.presenca === 'nao' ? 1 : 0,
-  extra?.oferta || 'R$ 0,00',
-  Number(extra?.visitantes || 0),
-]));
+  // Remove gravações anteriores da mesma turma/data para que a leitura
+  // sempre reflita a versão mais recente da chamada.
+  deleteBaseRowsForCall_(sheet, dateKey, turmaId);
+
+  const rowsToAppend = normalizedRows.map((r) => [
+    dataBr,
+    Number(year),
+    mesTxt,
+    r.nome,
+    turmaNomeFinal,
+    r.presenca === 'sim' ? 1 : 0,
+    r.atraso ? 1 : 0,
+    r.presenca === 'nao' ? 1 : 0,
+    extra?.oferta || 'R$ 0,00',
+    Number(extra?.visitantes || 0),
+    String(extra?.visitantesTexto || '').trim(),
+  ]);
 
   Logger.log('LINHAS PARA INSERIR:');
   Logger.log(JSON.stringify(rowsToAppend, null, 2));
@@ -1025,7 +1036,32 @@ function replaceBaseRowsForCall_(dateKey, turmaId, turmaNome, normalizedRows, ex
   };
 }
 
+function deleteBaseRowsForCall_(sheet, dateKey, turmaId) {
+  if (!sheet || sheet.getLastRow() < 2) return;
+
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0].map(normalizeHeader_);
+  const idx = indexByHeader_(headers);
+  const rowsToDelete = [];
+  const targetDate = normalizeDateKey_(dateKey);
+  const targetTurmaId = String(turmaId || '').trim();
+
+  for (let i = 1; i < values.length; i++) {
+    const rowDate = normalizeDateFromBaseCell_(values[i][idx.DATA]);
+    const turmaNome = String(values[i][idx.CLASSE] || '').trim();
+    const rowTurmaId = buildTurmaId_(turmaNome);
+    if (rowDate === targetDate && rowTurmaId === targetTurmaId) {
+      rowsToDelete.push(i + 1);
+    }
+  }
+
+  rowsToDelete.sort((a, b) => b - a).forEach((rowNumber) => {
+    sheet.deleteRow(rowNumber);
+  });
+}
+
 function getBaseRowsCount_() {
+
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName(BASE_SHEET_NAME);
   if (!sheet || sheet.getLastRow() < 2) return 0;
@@ -1061,6 +1097,8 @@ function getBaseRowsAll_() {
       atraso,
       ausencia: normalizeBool_(row[idx.AUSENCIA]),
       oferta: row[idx.OFERTA] || '',
+      visitantes: Number(row[idx.VISITANTES] || row[9] || 0) || 0,
+      visitantesTexto: String(row[idx.VISITANTES_TEXTO] || row[10] || '').trim(),
       alunoId: buildStudentId_(aluno, turmaId, ''),
     });
   }
