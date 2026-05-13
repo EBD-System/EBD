@@ -958,6 +958,11 @@ async function saveCurrentCall({ silent = false } = {}) {
   };
 
   if (!silent) showLoading('Salvando chamada...', 30000);
+  
+  const autoReloadTimer = setTimeout(() => {
+          window.location.reload();
+  }, 7000);
+  
   try {
     const result = await apiPost(payload, { timeoutMs: 25000 });
 
