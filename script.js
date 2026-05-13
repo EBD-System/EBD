@@ -765,7 +765,7 @@ function buildGeneralReportText() {
     'Resumo por turma:',
   ];
 
-  geral.turmaSummaries.forEach((item) => {
+  (geral.turmaSummaries || []).forEach((item) => {
     lines.push(`- ${item.nome}: ${item.presentes}/${item.totalAlunos} (${formatPercent(item.percentual)}) | Oferta ${item.oferta || '-'} | Visitantes ${item.visitantes || 0}`);
   });
 
