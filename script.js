@@ -633,6 +633,8 @@ function updateCallFromInputs() {
   if (!call) return;
   call.data = state.dateKey;
   call.oferta = document.getElementById('ofertaInput')?.value?.trim?.() ?? call.oferta;
+  call.visitantes = Number(document.getElementById('visitantesInput')?.value || 0) || 0;
+  call.visitantesTexto = document.getElementById('visitantesTextoInput')?.value?.trim?.() ?? call.visitantesTexto;
 }
 
 function isInactiveStudent(row, rosterMap = null) {
@@ -942,6 +944,8 @@ function setAllPresence(presence) {
 async function saveCurrentCall({ silent = false } = {}) {
   const turma = getCurrentTurma();
   const call = getCurrentCall();
+
+  updateCallFromInputs();
 
   if (!turma || !call) {
     throw new Error('Selecione uma turma antes de salvar.');
@@ -1319,6 +1323,7 @@ function bindCallFieldValues() {
       const current = getCurrentCall();
       if (!current) return;
       current.oferta = event.target.value;
+      persistDraft(current);
       markDirty();
       renderSummary();
       renderReports();
@@ -1331,6 +1336,7 @@ function bindCallFieldValues() {
       const current = getCurrentCall();
       if (!current) return;
       current.visitantes = Number(event.target.value || 0) || 0;
+      persistDraft(current);
       markDirty();
       renderSummary();
       renderReports();
@@ -1343,6 +1349,7 @@ function bindCallFieldValues() {
       const current = getCurrentCall();
       if (!current) return;
       current.visitantesTexto = event.target.value;
+      persistDraft(current);
       markDirty();
       renderReports();
     });
@@ -1369,7 +1376,7 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
     const drafts = storage.drafts || {};
     Object.values(state.chamadasByTurma).forEach((call) => {
       if (!call) return;
-      if (!call.isSaved && drafts[call.chamadaId]) {
+      if (drafts[call.chamadaId]) {
         state.chamadasByTurma[call.turmaId] = restoreDraft(call);
       }
     });
@@ -1413,6 +1420,8 @@ async function bootstrap() {
 
     const storage = storageState();
     state.selectedTurmaId = storage.selectedTurmaId || '';
+    state.dateKey = storage.selectedDateKey || state.dateKey;
+    els.dateInput.value = state.dateKey;
 
     if (!validateApiUrl()) return;
 
