@@ -37,8 +37,7 @@ const REPORTS_HEADERS = ['RelatorioID', 'Tipo', 'Data', 'TurmaID', 'Hash', 'Envi
 
 function doGet(e) {
 
-    // debugRoundTripChamada_();
-
+     // debugRoundTripChamada_();
      // debugLerChamadaSalva_('2026-05-14', 'T_cordei_de_cristo');
 
   const action = String(e?.parameter?.action || 'init').toLowerCase();
@@ -1067,7 +1066,7 @@ function getBaseRowsAll_() {
   atraso,
   ausencia: normalizeBool_(row[idx.AUSENCIA]),
   oferta: row[idx.OFERTA] || '',
-  visitantes: Number(row[idx.Visitantes] || 0) || 0,
+  visitantes: Number(row[idx.Visitantes] || row[idx.VISITANTES] || 0) || 0,
   alunoId: buildStudentId_(aluno, turmaId, ''),
 });
   }
@@ -1079,84 +1078,116 @@ function getBaseRowsForDate_(dateKey) {
   return getBaseRowsAll_().filter(row => row.dateKey === dateKey);
 }
 
+
+function getFirstNonEmpty_() {
+  for (const value of arguments) {
+    if (value === null || value === undefined) continue;
+    const str = String(value).trim();
+    if (str !== '') return value;
+  }
+  return '';
+}
+
+function parseCallMetaText_(text) {
+  try {
+    const obj = JSON.parse(String(text || '{}'));
+    return obj && typeof obj === 'object' ? obj : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+function buildCallMetaFromBaseRows_(dateKey, turmaId) {
+  const rows = getBaseRowsForDate_(dateKey)
+    .filter(r => String(r.turmaId || '') === String(turmaId || ''));
+
+  Logger.log('FALLBACK VIA BASE');
+  Logger.log('ROWS BASE ENCONTRADAS:');
+  Logger.log(JSON.stringify(rows, null, 2));
+
+  if (!rows.length) return null;
+
+  const oferta = getFirstNonEmpty_(
+    ...rows.map(r => r.oferta)
+  );
+
+  const visitantes = (() => {
+    for (const r of rows) {
+      const n = Number(r.visitantes || 0) || 0;
+      if (n > 0) return n;
+    }
+    return 0;
+  })();
+
+  const visitantesTexto = getFirstNonEmpty_(
+    ...rows.map(r => r.visitantesTexto)
+  );
+
+  Logger.log('META VIA BASE:');
+  Logger.log(JSON.stringify({ oferta, visitantes, visitantesTexto }, null, 2));
+
+  return {
+    ChamadaID: `CALL_${turmaId}_${dateKey}`,
+    Data: formatDateBR_(dateKey),
+    TurmaID: turmaId,
+    Oferta: String(oferta || '').trim(),
+    Visitantes: Number(visitantes || 0) || 0,
+    VisitantesTexto: String(visitantesTexto || '').trim(),
+    EnviadoTelegram: 'nao',
+    TelegramEnviadoEm: '',
+  };
+}
+
 function findCallMeta_(turmaId, dateKey) {
   const reportId = `CALL_${turmaId}_${dateKey}`;
 
-  // =========================================
-  // 1. TENTA PEGAR DO __RELATORIOS
-  // =========================================
-
+  // 1) TENTA PEGAR DO __RELATORIOS
   const log = getReportLogById_(reportId);
 
   if (log) {
-    try {
-      const obj = JSON.parse(String(log.Texto || '{}'));
+    const parsed = parseCallMetaText_(log.Texto);
 
-      Logger.log('META VIA __RELATORIOS:');
-      Logger.log(JSON.stringify(obj, null, 2));
+    Logger.log('META VIA __RELATORIOS (RAW):');
+    Logger.log(JSON.stringify(log, null, 2));
+
+    if (parsed) {
+      Logger.log('META VIA __RELATORIOS (PARSED):');
+      Logger.log(JSON.stringify(parsed, null, 2));
 
       return {
         ChamadaID: reportId,
         Data: formatDateBR_(dateKey),
         TurmaID: turmaId,
-
-        Oferta: obj.oferta || '',
-        Visitantes: Number(obj.visitantes || 0) || 0,
-        VisitantesTexto: obj.visitantesTexto || '',
-
-        EnviadoTelegram: String(log.Enviado || 'nao'),
-        TelegramEnviadoEm: String(log.EnviadoEm || ''),
+        Oferta: String(getFirstNonEmpty_(parsed.oferta, parsed.Oferta, log.Oferta, log.OFERTA) || '').trim(),
+        Visitantes: Number(getFirstNonEmpty_(parsed.visitantes, parsed.Visitantes, log.Visitantes, log.VISITANTES) || 0) || 0,
+        VisitantesTexto: String(getFirstNonEmpty_(parsed.visitantesTexto, parsed.VisitantesTexto, log.VisitantesTexto, log.VISITANTESTEXTO) || '').trim(),
+        EnviadoTelegram: String(getFirstNonEmpty_(log.Enviado, parsed.enviadoTelegram, parsed.EnviadoTelegram) || 'nao'),
+        TelegramEnviadoEm: String(getFirstNonEmpty_(log.EnviadoEm, parsed.telegramEnviadoEm, parsed.TelegramEnviadoEm) || ''),
       };
-    } catch (err) {
-      Logger.log('ERRO AO LER JSON DO __RELATORIOS');
-      Logger.log(err);
+    }
+
+    // Se o JSON do log não for válido, tenta ler os campos diretamente da linha
+    const directFallback = {
+      ChamadaID: reportId,
+      Data: formatDateBR_(dateKey),
+      TurmaID: turmaId,
+      Oferta: String(getFirstNonEmpty_(log.Oferta, log.oferta, log.OFERTA) || '').trim(),
+      Visitantes: Number(getFirstNonEmpty_(log.Visitantes, log.visitantes, log.VISITANTES) || 0) || 0,
+      VisitantesTexto: String(getFirstNonEmpty_(log.VisitantesTexto, log.visitantesTexto, log.VISITANTESTEXTO) || '').trim(),
+      EnviadoTelegram: String(getFirstNonEmpty_(log.Enviado, 'nao') || 'nao'),
+      TelegramEnviadoEm: String(getFirstNonEmpty_(log.EnviadoEm, '') || ''),
+    };
+
+    Logger.log('META VIA __RELATORIOS (DIRECT FALLBACK):');
+    Logger.log(JSON.stringify(directFallback, null, 2));
+
+    if (String(directFallback.Oferta || '').trim() !== '' || Number(directFallback.Visitantes || 0) > 0) {
+      return directFallback;
     }
   }
 
-  // =========================================
-  // 2. FALLBACK:
-  //    BUSCA DIRETO DA ABA BASE
-  // =========================================
-
-  Logger.log('FALLBACK VIA BASE');
-
-  const rows = getBaseRowsForDate_(dateKey)
-    .filter(r => String(r.turmaId || '') === String(turmaId || ''));
-
-  Logger.log('ROWS BASE ENCONTRADAS:');
-  Logger.log(JSON.stringify(rows, null, 2));
-
-  if (!rows.length) {
-    Logger.log('NENHUMA ROW ENCONTRADA NA BASE');
-    return null;
-  }
-
-  const oferta =
-    rows.find(r => String(r.oferta || '').trim() !== '')?.oferta || '';
-
-  const visitantes =
-    Number(
-      rows.find(r => Number(r.visitantes || 0) > 0)?.visitantes || 0
-    ) || 0;
-
-  Logger.log('META VIA BASE:');
-  Logger.log(JSON.stringify({
-    oferta,
-    visitantes,
-  }, null, 2));
-
-  return {
-    ChamadaID: reportId,
-    Data: formatDateBR_(dateKey),
-    TurmaID: turmaId,
-
-    Oferta: oferta,
-    Visitantes: visitantes,
-    VisitantesTexto: '',
-
-    EnviadoTelegram: 'nao',
-    TelegramEnviadoEm: '',
-  };
+  // 2) FALLBACK VIA BASE
+  return buildCallMetaFromBaseRows_(dateKey, turmaId);
 }
 
 function upsertCallMeta_(chamadaId, dateKey, turmaId, oferta, visitantes, visitantesTexto, totalAlunos, presentes, ausentes, percentual, enviadoTelegram) {
