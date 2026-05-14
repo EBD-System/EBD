@@ -1090,7 +1090,15 @@ function findCallMeta_(turmaId, dateKey) {
 }
 
 function upsertCallMeta_(chamadaId, dateKey, turmaId, oferta, visitantes, visitantesTexto, totalAlunos, presentes, ausentes, percentual, enviadoTelegram) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  
+Logger.log('@@@@@@@@@@@@@@');
+Logger.log(visitantes);
+Logger.log('===============');
+Logger.log(oferta);
+Logger.log('@@@@@@@@@@@@@@');
+
+
+const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = getOrCreateSheet_(ss, REPORTS_SHEET, REPORTS_HEADERS, true);
   const existing = getCallMetaRows_(sheet);
   const reportId = `CALL_${turmaId}_${dateKey}`;
