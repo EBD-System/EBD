@@ -36,6 +36,11 @@ const META_CLASSES_HEADERS = ['TurmaID', 'Nome', 'Ordem', 'Ativa', 'CriadoEm', '
 const REPORTS_HEADERS = ['RelatorioID', 'Tipo', 'Data', 'TurmaID', 'Hash', 'Enviado', 'EnviadoEm', 'Texto', 'CriadoEm'];
 
 function doGet(e) {
+
+     debugRoundTripChamada_();
+
+     // debugLerChamadaSalva_('2026-05-14', 'T_cordei_de_cristo');
+
   const action = String(e?.parameter?.action || 'init').toLowerCase();
 
   try {
@@ -1612,6 +1617,166 @@ function json_(obj) {
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }
+
+// debugRoundTripChamada_();
+function debugRoundTripChamada_() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) {
+    throw new Error('Não foi possível obter lock para o teste.');
+  }
+
+  try {
+    ensureSheets_();
+
+    const dateKey = todayKey_();
+    const all = loadAllData_();
+
+    const turma =
+      getTurmaByIdOrName_('T_cordei_de_cristo', all.turmas) ||
+      all.turmas[0] ||
+      null;
+
+    if (!turma) {
+      throw new Error('Nenhuma turma encontrada para o teste.');
+    }
+
+    const roster = getRosterForTurma_(turma.TurmaID, all);
+    if (!roster.length) {
+      throw new Error(`A turma ${turma.Nome} não tem alunos para testar.`);
+    }
+
+    const sampleRows = roster.slice(0, Math.min(4, roster.length)).map((aluno, index) => ({
+      alunoId: aluno.AlunoID,
+      nome: aluno.Nome,
+      presenca: index === 0 ? 'sim' : (index === 1 ? 'atrasado' : 'nao'),
+      atraso: index === 1,
+      observacao: `teste_${new Date().toISOString()}`,
+      statusAluno: String(aluno.Status || 'ativo'),
+    }));
+
+    const chamadaId = `CALL_${turma.TurmaID}_${dateKey}`;
+    const oferta = 'R$ 4,00';
+    const visitantes = 4;
+    const visitantesTexto = '4 visitantes';
+
+    Logger.log('========== TESTE ROUND-TRIP ==========');
+    Logger.log('TURMA: ' + JSON.stringify({
+      turmaId: turma.TurmaID,
+      turmaNome: turma.Nome,
+      dateKey,
+      chamadaId,
+    }, null, 2));
+
+    Logger.log('PAYLOAD DE TESTE: ' + JSON.stringify({
+      action: 'saveCall',
+      date: dateKey,
+      turmaId: turma.TurmaID,
+      chamadaId,
+      oferta,
+      visitantes,
+      visitantesTexto,
+      rowsJson: sampleRows,
+    }, null, 2));
+
+    const saveResult = saveCall_({
+      date: dateKey,
+      turmaId: turma.TurmaID,
+      chamadaId,
+      oferta,
+      visitantes: String(visitantes),
+      visitantesTexto,
+      rowsJson: JSON.stringify(sampleRows),
+      sendTelegram: 'nao',
+      autoSend: 'nao',
+    });
+
+    SpreadsheetApp.flush();
+
+    const reportId = `CALL_${turma.TurmaID}_${dateKey}`;
+    const rawLog = getReportLogById_(reportId);
+    const parsedMeta = findCallMeta_(turma.TurmaID, dateKey);
+    const initResult = init_({ date: dateKey });
+    const frontendCall = initResult?.callsByTurma?.[turma.TurmaID] || null;
+
+    Logger.log('========== SAVE RESULT ==========');
+    Logger.log(JSON.stringify(saveResult, null, 2));
+
+    Logger.log('========== REPORT LOG RAW ==========');
+    Logger.log(JSON.stringify(rawLog, null, 2));
+
+    Logger.log('========== PARSED META ==========');
+    Logger.log(JSON.stringify(parsedMeta, null, 2));
+
+    Logger.log('========== FRONTEND JSON ==========');
+    Logger.log(JSON.stringify(frontendCall, null, 2));
+
+    Logger.log('========== INIT INTEIRO ==========');
+    Logger.log(JSON.stringify({
+      dateKey: initResult.dateKey,
+      baseRowsCount: initResult.baseRowsCount,
+      call: frontendCall,
+    }, null, 2));
+
+    return {
+      ok: true,
+      dateKey,
+      turmaId: turma.TurmaID,
+      chamadaId,
+      saveResult,
+      rawLog,
+      parsedMeta,
+      frontendCall,
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// debugLerChamadaSalva_('2026-05-14', 'T_cordei_de_cristo');
+function debugLerChamadaSalva_(dateKey, turmaId) {
+  ensureSheets_();
+
+  const all = loadAllData_();
+  const turma = getTurmaByIdOrName_(turmaId, all.turmas);
+
+  if (!turma) {
+    throw new Error('Turma não encontrada.');
+  }
+
+  const reportId = `CALL_${turma.TurmaID}_${dateKey}`;
+  const rawLog = getReportLogById_(reportId);
+  const parsedMeta = findCallMeta_(turma.TurmaID, dateKey);
+  const initResult = init_({ date: dateKey });
+  const frontendCall = initResult?.callsByTurma?.[turma.TurmaID] || null;
+
+  Logger.log('========== LEITURA SALVA ==========');
+  Logger.log(JSON.stringify({
+    reportId,
+    rawLog,
+    parsedMeta,
+    frontendCall,
+  }, null, 2));
+
+  return {
+    ok: true,
+    reportId,
+    rawLog,
+    parsedMeta,
+    frontendCall,
+  };
+}
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
