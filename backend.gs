@@ -37,7 +37,7 @@ const REPORTS_HEADERS = ['RelatorioID', 'Tipo', 'Data', 'TurmaID', 'Hash', 'Envi
 
 function doGet(e) {
 
-     debugRoundTripChamada_();
+    // debugRoundTripChamada_();
 
      // debugLerChamadaSalva_('2026-05-14', 'T_cordei_de_cristo');
 
