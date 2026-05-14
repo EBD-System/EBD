@@ -798,6 +798,56 @@ function renderTurmaSelects() {
 
 function renderSummary() {
   const call = getCurrentCall();
+///////////
+// DEBUG JSON DA CHAMADA
+  console.log('DEBUG CALL JSON:', JSON.stringify(call, null, 2));
+
+  let debugBox = document.getElementById('debugCallJson');
+
+  if (!debugBox) {
+    debugBox = document.createElement('pre');
+    debugBox.id = 'debugCallJson';
+
+    debugBox.style.cssText = `
+      background:#111;
+      color:#00ff88;
+      padding:12px;
+      margin:12px 0;
+      border-radius:12px;
+      font-size:12px;
+      overflow:auto;
+      max-height:400px;
+      white-space:pre-wrap;
+      word-break:break-word;
+      border:2px solid #333;
+    `;
+
+    const summaryCard =
+      document.querySelector('.summary') ||
+      document.querySelector('.stats') ||
+      document.body;
+
+    summaryCard.prepend(debugBox);
+  }
+
+  debugBox.textContent = JSON.stringify({
+    chamadaId: call?.chamadaId,
+    turmaId: call?.turmaId,
+    turmaNome: call?.turmaNome,
+
+    oferta: call?.oferta,
+    visitantes: call?.visitantes,
+    visitantesTexto: call?.visitantesTexto,
+
+    totalAlunos: call?.totalAlunos,
+    presentes: call?.presentes,
+    atrasos: call?.atrasos,
+    ausentes: call?.ausentes,
+    percentual: call?.percentual,
+
+    rows: call?.rows
+  }, null, 2);
+  ///////////
   els.turmaMeta.className = 'turma-meta';
 
   if (!call) {
