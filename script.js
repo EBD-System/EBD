@@ -1,8 +1,14 @@
 const APPS_SCRIPT_URL =
-'https://script.google.com/macros/s/AKfycbxqqMq1jnkQ3c_5KjEW7i6a0EZgXiy-hqduShtvpeRl-4olRKc6cEKFPAH1C42HZQ2kUw/exec';
+  window.APPS_SCRIPT_URL ||
+  'https://script.google.com/macros/s/AKfycbxqqMq1jnkQ3c_5KjEW7i6a0EZgXiy-hqduShtvpeRl-4olRKc6cEKFPAH1C42HZQ2kUw/exec';
+
 const STORAGE_KEY = 'prb_presenca_turmas_v2';
 const ROSTER_CACHE_KEY = 'prb_roster_cache_v1';
 const ROSTER_CACHE_VERSION = 1;
+
+// Se false, o carregamento inicial usa somente o que vem do backend.
+// Se true, o rascunho local pode voltar a ser aplicado quando existir.
+const APPLY_LOCAL_DRAFTS_ON_LOAD = false;
 
 const state = {
   syncToken: 0,
