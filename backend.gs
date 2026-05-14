@@ -1057,18 +1057,19 @@ function getBaseRowsAll_() {
     const atraso = normalizeBool_(row[idx.ATRASO]);
     const presenca = atraso ? 'atrasado' : normalizePresence_(row[idx.PRESENCA]);
     result.push({
-      dateKey: normalizeDateFromBaseCell_(row[idx.DATA]),
-      ano: row[idx.ANO],
-      mes: row[idx.MES],
-      nome: aluno,
-      turmaId,
-      turmaNome: classe,
-      presenca,
-      atraso,
-      ausencia: normalizeBool_(row[idx.AUSENCIA]),
-      oferta: row[idx.OFERTA] || '',
-      alunoId: buildStudentId_(aluno, turmaId, ''),
-    });
+  dateKey: normalizeDateFromBaseCell_(row[idx.DATA]),
+  ano: row[idx.ANO],
+  mes: row[idx.MES],
+  nome: aluno,
+  turmaId,
+  turmaNome: classe,
+  presenca,
+  atraso,
+  ausencia: normalizeBool_(row[idx.AUSENCIA]),
+  oferta: row[idx.OFERTA] || '',
+  visitantes: Number(row[idx.Visitantes] || 0) || 0,
+  alunoId: buildStudentId_(aluno, turmaId, ''),
+});
   }
 
   return result;
