@@ -594,16 +594,21 @@ function blankCallForTurma(turma) {
   };
 }
 function restoreDraft(call) {
+  if (!APPLY_LOCAL_DRAFTS_ON_LOAD) return call;
+
   const drafts = storageState().drafts || {};
   const draft = drafts[call.chamadaId];
   if (!draft) return call;
+
   return {
     ...call,
     oferta: draft.oferta ?? call.oferta,
     visitantes: draft.visitantes ?? call.visitantes,
     visitantesTexto: draft.visitantesTexto ?? call.visitantesTexto,
-    rows: Array.isArray(draft.rows) ? draft.rows.map((row) => syncRowPresenceFields({ ...row })) : call.rows,
-    isSaved: !!draft.isSaved ? call.isSaved : call.isSaved,
+    rows: Array.isArray(draft.rows)
+      ? draft.rows.map((row) => syncRowPresenceFields({ ...row }))
+      : call.rows,
+    isSaved: draft.isSaved === true ? true : call.isSaved,
   };
 }
 
