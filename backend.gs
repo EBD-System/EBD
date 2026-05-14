@@ -1081,17 +1081,81 @@ function getBaseRowsForDate_(dateKey) {
 
 function findCallMeta_(turmaId, dateKey) {
   const reportId = `CALL_${turmaId}_${dateKey}`;
+
+  // =========================================
+  // 1. TENTA PEGAR DO __RELATORIOS
+  // =========================================
+
   const log = getReportLogById_(reportId);
-  if (!log) return null;
+
+  if (log) {
+    try {
+      const obj = JSON.parse(String(log.Texto || '{}'));
+
+      Logger.log('META VIA __RELATORIOS:');
+      Logger.log(JSON.stringify(obj, null, 2));
+
+      return {
+        ChamadaID: reportId,
+        Data: formatDateBR_(dateKey),
+        TurmaID: turmaId,
+
+        Oferta: obj.oferta || '',
+        Visitantes: Number(obj.visitantes || 0) || 0,
+        VisitantesTexto: obj.visitantesTexto || '',
+
+        EnviadoTelegram: String(log.Enviado || 'nao'),
+        TelegramEnviadoEm: String(log.EnviadoEm || ''),
+      };
+    } catch (err) {
+      Logger.log('ERRO AO LER JSON DO __RELATORIOS');
+      Logger.log(err);
+    }
+  }
+
+  // =========================================
+  // 2. FALLBACK:
+  //    BUSCA DIRETO DA ABA BASE
+  // =========================================
+
+  Logger.log('FALLBACK VIA BASE');
+
+  const rows = getBaseRowsForDate_(dateKey)
+    .filter(r => String(r.turmaId || '') === String(turmaId || ''));
+
+  Logger.log('ROWS BASE ENCONTRADAS:');
+  Logger.log(JSON.stringify(rows, null, 2));
+
+  if (!rows.length) {
+    Logger.log('NENHUMA ROW ENCONTRADA NA BASE');
+    return null;
+  }
+
+  const oferta =
+    rows.find(r => String(r.oferta || '').trim() !== '')?.oferta || '';
+
+  const visitantes =
+    Number(
+      rows.find(r => Number(r.visitantes || 0) > 0)?.visitantes || 0
+    ) || 0;
+
+  Logger.log('META VIA BASE:');
+  Logger.log(JSON.stringify({
+    oferta,
+    visitantes,
+  }, null, 2));
+
   return {
     ChamadaID: reportId,
     Data: formatDateBR_(dateKey),
     TurmaID: turmaId,
-    Oferta: extractCallMetaField_(log.Texto, 'oferta') || '',
-    Visitantes: Number(extractCallMetaField_(log.Texto, 'visitantes') || 0) || 0,
-    VisitantesTexto: extractCallMetaField_(log.Texto, 'visitantesTexto') || '',
-    EnviadoTelegram: String(log.Enviado || 'nao'),
-    TelegramEnviadoEm: String(log.EnviadoEm || ''),
+
+    Oferta: oferta,
+    Visitantes: visitantes,
+    VisitantesTexto: '',
+
+    EnviadoTelegram: 'nao',
+    TelegramEnviadoEm: '',
   };
 }
 
