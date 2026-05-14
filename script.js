@@ -1403,63 +1403,26 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
   if (!silent) showLoading('Carregando dados...');
 
   try {
-    const data = await apiGet({
-      action: 'init',
-      date: state.dateKey,
-    }, { timeoutMs: 25000 });
+    const data = await apiGet(
+      {
+        action: 'init',
+        date: state.dateKey,
+      },
+      { timeoutMs: 25000 }
+    );
 
-    //////////////////////
-// ================= DEBUG BOX =================
-let debugBox = document.getElementById('debugBackendJson');
-
-if (!debugBox) {
-  debugBox = document.createElement('pre');
-  debugBox.id = 'debugBackendJson';
-
-  debugBox.style.cssText = `
-    background:#000;
-    color:#00ff88;
-    padding:14px;
-    margin:14px;
-    border-radius:14px;
-    font-size:11px;
-    line-height:1.4;
-    overflow:auto;
-    max-height:500px;
-    white-space:pre-wrap;
-    word-break:break-word;
-    border:2px solid #333;
-    z-index:999999;
-    position:relative;
-  `;
-
-  document.body.prepend(debugBox);
-}
-
-const firstCall = Object.values(data.callsByTurma || {})[0];
-
-debugBox.textContent = JSON.stringify({
-  backendRaw: data,
-  firstCall,
-  oferta: firstCall?.oferta,
-  visitantes: firstCall?.visitantes,
-  visitantesTexto: firstCall?.visitantesTexto,
-}, null, 2);
-
-// =============================================
-    ///////////////////////
-
-    state.turmas = data.turmas || [];
-    state.alunos = data.alunos || [];
+    state.turmas = Array.isArray(data.turmas) ? data.turmas : [];
+    state.alunos = Array.isArray(data.alunos) ? data.alunos : [];
     state.chamadasByTurma = data.callsByTurma || {};
     state.resumoGeral = data.resumoGeral || null;
     state.baseRowsCount = Number(data.baseRowsCount || state.baseRowsCount || 0);
 
     const storage = storageState();
     const drafts = storage.drafts || {};
+
     Object.values(state.chamadasByTurma).forEach((call) => {
       if (!call) return;
-      if (drafts[call.chamadaId]) {
+      if (APPLY_LOCAL_DRAFTS_ON_LOAD && drafts[call.chamadaId]) {
         state.chamadasByTurma[call.turmaId] = restoreDraft(call);
       }
     });
