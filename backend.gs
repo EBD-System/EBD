@@ -597,13 +597,7 @@ function buildCallsByTurmaForDate_(dateKey, all) {
     const ausentes = rows.length - presentes;
     const percentual = rows.length ? round1_((presentes / rows.length) * 100) : 0;
 
-    Logger.log('@@@@@@@@@@@@@@');
-Logger.log(turma);
-Logger.log('===============');
-Logger.log(callMeta);
-Logger.log('@@@@@@@@@@@@@@');
-
-
+  
     callsByTurma[turma.TurmaID] = {
       chamadaId: callMeta?.ChamadaID || `${turma.TurmaID}_${dateKey}`,
       data: dateKey,
