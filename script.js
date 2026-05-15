@@ -1739,13 +1739,9 @@ els.dateInput.addEventListener('change', async (event) => {
   const nextDate = event.target.value || todayKey();
   if (nextDate === state.dateKey) return;
 
-  if (state.dirty && !isRestrictedMode()) {
-    try {
-      await saveCurrentCall({ silent: true });
-    } catch (err) {
-      console.warn('Falha ao salvar antes de trocar a data:', err);
-    }
-  }
+  if (state.dirty && !window.confirm('Há alterações não salvas. Trocar a data vai descartar o que foi editado. Deseja continuar?')) {
+  return;
+}
 
   state.dateKey = nextDate;
   const storage = storageState();
