@@ -1361,7 +1361,7 @@ function bindCallFieldValues() {
   const visitantesInput = document.getElementById('visitantesInput');
   const visitantesTextoInput = document.getElementById('visitantesTextoInput');
 
-  if (ofertaInput) ofertaInput.value = call.oferta || '';
+  if (ofertaInput) ofertaInput.value = formatCurrencyBR(call.oferta || 0);
   if (visitantesInput) visitantesInput.value = String(call.visitantes || 0);
   if (visitantesTextoInput) visitantesTextoInput.value = call.visitantesTexto || '';
 
@@ -1370,12 +1370,15 @@ function bindCallFieldValues() {
     ofertaInput.addEventListener('input', (event) => {
       const current = getCurrentCall();
       if (!current) return;
-      current.oferta = event.target.value;
+
+      const value = parseCurrencyBR(event.target.value);
+      current.oferta = value;
+      event.target.value = formatCurrencyBR(value);
+
       persistDraft(current);
       markDirty();
       renderSummary();
       renderReports();
-      scheduleAutosaveCurrentCall();
     });
   }
 
@@ -1389,7 +1392,6 @@ function bindCallFieldValues() {
       markDirty();
       renderSummary();
       renderReports();
-      scheduleAutosaveCurrentCall();
     });
   }
 
@@ -1402,7 +1404,6 @@ function bindCallFieldValues() {
       persistDraft(current);
       markDirty();
       renderReports();
-      scheduleAutosaveCurrentCall();
     });
   }
 }
