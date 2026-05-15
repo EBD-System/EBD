@@ -119,20 +119,6 @@ function clearAutosaveTimer() {
   }
 }
 
-function scheduleAutosaveCurrentCall(delayMs = 1200) {
-  if (!state.initialized) return;
-  if (state.loading) return;
-  clearAutosaveTimer();
-  state.autosaveTimer = setTimeout(async () => {
-    state.autosaveTimer = null;
-    if (!state.dirty || state.loading || isRestrictedMode()) return;
-    try {
-      await saveCurrentCall({ silent: true });
-    } catch (err) {
-      console.warn('Autosalvamento da chamada falhou:', err);
-    }
-  }, Math.max(300, Number(delayMs) || 1200));
-}
 
 function showLoading(message = 'Carregando...', timeoutMs = 35000) {
   ensureLoadingOverlay();
