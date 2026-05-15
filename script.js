@@ -676,7 +676,7 @@ function updateCallFromInputs() {
   const call = getCurrentCall();
   if (!call) return;
   call.data = state.dateKey;
-  call.oferta = document.getElementById('ofertaInput')?.value?.trim?.() ?? call.oferta;
+  call.oferta = parseCurrencyBR(document.getElementById('ofertaInput')?.value ?? call.oferta);
   call.visitantes = Number(document.getElementById('visitantesInput')?.value || 0) || 0;
   call.visitantesTexto = document.getElementById('visitantesTextoInput')?.value?.trim?.() ?? call.visitantesTexto;
 }
