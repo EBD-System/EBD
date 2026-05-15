@@ -109,7 +109,7 @@ function saveCall_(p) {
 
   const dateKey = normalizeDateKey_(p.date || todayKey_());
   const turmaId = String(p.turmaId || p.turmaNome || p.turma || '').trim();
-  const oferta = String(p.oferta || '').trim();
+  const oferta = parseMoney_(p.oferta);
   const visitantes = Number(p.visitantes || 0) || 0;
   const visitantesTexto = String(p.visitantesTexto || '').trim();
   const chamadaId = String(p.chamadaId || `${turmaId}_${dateKey}`).trim();
