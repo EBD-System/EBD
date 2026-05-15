@@ -193,6 +193,16 @@ function formatCpf(value) {
   return out;
 }
 
+function parseCurrencyBR(value) {
+  const digits = onlyDigits(value);
+  if (!digits) return 0;
+  return Number(digits) / 100;
+}
+
+function formatCurrencyBR(value) {
+  return formatMoney(parseCurrencyBR(value));
+}
+
 function formatMoney(value) {
   const n = Number(value || 0);
   try {
