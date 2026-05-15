@@ -981,16 +981,33 @@ function replaceBaseRowsForCall_(dateKey, turmaId, turmaNome, normalizedRows, ex
   Logger.log('SPREADSHEET_ID: ' + SPREADSHEET_ID);
 
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  Logger.log('PLANILHA ABERTA: ' + ss.getName());
-
   const sheet = getOrCreateSheet_(ss, BASE_SHEET_NAME, BASE_HEADERS, false);
-  Logger.log('ABA ENCONTRADA: ' + sheet.getName());
+  ensureBaseHeaders_(sheet, BASE_HEADERS);
 
+  const turmaNomeFinal = String(turmaNome || getTurmaNameById_(turmaId) || '').trim();
   const beforeRows = Math.max(0, sheet.getLastRow() - 1);
-  Logger.log('ÚLTIMA LINHA ANTES: ' + sheet.getLastRow());
 
   if (!normalizedRows || !normalizedRows.length) {
     throw new Error('Não há linhas para salvar.');
+  }
+
+  const values = sheet.getDataRange().getValues();
+  if (values.length > 1) {
+    const headers = values[0].map(normalizeHeader_);
+    const idx = indexByHeader_(headers);
+
+    for (let i = values.length - 1; i >= 1; i--) {
+      const row = values[i];
+      const rowDateKey = normalizeDateFromBaseCell_(row[idx.DATA]);
+      const rowTurma = String(row[idx.CLASSE] || '').trim();
+
+      if (
+        rowDateKey === dateKey &&
+        normalizeKey_(rowTurma) === normalizeKey_(turmaNomeFinal)
+      ) {
+        sheet.deleteRow(i + 1);
+      }
+    }
   }
 
   const [year, month] = String(dateKey).split('-');
@@ -998,29 +1015,27 @@ function replaceBaseRowsForCall_(dateKey, turmaId, turmaNome, normalizedRows, ex
   const mesTxt = monthToAbbrev_(month);
 
   const rowsToAppend = normalizedRows.map((r) => ([
-  dataBr,
-  Number(year),
-  mesTxt,
-  r.nome,
-  turmaNome || getTurmaNameById_(turmaId),
-  r.presenca === 'sim' ? 1 : 0,
-  r.atraso ? 1 : 0,
-  r.presenca === 'nao' ? 1 : 0,
-  extra?.oferta || 'R$ 0,00',
-  Number(extra?.visitantes || 0),
-]));
+    dataBr,
+    Number(year),
+    mesTxt,
+    r.nome,
+    turmaNomeFinal,
+    r.presenca === 'sim' ? 1 : 0,
+    r.atraso ? 1 : 0,
+    r.presenca === 'nao' ? 1 : 0,
+    Number(extra?.oferta || 0),
+    Number(extra?.visitantes || 0),
+  ]));
 
   Logger.log('LINHAS PARA INSERIR:');
   Logger.log(JSON.stringify(rowsToAppend, null, 2));
 
   const startRow = sheet.getLastRow() + 1;
-  Logger.log('START ROW: ' + startRow);
-
   sheet.getRange(startRow, 1, rowsToAppend.length, rowsToAppend[0].length).setValues(rowsToAppend);
   SpreadsheetApp.flush();
 
   const afterRows = Math.max(0, sheet.getLastRow() - 1);
-  Logger.log('ÚLTIMA LINHA DEPOIS: ' + sheet.getLastRow());
+
   Logger.log('SALVAMENTO FINALIZADO');
 
   return {
@@ -1029,6 +1044,7 @@ function replaceBaseRowsForCall_(dateKey, turmaId, turmaNome, normalizedRows, ex
     insertedRows: Math.max(0, afterRows - beforeRows),
   };
 }
+
 
 function getBaseRowsCount_() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
