@@ -946,7 +946,6 @@ function markDirty() {
   state.dirty = true;
   persistDraft(call);
   renderReports();
-  scheduleAutosaveCurrentCall();
 }
 
 function setStudentPresence(alunoId, presence) {
@@ -959,7 +958,6 @@ function setStudentPresence(alunoId, presence) {
   state.dirty = true;
   persistDraft(call);
   renderAll();
-  scheduleAutosaveCurrentCall();
 }
 function setAllPresence(presence) {
   const call = getCurrentCall();
@@ -972,7 +970,6 @@ function setAllPresence(presence) {
   state.dirty = true;
   persistDraft(call);
   renderAll();
-  scheduleAutosaveCurrentCall();
 }
 
 async function saveCurrentCall({ silent = false } = {}) {
