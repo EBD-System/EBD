@@ -1112,6 +1112,100 @@ async function saveCurrentCall({ silent = false } = {}) {
       clearDraft(call.chamadaId);
       state.selectedTurmaId = turma.TurmaID;
       renderAll();
+function saveCurrentCall({ silent = false } = {}) {
+  const turma = getCurrentTurma();
+  const call = getCurrentCall();
+
+  updateCallFromInputs();
+
+  if (!turma || !call) {
+    throw new Error('Selecione uma turma antes de salvar.');
+  }
+
+  const beforeRows = Number(state.baseRowsCount || 0);
+
+  const payload = {
+    action: 'saveCall',
+    date: state.dateKey,
+    turmaId: turma.TurmaID,
+    chamadaId: call.chamadaId,
+    oferta: call.oferta === '' || call.oferta === null || call.oferta === undefined ? '' : call.oferta,
+    visitantes: String(call.visitantes ?? 0),
+    visitantesTexto: call.visitantesTexto ?? '',
+    rowsJson: JSON.stringify(call.rows),
+  };
+
+  if (!silent) {
+    showLoading('Salvando chamada...', 30000);
+  }
+
+  let timeoutId = null;
+  let loadingClosed = false;
+
+  const closeLoading = () => {
+    if (loadingClosed) return;
+    loadingClosed = true;
+
+    clearTimeout(timeoutId);
+
+    if (!silent) {
+      if (typeof forceHideLoading === 'function') {
+        forceHideLoading();
+      }
+      hideLoading();
+    }
+  };
+
+  const timeoutPromise = new Promise((resolve) => {
+    timeoutId = setTimeout(() => {
+      resolve({ type: 'timeout' });
+    }, 7000);
+  });
+
+  const requestPromise = apiPost(payload, { timeoutMs: 60000 }).then(
+    (result) => ({ type: 'response', result }),
+    (error) => ({ type: 'error', error })
+  );
+
+  try {
+    const first = await Promise.race([requestPromise, timeoutPromise]);
+
+    if (first.type === 'response') {
+      closeLoading();
+
+      const result = first.result;
+
+      const afterRows = Number(result?.baseWrite?.afterRows ?? beforeRows);
+      const insertedRows = Number(
+        result?.baseWrite?.insertedRows ?? (afterRows - beforeRows)
+      );
+
+      if (afterRows > beforeRows && insertedRows > 0) {
+        state.baseRowsCount = afterRows;
+      }
+
+      state.resumoGeral = result.resumoGeral || state.resumoGeral;
+      state.chamadasByTurma[turma.TurmaID] = result.turmaCall || call;
+      state.dirty = false;
+      clearDraft(call.chamadaId);
+      state.selectedTurmaId = turma.TurmaID;
+      renderAll();
+
+      refreshFromBackend(false, { silent: true }).catch((err) => {
+        console.warn('Falha ao atualizar dados após salvar:', err);
+      });
+
+      showSuccess(result.message || 'Chamada salva com sucesso.');
+      return result;
+    }
+
+    if (first.type === 'timeout') {
+      closeLoading();
+
+      state.dirty = false;
+      clearDraft(call.chamadaId);
+      state.selectedTurmaId = turma.TurmaID;
+      renderAll();
 
       requestPromise.then((settled) => {
         if (settled?.type === 'response') {
