@@ -693,10 +693,22 @@ function getCurrentCall() {
 function updateCallFromInputs() {
   const call = getCurrentCall();
   if (!call) return;
+
+  const ofertaInput = document.getElementById('ofertaInput');
+  const visitantesInput = document.getElementById('visitantesInput');
+  const visitantesTextoInput = document.getElementById('visitantesTextoInput');
+
   call.data = state.dateKey;
-  call.oferta = parseCurrencyBR(document.getElementById('ofertaInput')?.value ?? call.oferta);
-  call.visitantes = Number(document.getElementById('visitantesInput')?.value || 0) || 0;
-  call.visitantesTexto = document.getElementById('visitantesTextoInput')?.value?.trim?.() ?? call.visitantesTexto;
+
+  const ofertaRaw = ofertaInput ? ofertaInput.value : '';
+  const ofertaParsed = parseCurrencyBR(ofertaRaw);
+  call.oferta = ofertaParsed === null ? '' : ofertaParsed;
+
+  const visitantesRaw = visitantesInput ? String(visitantesInput.value ?? '').trim() : '';
+  const visitantesParsed = visitantesRaw === '' ? 0 : Number(visitantesRaw);
+  call.visitantes = Number.isFinite(visitantesParsed) ? visitantesParsed : 0;
+
+  call.visitantesTexto = visitantesTextoInput ? String(visitantesTextoInput.value ?? '').trim() : '';
 }
 
 function isInactiveStudent(row, rosterMap = null) {
