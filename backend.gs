@@ -35,6 +35,83 @@ const META_STUDENTS_HEADERS = [
 const META_CLASSES_HEADERS = ['TurmaID', 'Nome', 'Ordem', 'Ativa', 'CriadoEm', 'AtualizadoEm'];
 const REPORTS_HEADERS = ['RelatorioID', 'Tipo', 'Data', 'TurmaID', 'Hash', 'Enviado', 'EnviadoEm', 'Texto', 'CriadoEm'];
 
+var __BACKEND_RUNTIME_CACHE__ = {
+  allData: null,
+  baseRowsAll: null,
+  baseRowsByDate: {},
+  metaStudents: null,
+  metaClasses: null,
+  reportLogsById: null,
+  loadTurmasFromReadBase: null,
+  loadRosterFromReadBase: null,
+};
+
+function invalidateRuntimeCache_() {
+  __BACKEND_RUNTIME_CACHE__.allData = null;
+  __BACKEND_RUNTIME_CACHE__.baseRowsAll = null;
+  __BACKEND_RUNTIME_CACHE__.baseRowsByDate = {};
+  __BACKEND_RUNTIME_CACHE__.metaStudents = null;
+  __BACKEND_RUNTIME_CACHE__.metaClasses = null;
+  __BACKEND_RUNTIME_CACHE__.reportLogsById = null;
+  __BACKEND_RUNTIME_CACHE__.loadTurmasFromReadBase = null;
+  __BACKEND_RUNTIME_CACHE__.loadRosterFromReadBase = null;
+}
+
+function deleteRowsByNumberDesc_(sheet, rowNumbers) {
+  const unique = [...new Set((rowNumbers || []).filter(n => Number(n) > 1).map(n => Number(n)))].sort((a, b) => b - a);
+  if (!unique.length) return;
+
+  let i = 0;
+  while (i < unique.length) {
+    const start = unique[i];
+    let count = 1;
+    while (i + count < unique.length && unique[i + count] === unique[i + count - 1] - 1) {
+      count++;
+    }
+    sheet.deleteRows(start - count + 1, count);
+    i += count;
+  }
+}
+
+function writeStudentMetaRows_(students) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = getOrCreateSheet_(ss, META_STUDENTS_SHEET, META_STUDENTS_HEADERS, true);
+  const rows = (students || []).map(student => ([
+    String(student.AlunoID || '').trim(),
+    student.Nome || '',
+    student.TurmaID || '',
+    student.TurmaNome || '',
+    student.Ativo || 'sim',
+    Number(student.FaltasConsecutivas || 0) || 0,
+    Number(student.TotalPresencas || 0) || 0,
+    Number(student.TotalFaltas || 0) || 0,
+    Number(student.Percentual || 0) || 0,
+    student.Status || 'ativo',
+    student.StatusManual || '',
+    student.UltimaPresenca || '',
+    student.UltimaAusencia || '',
+    student.RealocadoDe || '',
+    student.CriadoEm || '',
+    student.AtualizadoEm || new Date().toISOString(),
+  ]));
+
+  const desiredLastRow = rows.length + 1;
+  const currentLastRow = sheet.getLastRow();
+
+  if (currentLastRow > desiredLastRow) {
+    sheet.getRange(desiredLastRow + 1, 1, currentLastRow - desiredLastRow, META_STUDENTS_HEADERS.length).clearContent();
+  }
+
+  sheet.getRange(1, 1, 1, META_STUDENTS_HEADERS.length).setValues([META_STUDENTS_HEADERS]);
+  if (rows.length) {
+    sheet.getRange(2, 1, rows.length, META_STUDENTS_HEADERS.length).setValues(rows);
+  }
+
+  invalidateRuntimeCache_();
+}
+
+
+
 function doGet(e) {
 
      // debugRoundTripChamada_();
@@ -84,6 +161,7 @@ function doPost(e) {
   }
 }
 
+
 function init_(params) {
   ensureSheets_();
 
@@ -99,10 +177,13 @@ function init_(params) {
     alunos: sortAlunos_(all.alunos),
     callsByTurma,
     resumoGeral: geral,
-    baseRowsCount: getBaseRowsCount_(),
+    baseRowsCount: (all.baseRowsAll || []).length,
     timestamps: { now: new Date().toISOString() },
   };
 }
+
+
+
 
 function saveCall_(p) {
   ensureSheets_();
@@ -184,8 +265,9 @@ function saveCall_(p) {
     false
   );
 
-  recalculateAndPersistStudentStats_(); // PESADO
+  recalculateAndPersistStudentStats_();
 
+  invalidateRuntimeCache_();
   const allAfter = loadAllData_();
   const callsByTurma = buildCallsByTurmaForDate_(dateKey, allAfter);
   const geral = buildDailyGeneralSummary_(dateKey, allAfter, callsByTurma);
@@ -208,6 +290,9 @@ function saveCall_(p) {
     baseWrite,
   };
 }
+
+
+
 
 function sendReport_(p) {
   ensureSheets_();
@@ -253,6 +338,9 @@ function sendReport_(p) {
   return result;
 }
 
+
+
+
 function addTurma_(p) {
   ensureSheets_();
   const nome = String(p.nome || '').trim();
@@ -271,8 +359,12 @@ function addTurma_(p) {
   }
 
   sheet.appendRow([turmaId, nome, ordem, 'sim', now, now]);
+  invalidateRuntimeCache_();
   return { ok: true, message: 'Turma cadastrada com sucesso.', turmaId };
 }
+
+
+
 
 function addAluno_(p) {
   ensureSheets_();
@@ -311,8 +403,12 @@ function addAluno_(p) {
     AtualizadoEm: now,
   });
 
+  invalidateRuntimeCache_();
   return { ok: true, message: 'Aluno cadastrado com sucesso.', alunoId };
 }
+
+
+
 
 function moveAluno_(p) {
   ensureSheets_();
@@ -337,8 +433,12 @@ function moveAluno_(p) {
     AtualizadoEm: now,
   });
 
+  invalidateRuntimeCache_();
   return { ok: true, message: 'Aluno realocado com sucesso.', alunoId, turmaId: turma.TurmaID };
 }
+
+
+
 
 function toggleAluno_(p) {
   ensureSheets_();
@@ -359,8 +459,11 @@ function toggleAluno_(p) {
     AtualizadoEm: now,
   });
 
+  invalidateRuntimeCache_();
   return { ok: true, message: `Aluno marcado como ${ativo ? 'ativo' : 'inativo'}.`, alunoId, ativo };
 }
+
+
 
 function getReportText_(p) {
   const dateKey = normalizeDateKey_(p.date || todayKey_());
@@ -480,42 +583,12 @@ function buildGeneralReportText_(dateKey, geral, callsByTurma, all) {
   return lines.join('\n');
 }
 
-function buildGeneralReportText_(dateKey, geral, callsByTurma, all) {
-  const lines = [];
-  lines.push(`*Relatório geral*`);
-  lines.push(`Data: ${formatDateBR_(dateKey)}`);
-  lines.push(`Turmas com chamada: ${geral.totalTurmas}`);
-  lines.push(`Total de alunos: ${geral.totalAlunos}`);
-  lines.push(`Presentes: ${geral.presentes}`);
-  lines.push(`Ausentes: ${geral.ausentes}`);
-  lines.push(`Presença geral: ${formatPercent_(geral.percentual)}`);
-  lines.push(`Oferta total: ${formatMoney_(geral.ofertaTotal)}`);
-  if (geral.visitantesTotal > 0) lines.push(`Visitantes: ${geral.visitantesTotal}`);
-  lines.push('');
-  lines.push('*Resumo por turma:*');
 
-  const turmasOrdenadas = sortTurmas_(all.turmas).filter(t => callsByTurma[t.TurmaID]);
-  turmasOrdenadas.forEach(turma => {
-    const call = callsByTurma[turma.TurmaID];
-    const activeRows = getActiveCallRows_(call.rows);
-    const totalAtivos = activeRows.length;
-    const presentesAtivos = activeRows.filter(r => isPresenceLikeRow_(r)).length;
-    const atrasosAtivos = activeRows.filter(r => isDelayedRow_(r)).length;
-    const percentualAtivos = totalAtivos ? round1_((presentesAtivos / totalAtivos) * 100) : 0;
-    lines.push(`• ${turma.Nome}: ${presentesAtivos}/${totalAtivos} presentes (${formatPercent_(percentualAtivos)}) | atrasos ${atrasosAtivos}`);
-  });
 
-  const top = getTopStudentsOverall_(all);
-  if (top.length) {
-    lines.push('');
-    lines.push('*Melhores alunos no período:*');
-    top.slice(0, 5).forEach((s, idx) => {
-      lines.push(`${idx + 1}. ${s.Nome} — ${s.TurmaNome} — ${formatPercent_(s.Percentual)}`);
-    });
-  }
 
-  return lines.join('\n');
-}
+
+
+
 
 function buildDailyGeneralSummary_(dateKey, all, callsByTurma) {
   const calls = Object.values(callsByTurma || {});
@@ -563,6 +636,7 @@ function getTopStudentsOverall_(all) {
     .sort((a, b) => Number(b.Percentual || 0) - Number(a.Percentual || 0));
 }
 
+
 function buildCallsByTurmaForDate_(dateKey, all) {
   const roster = all.alunos || [];
   const groupedRoster = groupBy_(roster, 'TurmaID');
@@ -571,6 +645,7 @@ function buildCallsByTurmaForDate_(dateKey, all) {
 
   const callsByTurma = {};
   const turmas = sortTurmas_(all.turmas);
+  const reportMetaCache = {};
 
   turmas.forEach(turma => {
     const turmaRoster = sortAlunos_(groupedRoster[turma.TurmaID] || []);
@@ -596,7 +671,7 @@ function buildCallsByTurmaForDate_(dateKey, all) {
       };
     });
 
-    const callMeta = findCallMeta_(turma.TurmaID, dateKey);
+    const callMeta = getCallMetaForTurmaAndDate_(turma.TurmaID, dateKey, reportMetaCache);
     const presentes = rows.filter(r => isPresenceLikeRow_(r)).length;
     const atrasos = rows.filter(r => isDelayedRow_(r)).length;
     const ausentes = rows.length - presentes;
@@ -646,63 +721,57 @@ function buildCallsByTurmaForDate_(dateKey, all) {
   });
 
   return callsByTurma;
-
-
-  // Garante turmas cadastradas somente em meta, mesmo sem alunos na ReadBase.
-  (all.turmas || []).forEach(turma => {
-    if (!callsByTurma[turma.TurmaID]) {
-      callsByTurma[turma.TurmaID] = {
-        chamadaId: `${turma.TurmaID}_${dateKey}`,
-        data: dateKey,
-        turmaId: turma.TurmaID,
-        turmaNome: turma.Nome,
-        oferta: '',
-        visitantes: 0,
-        visitantesTexto: '',
-        totalAlunos: 0,
-        presentes: 0,
-        atrasos: 0,
-        ausentes: 0,
-        percentual: 0,
-        enviadoTelegram: false,
-        telegramEnviadoEm: '',
-        rows: [],
-        isSaved: false,
-      };
-    }
-  });
-
-  return callsByTurma;
 }
+
+
 
 function getRosterForTurma_(turmaId, all) {
   const alunos = (all.alunos || []).filter(a => String(a.TurmaID || '') === String(turmaId || ''));
   return sortAlunos_(alunos);
 }
 
+
 function loadAllData_() {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  if (__BACKEND_RUNTIME_CACHE__.allData) return __BACKEND_RUNTIME_CACHE__.allData;
+
   const turmas = mergeTurmas_(loadMetaClasses_(), loadTurmasFromReadBase_());
   const studentsMeta = loadMetaStudents_();
   const roster = loadRosterFromReadBase_();
   const alunos = mergeRosterWithMeta_(roster, studentsMeta, turmas);
-  return {
+
+  const data = {
     turmas,
     alunos,
     studentsMeta,
+    baseRowsAll: getBaseRowsAll_(),
   };
+
+  __BACKEND_RUNTIME_CACHE__.allData = data;
+  return data;
 }
 
+
+
+
 function loadTurmasFromReadBase_() {
+  const cached = __BACKEND_RUNTIME_CACHE__.loadTurmasFromReadBase;
+  if (cached) return cached;
+
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName(READ_SHEET_NAME);
-  if (!sheet || sheet.getLastRow() < 2) return [];
+  if (!sheet || sheet.getLastRow() < 2) {
+    __BACKEND_RUNTIME_CACHE__.loadTurmasFromReadBase = [];
+    return [];
+  }
 
   const values = sheet.getDataRange().getValues();
   const headers = values[0].map(normalizeHeader_);
   const idxAluno = findHeaderIndex_(headers, ['ALUNO', 'NOME']);
   const idxClasse = findHeaderIndex_(headers, ['CLASSE', 'TURMA']);
-  if (idxAluno === -1 || idxClasse === -1) return [];
+  if (idxAluno === -1 || idxClasse === -1) {
+    __BACKEND_RUNTIME_CACHE__.loadTurmasFromReadBase = [];
+    return [];
+  }
 
   const seen = new Map();
   let order = 1;
@@ -722,13 +791,25 @@ function loadTurmasFromReadBase_() {
       });
     }
   }
-  return [...seen.values()];
+
+  const result = [...seen.values()];
+  __BACKEND_RUNTIME_CACHE__.loadTurmasFromReadBase = result;
+  return result;
 }
 
+
+
+
 function loadRosterFromReadBase_() {
+  const cached = __BACKEND_RUNTIME_CACHE__.loadRosterFromReadBase;
+  if (cached) return cached;
+
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName(READ_SHEET_NAME);
-  if (!sheet || sheet.getLastRow() < 2) return [];
+  if (!sheet || sheet.getLastRow() < 2) {
+    __BACKEND_RUNTIME_CACHE__.loadRosterFromReadBase = [];
+    return [];
+  }
 
   const values = sheet.getDataRange().getValues();
   const headers = values[0].map(normalizeHeader_);
@@ -777,8 +858,11 @@ function loadRosterFromReadBase_() {
     }
   }
 
+  __BACKEND_RUNTIME_CACHE__.loadRosterFromReadBase = result;
   return result;
 }
+
+
 
 function mergeTurmas_(metaTurmas, readTurmas) {
   const map = new Map();
@@ -803,6 +887,7 @@ function mergeTurmas_(metaTurmas, readTurmas) {
   });
   return [...map.values()];
 }
+
 
 function mergeRosterWithMeta_(roster, studentsMeta, turmas) {
   const metaById = new Map((studentsMeta || []).map(s => [String(s.AlunoID || ''), s]));
@@ -834,7 +919,6 @@ function mergeRosterWithMeta_(roster, studentsMeta, turmas) {
     };
   });
 
-  // Garante que novos alunos da ReadBase entrem mesmo sem meta prévia.
   const existingIds = new Set(merged.map(a => String(a.AlunoID || '')));
   (studentsMeta || []).forEach(meta => {
     const id = String(meta.AlunoID || '');
@@ -863,31 +947,58 @@ function mergeRosterWithMeta_(roster, studentsMeta, turmas) {
   return sortAlunos_(merged);
 }
 
-function loadMetaStudents_() {
+
+
+
+function loadMetaStudents_(forceReload) {
+  if (!forceReload && __BACKEND_RUNTIME_CACHE__.metaStudents) return __BACKEND_RUNTIME_CACHE__.metaStudents;
+
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName(META_STUDENTS_SHEET);
-  if (!sheet || sheet.getLastRow() < 2) return [];
+  if (!sheet || sheet.getLastRow() < 2) {
+    __BACKEND_RUNTIME_CACHE__.metaStudents = [];
+    return [];
+  }
+
   const values = sheet.getDataRange().getValues();
   const headers = values[0].map(String);
-  return values.slice(1).filter(row => row.some(v => String(v || '').trim() !== '')).map(row => {
+  const result = values.slice(1).filter(row => row.some(v => String(v || '').trim() !== '')).map(row => {
     const obj = {};
     headers.forEach((h, i) => obj[h] = row[i]);
     return obj;
   });
+
+  __BACKEND_RUNTIME_CACHE__.metaStudents = result;
+  return result;
 }
 
-function loadMetaClasses_() {
+
+
+
+function loadMetaClasses_(forceReload) {
+  if (!forceReload && __BACKEND_RUNTIME_CACHE__.metaClasses) return __BACKEND_RUNTIME_CACHE__.metaClasses;
+
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName(META_CLASSES_SHEET);
-  if (!sheet || sheet.getLastRow() < 2) return [];
+  if (!sheet || sheet.getLastRow() < 2) {
+    __BACKEND_RUNTIME_CACHE__.metaClasses = [];
+    return [];
+  }
+
   const values = sheet.getDataRange().getValues();
   const headers = values[0].map(String);
-  return values.slice(1).filter(row => row.some(v => String(v || '').trim() !== '')).map(row => {
+  const result = values.slice(1).filter(row => row.some(v => String(v || '').trim() !== '')).map(row => {
     const obj = {};
     headers.forEach((h, i) => obj[h] = row[i]);
     return obj;
   });
+
+  __BACKEND_RUNTIME_CACHE__.metaClasses = result;
+  return result;
 }
+
+
+
 
 function upsertStudentMeta_(student) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -930,28 +1041,30 @@ function upsertStudentMeta_(student) {
   } else {
     sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
   }
+
+  invalidateRuntimeCache_();
 }
 
+
+
+
 function recalculateAndPersistStudentStats_() {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const baseRows = getBaseRowsAll_();
   const roster = loadRosterFromReadBase_();
   const studentsMeta = loadMetaStudents_();
   const metaById = new Map(studentsMeta.map(s => [String(s.AlunoID || ''), s]));
 
-  // Organiza as ocorrências por aluno+turma.
   const grouped = new Map();
   baseRows.forEach(row => {
     const alunoId = String(row.alunoId || '').trim();
     if (!alunoId) return;
-    const key = `${alunoId}`;
-    if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key).push(row);
+    if (!grouped.has(alunoId)) grouped.set(alunoId, []);
+    grouped.get(alunoId).push(row);
   });
 
-  // Recalcula para o que já existe na base.
-  const now = new Date().toISOString();
   const mergedRoster = mergeRosterWithMeta_(roster, studentsMeta, loadTurmasFromReadBase_().concat(loadMetaClasses_()));
+  const now = new Date().toISOString();
+  const rowsToPersist = [];
 
   mergedRoster.forEach(st => {
     const meta = metaById.get(String(st.AlunoID || '')) || {};
@@ -981,7 +1094,7 @@ function recalculateAndPersistStudentStats_() {
     const autoStatus = faltasConsecutivas >= 4 ? 'inativo' : 'ativo';
     const finalStatus = String(meta.StatusManual || '').trim() || autoStatus;
 
-    upsertStudentMeta_({
+    rowsToPersist.push({
       AlunoID: st.AlunoID,
       Nome: st.Nome,
       TurmaID: st.TurmaID,
@@ -1000,7 +1113,12 @@ function recalculateAndPersistStudentStats_() {
       AtualizadoEm: now,
     });
   });
+
+  writeStudentMetaRows_(rowsToPersist);
 }
+
+
+
 
 function replaceBaseRowsForCall_(dateKey, turmaId, turmaNome, normalizedRows, extra) {
   Logger.log('INICIANDO SALVAMENTO');
@@ -1018,23 +1136,24 @@ function replaceBaseRowsForCall_(dateKey, turmaId, turmaNome, normalizedRows, ex
   }
 
   const values = sheet.getDataRange().getValues();
+  const rowsToDelete = [];
+
   if (values.length > 1) {
     const headers = values[0].map(normalizeHeader_);
     const idx = indexByHeader_(headers);
 
-    for (let i = values.length - 1; i >= 1; i--) {
+    for (let i = 1; i < values.length; i++) {
       const row = values[i];
       const rowDateKey = normalizeDateFromBaseCell_(row[idx.DATA]);
       const rowTurma = String(row[idx.CLASSE] || '').trim();
 
-      if (
-        rowDateKey === dateKey &&
-        normalizeKey_(rowTurma) === normalizeKey_(turmaNomeFinal)
-      ) {
-        sheet.deleteRow(i + 1);
+      if (rowDateKey === dateKey && normalizeKey_(rowTurma) === normalizeKey_(turmaNomeFinal)) {
+        rowsToDelete.push(i + 1);
       }
     }
   }
+
+  deleteRowsByNumberDesc_(sheet, rowsToDelete);
 
   const [year, month] = String(dateKey).split('-');
   const dataBr = formatDateBR_(dateKey);
@@ -1060,6 +1179,8 @@ function replaceBaseRowsForCall_(dateKey, turmaId, turmaNome, normalizedRows, ex
   sheet.getRange(startRow, 1, rowsToAppend.length, rowsToAppend[0].length).setValues(rowsToAppend);
   SpreadsheetApp.flush();
 
+  invalidateRuntimeCache_();
+
   const afterRows = Math.max(0, sheet.getLastRow() - 1);
 
   Logger.log('SALVAMENTO FINALIZADO');
@@ -1071,6 +1192,8 @@ function replaceBaseRowsForCall_(dateKey, turmaId, turmaNome, normalizedRows, ex
   };
 }
 
+
+
 function getBaseRowsCount_() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName(BASE_SHEET_NAME);
@@ -1078,10 +1201,16 @@ function getBaseRowsCount_() {
   return sheet.getLastRow() - 1;
 }
 
-function getBaseRowsAll_() {
+
+function getBaseRowsAll_(forceReload) {
+  if (!forceReload && __BACKEND_RUNTIME_CACHE__.baseRowsAll) return __BACKEND_RUNTIME_CACHE__.baseRowsAll;
+
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName(BASE_SHEET_NAME);
-  if (!sheet || sheet.getLastRow() < 2) return [];
+  if (!sheet || sheet.getLastRow() < 2) {
+    __BACKEND_RUNTIME_CACHE__.baseRowsAll = [];
+    return [];
+  }
 
   const values = sheet.getDataRange().getValues();
   const headers = values[0].map(normalizeHeader_);
@@ -1114,12 +1243,22 @@ function getBaseRowsAll_() {
     });
   }
 
+  __BACKEND_RUNTIME_CACHE__.baseRowsAll = result;
   return result;
 }
 
+
+
+
 function getBaseRowsForDate_(dateKey) {
-  return getBaseRowsAll_().filter(row => row.dateKey === dateKey);
+  const key = String(dateKey || '');
+  if (!__BACKEND_RUNTIME_CACHE__.baseRowsByDate[key]) {
+    __BACKEND_RUNTIME_CACHE__.baseRowsByDate[key] = getBaseRowsAll_().filter(row => row.dateKey === dateKey);
+  }
+  return __BACKEND_RUNTIME_CACHE__.baseRowsByDate[key];
 }
+
+
 
 
 function getFirstNonEmpty_() {
@@ -1231,13 +1370,24 @@ function findCallMeta_(turmaId, dateKey) {
   return buildCallMetaFromBaseRows_(dateKey, turmaId);
 }
 
+
+function getCallMetaForTurmaAndDate_(turmaId, dateKey, cache) {
+  const key = `${turmaId}_${dateKey}`;
+  if (cache && Object.prototype.hasOwnProperty.call(cache, key)) {
+    return cache[key];
+  }
+
+  const value = findCallMeta_(turmaId, dateKey);
+  if (cache) cache[key] = value;
+  return value;
+}
+
+
+
+
 function upsertCallMeta_(chamadaId, dateKey, turmaId, oferta, visitantes, visitantesTexto, totalAlunos, presentes, ausentes, percentual, enviadoTelegram) {
-  
-
-
-const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = getOrCreateSheet_(ss, REPORTS_SHEET, REPORTS_HEADERS, true);
-  const existing = getCallMetaRows_(sheet);
   const reportId = `CALL_${turmaId}_${dateKey}`;
   const hash = textHash_([dateKey, turmaId, oferta, visitantes, visitantesTexto, totalAlunos, presentes, ausentes, percentual].join('|'));
   const now = new Date().toISOString();
@@ -1271,7 +1421,11 @@ const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   } else {
     sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
   }
+
+  invalidateRuntimeCache_();
 }
+
+
 
 function getCallMetaRows_(sheet) {
   const values = sheet.getDataRange().getValues();
@@ -1283,6 +1437,7 @@ function getCallMetaRows_(sheet) {
     return obj;
   });
 }
+
 
 function markCallAsSent_(turmaId, dateKey, text) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -1301,28 +1456,41 @@ function markCallAsSent_(turmaId, dateKey, text) {
       values[i][idx.EnviadoEm] = now;
       values[i][idx.Texto] = text || values[i][idx.Texto] || '';
       sheet.getRange(i + 1, 1, 1, headers.length).setValues([values[i]]);
+      invalidateRuntimeCache_();
       return;
     }
   }
 }
 
-function getReportLogById_(reportId) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName(REPORTS_SHEET);
-  if (!sheet || sheet.getLastRow() < 2) return null;
 
-  const values = sheet.getDataRange().getValues();
-  const headers = values[0].map(String);
-  const idx = indexByHeader_(headers);
-  for (let i = 1; i < values.length; i++) {
-    if (String(values[i][idx.RelatorioID] || '') === String(reportId || '')) {
-      const obj = {};
-      headers.forEach((h, j) => obj[h] = values[i][j]);
-      return obj;
+
+
+function getReportLogById_(reportId) {
+  if (!__BACKEND_RUNTIME_CACHE__.reportLogsById) {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(REPORTS_SHEET);
+    const map = {};
+
+    if (sheet && sheet.getLastRow() >= 2) {
+      const values = sheet.getDataRange().getValues();
+      const headers = values[0].map(String);
+      const idx = indexByHeader_(headers);
+
+      for (let i = 1; i < values.length; i++) {
+        const obj = {};
+        headers.forEach((h, j) => obj[h] = values[i][j]);
+        const id = String(values[i][idx.RelatorioID] || '');
+        if (id) map[id] = obj;
+      }
     }
+
+    __BACKEND_RUNTIME_CACHE__.reportLogsById = map;
   }
-  return null;
+
+  return __BACKEND_RUNTIME_CACHE__.reportLogsById[String(reportId || '')] || null;
 }
+
+
 
 function extractCallMetaField_(text, field) {
   try {
@@ -1395,12 +1563,14 @@ function findMetaClassById_(turmaId) {
   return loadMetaClasses_().find(t => String(t.TurmaID || '') === String(turmaId || '')) || null;
 }
 
+
 function updateMetaClass_(turmaId, patch) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = getOrCreateSheet_(ss, META_CLASSES_SHEET, META_CLASSES_HEADERS, true);
   const values = sheet.getDataRange().getValues();
   if (values.length < 2) {
     sheet.appendRow([turmaId, patch.Nome || '', patch.Ordem || 0, patch.Ativa || 'sim', patch.CriadoEm || new Date().toISOString(), patch.AtualizadoEm || new Date().toISOString()]);
+    invalidateRuntimeCache_();
     return;
   }
 
@@ -1414,11 +1584,16 @@ function updateMetaClass_(turmaId, patch) {
       values[i][idx.Ativa] = patch.Ativa ?? values[i][idx.Ativa];
       values[i][idx.AtualizadoEm] = patch.AtualizadoEm ?? now;
       sheet.getRange(i + 1, 1, 1, headers.length).setValues([values[i]]);
+      invalidateRuntimeCache_();
       return;
     }
   }
   sheet.appendRow([turmaId, patch.Nome || '', patch.Ordem || 0, patch.Ativa || 'sim', patch.CriadoEm || now, patch.AtualizadoEm || now]);
+  invalidateRuntimeCache_();
 }
+
+
+
 
 function upsertReportLog_(log) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -1453,7 +1628,11 @@ function upsertReportLog_(log) {
   } else {
     sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
   }
+
+  invalidateRuntimeCache_();
 }
+
+
 
 function ensureSheets_() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
