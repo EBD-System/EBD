@@ -1157,8 +1157,6 @@ function buildCallMetaFromBaseRows_(dateKey, turmaId) {
 
 function findCallMeta_(turmaId, dateKey) {
   const reportId = `CALL_${turmaId}_${dateKey}`;
-
-  // 1) TENTA PEGAR DO __RELATORIOS
   const log = getReportLogById_(reportId);
 
   if (log) {
@@ -1171,26 +1169,29 @@ function findCallMeta_(turmaId, dateKey) {
       Logger.log('META VIA __RELATORIOS (PARSED):');
       Logger.log(JSON.stringify(parsed, null, 2));
 
+      const parsedOferta = getFirstNonEmpty_(parsed.oferta, parsed.Oferta, log.Oferta, log.OFERTA);
+      const parsedVisitantes = getFirstNonEmpty_(parsed.visitantes, parsed.Visitantes, log.Visitantes, log.VISITANTES);
+      const parsedVisitantesTexto = getFirstNonEmpty_(parsed.visitantesTexto, parsed.VisitantesTexto, log.VisitantesTexto, log.VISITANTESTEXTO);
+
       return {
         ChamadaID: reportId,
         Data: formatDateBR_(dateKey),
         TurmaID: turmaId,
-        Oferta: String(getFirstNonEmpty_(parsed.oferta, parsed.Oferta, log.Oferta, log.OFERTA) || '').trim(),
-        Visitantes: Number(getFirstNonEmpty_(parsed.visitantes, parsed.Visitantes, log.Visitantes, log.VISITANTES) || 0) || 0,
-        VisitantesTexto: String(getFirstNonEmpty_(parsed.visitantesTexto, parsed.VisitantesTexto, log.VisitantesTexto, log.VISITANTESTEXTO) || '').trim(),
+        Oferta: parsedOferta ?? '',
+        Visitantes: Number(parsedVisitantes ?? 0) || 0,
+        VisitantesTexto: parsedVisitantesTexto ?? '',
         EnviadoTelegram: String(getFirstNonEmpty_(log.Enviado, parsed.enviadoTelegram, parsed.EnviadoTelegram) || 'nao'),
         TelegramEnviadoEm: String(getFirstNonEmpty_(log.EnviadoEm, parsed.telegramEnviadoEm, parsed.TelegramEnviadoEm) || ''),
       };
     }
 
-    // Se o JSON do log não for válido, tenta ler os campos diretamente da linha
     const directFallback = {
       ChamadaID: reportId,
       Data: formatDateBR_(dateKey),
       TurmaID: turmaId,
-      Oferta: String(getFirstNonEmpty_(log.Oferta, log.oferta, log.OFERTA) || '').trim(),
-      Visitantes: Number(getFirstNonEmpty_(log.Visitantes, log.visitantes, log.VISITANTES) || 0) || 0,
-      VisitantesTexto: String(getFirstNonEmpty_(log.VisitantesTexto, log.visitantesTexto, log.VISITANTESTEXTO) || '').trim(),
+      Oferta: getFirstNonEmpty_(log.Oferta, log.oferta, log.OFERTA) ?? '',
+      Visitantes: Number(getFirstNonEmpty_(log.Visitantes, log.visitantes, log.VISITANTES) ?? 0) || 0,
+      VisitantesTexto: getFirstNonEmpty_(log.VisitantesTexto, log.visitantesTexto, log.VISITANTESTEXTO) ?? '',
       EnviadoTelegram: String(getFirstNonEmpty_(log.Enviado, 'nao') || 'nao'),
       TelegramEnviadoEm: String(getFirstNonEmpty_(log.EnviadoEm, '') || ''),
     };
@@ -1198,12 +1199,9 @@ function findCallMeta_(turmaId, dateKey) {
     Logger.log('META VIA __RELATORIOS (DIRECT FALLBACK):');
     Logger.log(JSON.stringify(directFallback, null, 2));
 
-    if (String(directFallback.Oferta || '').trim() !== '' || Number(directFallback.Visitantes || 0) > 0) {
-      return directFallback;
-    }
+    return directFallback;
   }
 
-  // 2) FALLBACK VIA BASE
   return buildCallMetaFromBaseRows_(dateKey, turmaId);
 }
 
