@@ -1671,31 +1671,35 @@ function monthToAbbrev_(month) {
 }
 
 function parseMoney_(value) {
-  if (value === null || value === undefined) return 0;
-  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
 
-  const raw = String(value).trim();
-  if (!raw) return 0;
-
-  const cleaned = raw
-    .replace(/\s+/g, '')
-    .replace(/R\$/gi, '')
-    .replace(/[^\d,.-]/g, '');
-
-  if (!cleaned) return 0;
-
-  let normalized = cleaned;
-
-  if (cleaned.includes(',') && cleaned.includes('.')) {
-    normalized = cleaned.replace(/\./g, '').replace(',', '.');
-  } else if (cleaned.includes(',')) {
-    normalized = cleaned.replace(/\./g, '').replace(',', '.');
-  } else if (/^\d{1,3}(\.\d{3})+$/.test(cleaned)) {
-    normalized = cleaned.replace(/\./g, '');
+  if (
+    value === null ||
+    value === undefined ||
+    value === ''
+  ) {
+    return 0;
   }
 
-  const n = Number(normalized);
-  return Number.isFinite(n) ? n : 0;
+  if (typeof value === 'number') {
+    return Number.isFinite(value)
+      ? value
+      : 0;
+  }
+
+  let str = String(value).trim();
+
+  // formato BR
+  if (str.includes(',')) {
+
+    str = str.replace(/\./g, '');
+    str = str.replace(',', '.');
+  }
+
+  const num = Number(str);
+
+  return Number.isFinite(num)
+    ? num
+    : 0;
 }
 
 
