@@ -765,6 +765,7 @@ function buildTurmaReportText() {
   const call = getCurrentCall();
   const turma = getCurrentTurma();
   if (!call || !turma) return 'Nenhuma turma selecionada.';
+
   const stats = computeLocalStats(call);
   const best = bestStudentForCurrentTurma();
   const presentNames = getActiveRows(call).filter((r) => isPresentLikeValue(r.presenca)).map((r) => r.nome).join(', ') || 'nenhum';
@@ -772,6 +773,9 @@ function buildTurmaReportText() {
   const absentNames = getActiveRows(call).filter((r) => !isPresentLikeValue(r.presenca)).map((r) => r.nome).join(', ') || 'nenhum';
   const inactiveNames = getAlunosForTurma(turma.TurmaID).filter((a) => String(a.Status || '') === 'inativo').map((a) => a.Nome).join(', ') || 'nenhum';
   const faltandoMuito = getAlunosForTurma(turma.TurmaID).filter((a) => String(a.FaltandoMuito || '') === 'sim').map((a) => a.Nome).join(', ') || 'nenhum';
+
+  const ofertaTexto = formatMoney(call.oferta) || '-';
+  const visitantesTexto = call.visitantes === null || call.visitantes === undefined ? '-' : String(call.visitantes);
 
   return [
     '📋 RELATÓRIO DA TURMA',
@@ -783,8 +787,8 @@ function buildTurmaReportText() {
     `Atrasados: ${stats.atrasos}`,
     `Ausentes: ${stats.ausentes}`,
     `Presença: ${formatPercent(stats.percentual)}`,
-    `Oferta da classe: ${call.oferta || '-'}`,
-    `Visitantes: ${Number(call.visitantes || 0) > 0 ? call.visitantes : 'não informado'}`,
+    `Oferta da classe: ${ofertaTexto}`,
+    `Visitantes: ${visitantesTexto}`,
     call.visitantesTexto ? `Detalhe visitantes: ${call.visitantesTexto}` : '',
     '',
     `Melhor aluno: ${best ? `${best.Nome} (${formatPercent(best.Percentual)})` : '—'}`,
@@ -796,6 +800,42 @@ function buildTurmaReportText() {
     `Ausentes: ${absentNames}`,
   ].filter(Boolean).join('\n');
 }
+
+function buildGeneralReportText() {
+  if (isRestrictedMode()) return 'Relatório oculto neste modo.';
+  const geral = state.resumoGeral;
+  if (!geral) return 'Sem dados gerais carregados.';
+
+  const lines = [
+    '📊 RELATÓRIO GERAL',
+    `Data: ${formatDateBR(state.dateKey)}`,
+    '',
+    `Turmas salvas: ${geral.turmasSalvas}/${geral.totalTurmas}`,
+    `Total de alunos: ${geral.totalAlunos}`,
+    `Presentes: ${geral.presentes}`,
+    `Atrasados: ${geral.atrasos || 0}`,
+    `Ausentes: ${geral.ausentes}`,
+    `Presença geral: ${formatPercent(geral.percentual)}`,
+    `Oferta total: ${formatMoney(geral.ofertaTotal)}`,
+    `Visitantes: ${geral.visitantesTotal ?? 0}`,
+    '',
+    'Resumo por turma:',
+  ];
+
+  (geral.turmaSummaries || []).forEach((item) => {
+    const ofertaTexto = formatMoney(item.oferta) || '-';
+    lines.push(`- ${item.nome}: ${item.presentes}/${item.totalAlunos} (${formatPercent(item.percentual)}) | Oferta ${ofertaTexto} | Visitantes ${item.visitantes ?? 0}`);
+  });
+
+  lines.push('');
+  lines.push(`Melhores alunos: ${geral.melhores?.length ? geral.melhores.map((a) => `${a.Nome} (${formatPercent(a.Percentual)})`).join(', ') : '—'}`);
+  lines.push(`Inativos: ${geral.inativos?.length ? geral.inativos.map((a) => a.Nome).join(', ') : 'nenhum'}`);
+  lines.push(`Faltando muito: ${geral.faltandoMuito?.length ? geral.faltandoMuito.map((a) => a.Nome).join(', ') : 'nenhum'}`);
+  lines.push(`Reativados: ${geral.reativados?.length ? geral.reativados.map((a) => a.Nome).join(', ') : 'nenhum'}`);
+
+  return lines.join('\n');
+}
+
 function buildGeneralReportText() {
   if (isRestrictedMode()) return 'Relatório oculto neste modo.';
   const geral = state.resumoGeral;
