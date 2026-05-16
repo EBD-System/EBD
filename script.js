@@ -1522,9 +1522,17 @@ function bindCallFieldValues() {
   const visitantesInput = document.getElementById('visitantesInput');
   const visitantesTextoInput = document.getElementById('visitantesTextoInput');
 
-  if (ofertaInput) ofertaInput.value = formatCurrencyBR(call.oferta || 0);
-  if (visitantesInput) visitantesInput.value = String(call.visitantes || 0);
-  if (visitantesTextoInput) visitantesTextoInput.value = call.visitantesTexto || '';
+  if (ofertaInput) {
+    ofertaInput.value = isBlankValue(call.oferta) ? '' : formatCurrencyBR(call.oferta);
+  }
+
+  if (visitantesInput) {
+    visitantesInput.value = call.visitantes === null || call.visitantes === undefined ? '' : String(call.visitantes);
+  }
+
+  if (visitantesTextoInput) {
+    visitantesTextoInput.value = call.visitantesTexto || '';
+  }
 
   if (ofertaInput && !ofertaInput.dataset.bound) {
     ofertaInput.dataset.bound = '1';
@@ -1532,9 +1540,9 @@ function bindCallFieldValues() {
       const current = getCurrentCall();
       if (!current) return;
 
-      const value = parseCurrencyBR(event.target.value);
-      current.oferta = value;
-      event.target.value = formatCurrencyBR(value);
+      const parsed = parseCurrencyBR(event.target.value);
+      current.oferta = parsed === null ? '' : parsed;
+      event.target.value = parsed === null ? '' : formatCurrencyBR(parsed);
 
       persistDraft(current);
       markDirty();
@@ -1548,7 +1556,11 @@ function bindCallFieldValues() {
     visitantesInput.addEventListener('input', (event) => {
       const current = getCurrentCall();
       if (!current) return;
-      current.visitantes = Number(event.target.value || 0) || 0;
+
+      const raw = String(event.target.value ?? '').trim();
+      const parsed = raw === '' ? 0 : Number(raw);
+      current.visitantes = Number.isFinite(parsed) ? parsed : 0;
+
       persistDraft(current);
       markDirty();
       renderSummary();
