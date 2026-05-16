@@ -646,7 +646,6 @@ function buildCallsByTurmaForDate_(dateKey, all) {
   });
 
   return callsByTurma;
-}
 
 
   // Garante turmas cadastradas somente em meta, mesmo sem alunos na ReadBase.
