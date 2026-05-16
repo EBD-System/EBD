@@ -730,53 +730,32 @@ function getCurrentCall() {
 }
 
 function updateCallFromInputs() {
-
   const call = getCurrentCall();
 
   if (!call) return;
 
   call.data = state.dateKey;
 
-  const ofertaInput =
-    document.getElementById('ofertaInput');
+  const ofertaInput = document.getElementById('ofertaInput');
+  const visitantesInput = document.getElementById('visitantesInput');
+  const visitantesTextoInput = document.getElementById('visitantesTextoInput');
 
-  const visitantesInput =
-    document.getElementById('visitantesInput');
-
-  const visitantesTextoInput =
-    document.getElementById('visitantesTextoInput');
-
-  // =========================================
   // OFERTA
-  // =========================================
+  call.oferta = parseCurrencyBR(ofertaInput?.value ?? 0);
 
-  call.oferta = parseCurrencyBR(
-    ofertaInput?.value ?? 0
-  );
-
-  // =========================================
   // VISITANTES
-  // =========================================
-
   call.visitantes =
     visitantesInput?.value === ''
       ? 0
       : Number(visitantesInput.value);
 
-  // =========================================
   // TEXTO VISITANTES
-  // =========================================
+  call.visitantesTexto = visitantesTextoInput?.value?.trim?.() ?? '';
 
-  call.visitantesTexto =
-    visitantesTextoInput?.value?.trim?.() ?? '';
-
-  console.log(
-    '[updateCallFromInputs]',
-    {
-      ofertaInput: ofertaInput?.value,
-      ofertaFinal: call.oferta,
-    }
-  );
+  console.log('[updateCallFromInputs]', {
+    ofertaInput: ofertaInput?.value,
+    ofertaFinal: call.oferta,
+  });
 }
 
 function isInactiveStudent(row, rosterMap = null) {
