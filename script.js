@@ -179,46 +179,14 @@ function formatCpf(value) {
   return out;
 }
 
-function isBlankValue(value) {
-  return value === null || value === undefined || String(value).trim() === '';
-}
-
 function parseCurrencyBR(value) {
-  if (value === null || value === undefined) return null;
-
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? value : null;
-  }
-
-  const raw = String(value).trim();
-  if (!raw) return null;
-
-  const cleaned = raw
-    .replace(/\s+/g, '')
-    .replace(/R\$/gi, '')
-    .replace(/[^\d,.-]/g, '');
-
-  if (!cleaned) return null;
-
-  let normalized = cleaned;
-
-  // Ex.: 1.599,00 -> 1599.00
-  if (cleaned.includes(',') && cleaned.includes('.')) {
-    normalized = cleaned.replace(/\./g, '').replace(',', '.');
-  } else if (cleaned.includes(',')) {
-    // Ex.: 1599,50 -> 1599.50
-    normalized = cleaned.replace(/\./g, '').replace(',', '.');
-  } else if (/^\d{1,3}(\.\d{3})+$/.test(cleaned)) {
-    // Ex.: 1.599 -> 1599
-    normalized = cleaned.replace(/\./g, '');
-  }
-
-  const n = Number(normalized);
-  return Number.isFinite(n) ? n : null;
+  const digits = onlyDigits(value);
+  if (!digits) return 0;
+  return Number(digits) / 100;
 }
 
 function formatCurrencyBR(value) {
-  return formatMoney(value);
+  return formatMoney(parseCurrencyBR(value));
 }
 
 function formatMoney(value) {
@@ -693,22 +661,10 @@ function getCurrentCall() {
 function updateCallFromInputs() {
   const call = getCurrentCall();
   if (!call) return;
-
-  const ofertaInput = document.getElementById('ofertaInput');
-  const visitantesInput = document.getElementById('visitantesInput');
-  const visitantesTextoInput = document.getElementById('visitantesTextoInput');
-
   call.data = state.dateKey;
-
-  const ofertaRaw = ofertaInput ? ofertaInput.value : '';
-  const ofertaParsed = parseCurrencyBR(ofertaRaw);
-  call.oferta = ofertaParsed === null ? '' : ofertaParsed;
-
-  const visitantesRaw = visitantesInput ? String(visitantesInput.value ?? '').trim() : '';
-  const visitantesParsed = visitantesRaw === '' ? 0 : Number(visitantesRaw);
-  call.visitantes = Number.isFinite(visitantesParsed) ? visitantesParsed : 0;
-
-  call.visitantesTexto = visitantesTextoInput ? String(visitantesTextoInput.value ?? '').trim() : '';
+  call.oferta = parseCurrencyBR(document.getElementById('ofertaInput')?.value ?? call.oferta);
+  call.visitantes = Number(document.getElementById('visitantesInput')?.value || 0) || 0;
+  call.visitantesTexto = document.getElementById('visitantesTextoInput')?.value?.trim?.() ?? call.visitantesTexto;
 }
 
 function isInactiveStudent(row, rosterMap = null) {
@@ -765,7 +721,6 @@ function buildTurmaReportText() {
   const call = getCurrentCall();
   const turma = getCurrentTurma();
   if (!call || !turma) return 'Nenhuma turma selecionada.';
-
   const stats = computeLocalStats(call);
   const best = bestStudentForCurrentTurma();
   const presentNames = getActiveRows(call).filter((r) => isPresentLikeValue(r.presenca)).map((r) => r.nome).join(', ') || 'nenhum';
@@ -773,9 +728,6 @@ function buildTurmaReportText() {
   const absentNames = getActiveRows(call).filter((r) => !isPresentLikeValue(r.presenca)).map((r) => r.nome).join(', ') || 'nenhum';
   const inactiveNames = getAlunosForTurma(turma.TurmaID).filter((a) => String(a.Status || '') === 'inativo').map((a) => a.Nome).join(', ') || 'nenhum';
   const faltandoMuito = getAlunosForTurma(turma.TurmaID).filter((a) => String(a.FaltandoMuito || '') === 'sim').map((a) => a.Nome).join(', ') || 'nenhum';
-
-  const ofertaTexto = formatMoney(call.oferta) || '-';
-  const visitantesTexto = call.visitantes === null || call.visitantes === undefined ? '-' : String(call.visitantes);
 
   return [
     '📋 RELATÓRIO DA TURMA',
@@ -787,8 +739,8 @@ function buildTurmaReportText() {
     `Atrasados: ${stats.atrasos}`,
     `Ausentes: ${stats.ausentes}`,
     `Presença: ${formatPercent(stats.percentual)}`,
-    `Oferta da classe: ${ofertaTexto}`,
-    `Visitantes: ${visitantesTexto}`,
+    `Oferta da classe: ${call.oferta || '-'}`,
+    `Visitantes: ${Number(call.visitantes || 0) > 0 ? call.visitantes : 'não informado'}`,
     call.visitantesTexto ? `Detalhe visitantes: ${call.visitantesTexto}` : '',
     '',
     `Melhor aluno: ${best ? `${best.Nome} (${formatPercent(best.Percentual)})` : '—'}`,
@@ -800,42 +752,6 @@ function buildTurmaReportText() {
     `Ausentes: ${absentNames}`,
   ].filter(Boolean).join('\n');
 }
-
-function buildGeneralReportText() {
-  if (isRestrictedMode()) return 'Relatório oculto neste modo.';
-  const geral = state.resumoGeral;
-  if (!geral) return 'Sem dados gerais carregados.';
-
-  const lines = [
-    '📊 RELATÓRIO GERAL',
-    `Data: ${formatDateBR(state.dateKey)}`,
-    '',
-    `Turmas salvas: ${geral.turmasSalvas}/${geral.totalTurmas}`,
-    `Total de alunos: ${geral.totalAlunos}`,
-    `Presentes: ${geral.presentes}`,
-    `Atrasados: ${geral.atrasos || 0}`,
-    `Ausentes: ${geral.ausentes}`,
-    `Presença geral: ${formatPercent(geral.percentual)}`,
-    `Oferta total: ${formatMoney(geral.ofertaTotal)}`,
-    `Visitantes: ${geral.visitantesTotal ?? 0}`,
-    '',
-    'Resumo por turma:',
-  ];
-
-  (geral.turmaSummaries || []).forEach((item) => {
-    const ofertaTexto = formatMoney(item.oferta) || '-';
-    lines.push(`- ${item.nome}: ${item.presentes}/${item.totalAlunos} (${formatPercent(item.percentual)}) | Oferta ${ofertaTexto} | Visitantes ${item.visitantes ?? 0}`);
-  });
-
-  lines.push('');
-  lines.push(`Melhores alunos: ${geral.melhores?.length ? geral.melhores.map((a) => `${a.Nome} (${formatPercent(a.Percentual)})`).join(', ') : '—'}`);
-  lines.push(`Inativos: ${geral.inativos?.length ? geral.inativos.map((a) => a.Nome).join(', ') : 'nenhum'}`);
-  lines.push(`Faltando muito: ${geral.faltandoMuito?.length ? geral.faltandoMuito.map((a) => a.Nome).join(', ') : 'nenhum'}`);
-  lines.push(`Reativados: ${geral.reativados?.length ? geral.reativados.map((a) => a.Nome).join(', ') : 'nenhum'}`);
-
-  return lines.join('\n');
-}
-
 function buildGeneralReportText() {
   if (isRestrictedMode()) return 'Relatório oculto neste modo.';
   const geral = state.resumoGeral;
@@ -1152,100 +1068,6 @@ async function saveCurrentCall({ silent = false } = {}) {
       clearDraft(call.chamadaId);
       state.selectedTurmaId = turma.TurmaID;
       renderAll();
-function saveCurrentCall({ silent = false } = {}) {
-  const turma = getCurrentTurma();
-  const call = getCurrentCall();
-
-  updateCallFromInputs();
-
-  if (!turma || !call) {
-    throw new Error('Selecione uma turma antes de salvar.');
-  }
-
-  const beforeRows = Number(state.baseRowsCount || 0);
-
-  const payload = {
-    action: 'saveCall',
-    date: state.dateKey,
-    turmaId: turma.TurmaID,
-    chamadaId: call.chamadaId,
-    oferta: call.oferta === '' || call.oferta === null || call.oferta === undefined ? '' : call.oferta,
-    visitantes: String(call.visitantes ?? 0),
-    visitantesTexto: call.visitantesTexto ?? '',
-    rowsJson: JSON.stringify(call.rows),
-  };
-
-  if (!silent) {
-    showLoading('Salvando chamada...', 30000);
-  }
-
-  let timeoutId = null;
-  let loadingClosed = false;
-
-  const closeLoading = () => {
-    if (loadingClosed) return;
-    loadingClosed = true;
-
-    clearTimeout(timeoutId);
-
-    if (!silent) {
-      if (typeof forceHideLoading === 'function') {
-        forceHideLoading();
-      }
-      hideLoading();
-    }
-  };
-
-  const timeoutPromise = new Promise((resolve) => {
-    timeoutId = setTimeout(() => {
-      resolve({ type: 'timeout' });
-    }, 7000);
-  });
-
-  const requestPromise = apiPost(payload, { timeoutMs: 60000 }).then(
-    (result) => ({ type: 'response', result }),
-    (error) => ({ type: 'error', error })
-  );
-
-  try {
-    const first = await Promise.race([requestPromise, timeoutPromise]);
-
-    if (first.type === 'response') {
-      closeLoading();
-
-      const result = first.result;
-
-      const afterRows = Number(result?.baseWrite?.afterRows ?? beforeRows);
-      const insertedRows = Number(
-        result?.baseWrite?.insertedRows ?? (afterRows - beforeRows)
-      );
-
-      if (afterRows > beforeRows && insertedRows > 0) {
-        state.baseRowsCount = afterRows;
-      }
-
-      state.resumoGeral = result.resumoGeral || state.resumoGeral;
-      state.chamadasByTurma[turma.TurmaID] = result.turmaCall || call;
-      state.dirty = false;
-      clearDraft(call.chamadaId);
-      state.selectedTurmaId = turma.TurmaID;
-      renderAll();
-
-      refreshFromBackend(false, { silent: true }).catch((err) => {
-        console.warn('Falha ao atualizar dados após salvar:', err);
-      });
-
-      showSuccess(result.message || 'Chamada salva com sucesso.');
-      return result;
-    }
-
-    if (first.type === 'timeout') {
-      closeLoading();
-
-      state.dirty = false;
-      clearDraft(call.chamadaId);
-      state.selectedTurmaId = turma.TurmaID;
-      renderAll();
 
       requestPromise.then((settled) => {
         if (settled?.type === 'response') {
@@ -1522,17 +1344,9 @@ function bindCallFieldValues() {
   const visitantesInput = document.getElementById('visitantesInput');
   const visitantesTextoInput = document.getElementById('visitantesTextoInput');
 
-  if (ofertaInput) {
-    ofertaInput.value = isBlankValue(call.oferta) ? '' : formatCurrencyBR(call.oferta);
-  }
-
-  if (visitantesInput) {
-    visitantesInput.value = call.visitantes === null || call.visitantes === undefined ? '' : String(call.visitantes);
-  }
-
-  if (visitantesTextoInput) {
-    visitantesTextoInput.value = call.visitantesTexto || '';
-  }
+  if (ofertaInput) ofertaInput.value = formatCurrencyBR(call.oferta || 0);
+  if (visitantesInput) visitantesInput.value = String(call.visitantes || 0);
+  if (visitantesTextoInput) visitantesTextoInput.value = call.visitantesTexto || '';
 
   if (ofertaInput && !ofertaInput.dataset.bound) {
     ofertaInput.dataset.bound = '1';
@@ -1540,9 +1354,9 @@ function bindCallFieldValues() {
       const current = getCurrentCall();
       if (!current) return;
 
-      const parsed = parseCurrencyBR(event.target.value);
-      current.oferta = parsed === null ? '' : parsed;
-      event.target.value = parsed === null ? '' : formatCurrencyBR(parsed);
+      const value = parseCurrencyBR(event.target.value);
+      current.oferta = value;
+      event.target.value = formatCurrencyBR(value);
 
       persistDraft(current);
       markDirty();
@@ -1556,11 +1370,7 @@ function bindCallFieldValues() {
     visitantesInput.addEventListener('input', (event) => {
       const current = getCurrentCall();
       if (!current) return;
-
-      const raw = String(event.target.value ?? '').trim();
-      const parsed = raw === '' ? 0 : Number(raw);
-      current.visitantes = Number.isFinite(parsed) ? parsed : 0;
-
+      current.visitantes = Number(event.target.value || 0) || 0;
       persistDraft(current);
       markDirty();
       renderSummary();
@@ -2018,4 +1828,3 @@ els.alunoForm.addEventListener('submit', (event) => {
 els.alunoCpf.addEventListener('input', normalizeCpfInput);
 
 document.addEventListener('DOMContentLoaded', bootstrap);
-
