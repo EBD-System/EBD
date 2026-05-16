@@ -601,15 +601,14 @@ function buildCallsByTurmaForDate_(dateKey, all) {
     const ausentes = rows.length - presentes;
     const percentual = rows.length ? round1_((presentes / rows.length) * 100) : 0;
 
-  
     callsByTurma[turma.TurmaID] = {
       chamadaId: callMeta?.ChamadaID || `${turma.TurmaID}_${dateKey}`,
       data: dateKey,
       turmaId: turma.TurmaID,
       turmaNome: turma.Nome,
-      oferta: callMeta?.Oferta || '',
-      visitantes: Number(callMeta?.Visitantes || 0) || 0,
-      visitantesTexto: callMeta?.VisitantesTexto || '',
+      oferta: callMeta?.Oferta ?? '',
+      visitantes: Number(callMeta?.Visitantes ?? 0) || 0,
+      visitantesTexto: callMeta?.VisitantesTexto ?? '',
       totalAlunos: rows.length,
       presentes,
       atrasos,
@@ -621,6 +620,33 @@ function buildCallsByTurmaForDate_(dateKey, all) {
       isSaved: !!callMeta,
     };
   });
+
+  (all.turmas || []).forEach(turma => {
+    if (!callsByTurma[turma.TurmaID]) {
+      callsByTurma[turma.TurmaID] = {
+        chamadaId: `${turma.TurmaID}_${dateKey}`,
+        data: dateKey,
+        turmaId: turma.TurmaID,
+        turmaNome: turma.Nome,
+        oferta: '',
+        visitantes: 0,
+        visitantesTexto: '',
+        totalAlunos: 0,
+        presentes: 0,
+        atrasos: 0,
+        ausentes: 0,
+        percentual: 0,
+        enviadoTelegram: false,
+        telegramEnviadoEm: '',
+        rows: [],
+        isSaved: false,
+      };
+    }
+  });
+
+  return callsByTurma;
+}
+
 
   // Garante turmas cadastradas somente em meta, mesmo sem alunos na ReadBase.
   (all.turmas || []).forEach(turma => {
