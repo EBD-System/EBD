@@ -180,20 +180,94 @@ function formatCpf(value) {
 }
 
 function parseCurrencyBR(value) {
-  const digits = onlyDigits(value);
-  if (!digits) return 0;
-  return Number(digits) / 100;
+
+  // =========================================
+  // ACEITA:
+  // 15,99
+  // 15.99
+  // 1599
+  // 0
+  // =========================================
+
+  if (
+    value === null ||
+    value === undefined
+  ) {
+    return 0;
+  }
+
+  // Já é número
+  if (typeof value === 'number') {
+    return Number.isFinite(value)
+      ? value
+      : 0;
+  }
+
+  let str = String(value).trim();
+
+  if (str === '') {
+    return 0;
+  }
+
+  // remove espaços
+  str = str.replace(/\s/g, '');
+
+  // Se tiver vírgula, assume formato BR
+  if (str.includes(',')) {
+
+    // remove separador milhar
+    str = str.replace(/\./g, '');
+
+    // troca decimal
+    str = str.replace(',', '.');
+
+  } else {
+
+    // formato americano
+    // mantém decimal normal
+  }
+
+  const num = Number(str);
+
+  return Number.isFinite(num)
+    ? num
+    : 0;
 }
 
 function formatCurrencyBR(value) {
-  return formatMoney(parseCurrencyBR(value));
+
+  const number = parseCurrencyBR(value);
+
+  return number.toLocaleString(
+    'pt-BR',
+    {
+      style: 'currency',
+      currency: 'BRL',
+    }
+  );
 }
 
 function formatMoney(value) {
-  const n = Number(value || 0);
+
+  const n =
+    value === null ||
+    value === undefined ||
+    value === ''
+      ? 0
+      : Number(value);
+
   try {
-    return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+    return n.toLocaleString(
+      'pt-BR',
+      {
+        style: 'currency',
+        currency: 'BRL',
+      }
+    );
+
   } catch (err) {
+
     return `R$ ${n.toFixed(2)}`;
   }
 }
