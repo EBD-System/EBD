@@ -443,38 +443,39 @@ function getActiveCallRows_(rows) {
   return (rows || []).filter(r => String(r.statusAluno || '').trim().toLowerCase() !== 'inativo');
 }
 
-function buildTurmaReportText_(dateKey, turma, turmaCall, all) {
+function buildGeneralReportText_(dateKey, geral, callsByTurma, all) {
   const lines = [];
-  lines.push(`*Relatório da turma*`);
+  lines.push(`*Relatório geral*`);
   lines.push(`Data: ${formatDateBR_(dateKey)}`);
-  lines.push(`Turma: ${turma.Nome}`);
-  const activeRows = getActiveCallRows_(turmaCall.rows);
-  const totalAtivos = activeRows.length;
-  const presentesAtivos = activeRows.filter(r => isPresenceLikeRow_(r)).length;
-  const atrasosAtivos = activeRows.filter(r => isDelayedRow_(r)).length;
-  const ausentesAtivos = totalAtivos - presentesAtivos;
-  const percentualAtivos = totalAtivos ? round1_((presentesAtivos / totalAtivos) * 100) : 0;
+  lines.push(`Turmas com chamada: ${geral.totalTurmas}`);
+  lines.push(`Total de alunos: ${geral.totalAlunos}`);
+  lines.push(`Presentes: ${geral.presentes}`);
+  lines.push(`Ausentes: ${geral.ausentes}`);
+  lines.push(`Presença geral: ${formatPercent_(geral.percentual)}`);
+  lines.push(`Oferta total: ${formatMoney_(geral.ofertaTotal)}`);
+  lines.push(`Visitantes: ${geral.visitantesTotal ?? 0}`);
+  lines.push('');
+  lines.push('*Resumo por turma:*');
 
-  lines.push(`Total de alunos: ${totalAtivos}`);
-  lines.push(`Presentes: ${presentesAtivos}`);
-  lines.push(`Ausentes: ${ausentesAtivos}`);
-  lines.push(`Presença: ${formatPercent_(percentualAtivos)}`);
-  lines.push(`Oferta: ${formatMoney_(parseMoney_(turmaCall.oferta))}`);
-  if (Number(turmaCall.visitantes || 0) > 0) lines.push(`Visitantes: ${turmaCall.visitantes}`);
-  if (String(turmaCall.visitantesTexto || '').trim()) lines.push(`Detalhe visitantes: ${turmaCall.visitantesTexto}`);
+  const turmasOrdenadas = sortTurmas_(all.turmas).filter(t => callsByTurma[t.TurmaID]);
+  turmasOrdenadas.forEach(turma => {
+    const call = callsByTurma[turma.TurmaID];
+    const activeRows = getActiveCallRows_(call.rows);
+    const totalAtivos = activeRows.length;
+    const presentesAtivos = activeRows.filter(r => isPresenceLikeRow_(r)).length;
+    const atrasosAtivos = activeRows.filter(r => isDelayedRow_(r)).length;
+    const percentualAtivos = totalAtivos ? round1_((presentesAtivos / totalAtivos) * 100) : 0;
+    lines.push(`• ${turma.Nome}: ${presentesAtivos}/${totalAtivos} presentes (${formatPercent_(percentualAtivos)}) | atrasos ${atrasosAtivos} | Oferta ${formatMoney_(call.oferta) || '-'} | Visitantes ${Number(call.visitantes ?? 0)}`);
+  });
 
-  const stats = getTopStatsForTurma_(turma.TurmaID, all);
-  if (stats.bestStudent) lines.push(`Melhor aluno: ${stats.bestStudent.Nome} (${formatPercent_(stats.bestStudent.Percentual)})`);
-  if (stats.mostAbsent) lines.push(`Mais faltas: ${stats.mostAbsent.Nome} (${stats.mostAbsent.TotalFaltas})`);
-  if (stats.inactiveCount) lines.push(`Inativos: ${stats.inactiveCount}`);
-
-  const presentNames = activeRows.filter(r => isPresenceLikeRow_(r)).map(r => r.nome);
-  const delayedNames = activeRows.filter(r => isDelayedRow_(r)).map(r => r.nome);
-  const absentNames = activeRows.filter(r => !isPresenceLikeRow_(r)).map(r => r.nome);
-  if (presentNames.length) lines.push('');
-  if (presentNames.length) lines.push(`Presentes: ${presentNames.join(', ')}`);
-  if (delayedNames.length) lines.push(`Atrasados: ${delayedNames.join(', ')}`);
-  if (absentNames.length) lines.push(`Ausentes: ${absentNames.join(', ')}`);
+  const top = getTopStudentsOverall_(all);
+  if (top.length) {
+    lines.push('');
+    lines.push('*Melhores alunos no período:*');
+    top.slice(0, 5).forEach((s, idx) => {
+      lines.push(`${idx + 1}. ${s.Nome} — ${s.TurmaNome} — ${formatPercent_(s.Percentual)}`);
+    });
+  }
 
   return lines.join('\n');
 }
