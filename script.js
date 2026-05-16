@@ -179,14 +179,46 @@ function formatCpf(value) {
   return out;
 }
 
+function isBlankValue(value) {
+  return value === null || value === undefined || String(value).trim() === '';
+}
+
 function parseCurrencyBR(value) {
-  const digits = onlyDigits(value);
-  if (!digits) return 0;
-  return Number(digits) / 100;
+  if (value === null || value === undefined) return null;
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  const cleaned = raw
+    .replace(/\s+/g, '')
+    .replace(/R\$/gi, '')
+    .replace(/[^\d,.-]/g, '');
+
+  if (!cleaned) return null;
+
+  let normalized = cleaned;
+
+  // Ex.: 1.599,00 -> 1599.00
+  if (cleaned.includes(',') && cleaned.includes('.')) {
+    normalized = cleaned.replace(/\./g, '').replace(',', '.');
+  } else if (cleaned.includes(',')) {
+    // Ex.: 1599,50 -> 1599.50
+    normalized = cleaned.replace(/\./g, '').replace(',', '.');
+  } else if (/^\d{1,3}(\.\d{3})+$/.test(cleaned)) {
+    // Ex.: 1.599 -> 1599
+    normalized = cleaned.replace(/\./g, '');
+  }
+
+  const n = Number(normalized);
+  return Number.isFinite(n) ? n : null;
 }
 
 function formatCurrencyBR(value) {
-  return formatMoney(parseCurrencyBR(value));
+  return formatMoney(value);
 }
 
 function formatMoney(value) {
