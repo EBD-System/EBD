@@ -1459,7 +1459,12 @@ function bindCallFieldValues() {
   const visitantesInput = document.getElementById('visitantesInput');
   const visitantesTextoInput = document.getElementById('visitantesTextoInput');
 
-  if (ofertaInput) ofertaInput.value = formatCurrencyBR(call.oferta || 0);
+  if (ofertaInput) {
+  ofertaInput.value =
+    formatCurrencyBR(
+      call.oferta ?? 0
+    );
+}
   if (visitantesInput) visitantesInput.value = String(call.visitantes || 0);
   if (visitantesTextoInput) visitantesTextoInput.value = call.visitantesTexto || '';
 
