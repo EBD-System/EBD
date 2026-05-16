@@ -179,6 +179,24 @@ function formatCpf(value) {
   return out;
 }
 
+function isModifierKey(event) {
+  return !!(event?.ctrlKey || event?.metaKey || event?.altKey);
+}
+
+function formatTensToBRL(event) {
+  if (!event?.target) return;
+  if (isModifierKey(event)) return;
+
+  const digits = String(event.target.value || '').replace(/\D/g, '');
+  const cents = digits.padStart(3, '0');
+  const number = Number(cents) / 100;
+
+  event.target.value = number.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  });
+}
+
 function parseCurrencyBR(value) {
   if (value === null || value === undefined) {
     return 0;
@@ -1441,29 +1459,35 @@ function bindCallFieldValues() {
   if (visitantesInput) visitantesInput.value = String(call.visitantes || 0);
   if (visitantesTextoInput) visitantesTextoInput.value = call.visitantesTexto || '';
 
-  if (ofertaInput && !ofertaInput.dataset.bound) {
+if (ofertaInput && !ofertaInput.dataset.bound) {
+
   ofertaInput.dataset.bound = '1';
 
   ofertaInput.addEventListener('input', (event) => {
+
+    formatTensToBRL(event);
+
     const current = getCurrentCall();
+
     if (!current) return;
 
-    const rawValue = event.target.value;
-    const parsed = parseCurrencyBR(rawValue);
+    current.oferta =
+      parseCurrencyBR(event.target.value);
 
-    current.oferta = parsed;
-
-    event.target.value = formatCurrencyBR(parsed);
-
-    console.log('[ofertaInput]', {
-      digitado: rawValue,
-      parsed,
-      armazenado: current.oferta,
-    });
+    console.log(
+      '[ofertaInput]',
+      {
+        digitado: event.target.value,
+        armazenado: current.oferta,
+      }
+    );
 
     persistDraft(current);
+
     markDirty();
+
     renderSummary();
+
     renderReports();
   });
 }
