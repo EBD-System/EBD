@@ -180,58 +180,55 @@ function formatCpf(value) {
 }
 
 function parseCurrencyBR(value) {
-
-  // =========================================
-  // ACEITA:
-  // 15,99
-  // 15.99
-  // 1599
-  // 0
-  // =========================================
-
-  if (
-    value === null ||
-    value === undefined
-  ) {
+  if (value === null || value === undefined) {
     return 0;
   }
 
-  // Já é número
   if (typeof value === 'number') {
-    return Number.isFinite(value)
-      ? value
-      : 0;
+    return Number.isFinite(value) ? value : 0;
   }
 
   let str = String(value).trim();
 
-  if (str === '') {
+  if (!str) {
     return 0;
   }
 
-  // remove espaços
-  str = str.replace(/\s/g, '');
+  // Remove tudo que não for dígito, vírgula, ponto ou sinal de menos
+  str = str.replace(/[^\d.,-]/g, '');
 
-  // Se tiver vírgula, assume formato BR
-  if (str.includes(',')) {
+  if (!str) {
+    return 0;
+  }
 
-    // remove separador milhar
+  const hasComma = str.includes(',');
+  const hasDot = str.includes('.');
+
+  // Se tiver vírgula e ponto, assume que o último separador é o decimal
+  if (hasComma && hasDot) {
+    const lastComma = str.lastIndexOf(',');
+    const lastDot = str.lastIndexOf('.');
+    const decimalSep = lastComma > lastDot ? ',' : '.';
+
+    if (decimalSep === ',') {
+      str = str.replace(/\./g, '');
+      str = str.replace(',', '.');
+    } else {
+      str = str.replace(/,/g, '');
+    }
+  } else if (hasComma) {
     str = str.replace(/\./g, '');
-
-    // troca decimal
     str = str.replace(',', '.');
-
-  } else {
-
-    // formato americano
-    // mantém decimal normal
+  } else if (hasDot) {
+    // Se houver vários pontos, trata como milhar; se houver um só, mantém decimal
+    const parts = str.split('.');
+    if (parts.length > 2) {
+      str = parts.join('');
+    }
   }
 
   const num = Number(str);
-
-  return Number.isFinite(num)
-    ? num
-    : 0;
+  return Number.isFinite(num) ? num : 0;
 }
 
 function formatCurrencyBR(value) {
