@@ -1045,13 +1045,13 @@ function replaceBaseRowsForCall_(dateKey, turmaId, turmaNome, normalizedRows, ex
   };
 }
 
-
 function getBaseRowsCount_() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName(BASE_SHEET_NAME);
   if (!sheet || sheet.getLastRow() < 2) return 0;
   return sheet.getLastRow() - 1;
 }
+
 function getBaseRowsAll_() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName(BASE_SHEET_NAME);
@@ -1071,20 +1071,21 @@ function getBaseRowsAll_() {
     const turmaId = buildTurmaId_(classe);
     const atraso = normalizeBool_(row[idx.ATRASO]);
     const presenca = atraso ? 'atrasado' : normalizePresence_(row[idx.PRESENCA]);
+
     result.push({
-  dateKey: normalizeDateFromBaseCell_(row[idx.DATA]),
-  ano: row[idx.ANO],
-  mes: row[idx.MES],
-  nome: aluno,
-  turmaId,
-  turmaNome: classe,
-  presenca,
-  atraso,
-  ausencia: normalizeBool_(row[idx.AUSENCIA]),
-  oferta: row[idx.OFERTA] || '',
-  visitantes: Number(row[idx.Visitantes] || row[idx.VISITANTES] || 0) || 0,
-  alunoId: buildStudentId_(aluno, turmaId, ''),
-});
+      dateKey: normalizeDateFromBaseCell_(row[idx.DATA]),
+      ano: row[idx.ANO],
+      mes: row[idx.MES],
+      nome: aluno,
+      turmaId,
+      turmaNome: classe,
+      presenca,
+      atraso,
+      ausencia: normalizeBool_(row[idx.AUSENCIA]),
+      oferta: row[idx.OFERTA] ?? '',
+      visitantes: Number(row[idx.Visitantes] ?? row[idx.VISITANTES] ?? 0) || 0,
+      alunoId: buildStudentId_(aluno, turmaId, ''),
+    });
   }
 
   return result;
