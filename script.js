@@ -1529,38 +1529,54 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
   try {
 
     // =========================================
-    // DEBUG BOX
-    // =========================================
+// DEBUG BOX
+// =========================================
 
-    let debugBox = document.getElementById('debugBackendJson');
+// true = mostrar debug
+// false = ocultar debug
+const DEBUG_BACKEND_JSON = false;
 
-    if (!debugBox) {
+let debugBox = document.getElementById('debugBackendJson');
 
-      debugBox = document.createElement('pre');
-      debugBox.id = 'debugBackendJson';
+// Se debug estiver desativado
+if (!DEBUG_BACKEND_JSON) {
 
-      debugBox.style.cssText = `
-        position:fixed;
-        left:10px;
-        right:10px;
-        bottom:10px;
-        max-height:45vh;
-        overflow:auto;
-        z-index:999999999;
-        background:#000;
-        color:#00ff88;
-        padding:14px;
-        border-radius:12px;
-        font-size:11px;
-        line-height:1.4;
-        border:2px solid #333;
-        white-space:pre-wrap;
-        word-break:break-word;
-        box-shadow:0 0 30px rgba(0,0,0,.5);
-      `;
+  // Remove a box caso exista
+  if (debugBox) {
+    debugBox.remove();
+  }
 
-      document.body.appendChild(debugBox);
-    }
+} else {
+
+  // Cria a box se não existir
+  if (!debugBox) {
+
+    debugBox = document.createElement('pre');
+    debugBox.id = 'debugBackendJson';
+
+    debugBox.style.cssText = `
+      position:fixed;
+      left:10px;
+      right:10px;
+      bottom:10px;
+      max-height:45vh;
+      overflow:auto;
+      z-index:999999999;
+      background:#000;
+      color:#00ff88;
+      padding:14px;
+      border-radius:12px;
+      font-size:11px;
+      line-height:1.4;
+      border:2px solid #333;
+      white-space:pre-wrap;
+      word-break:break-word;
+      box-shadow:0 0 30px rgba(0,0,0,.5);
+    `;
+
+    document.body.appendChild(debugBox);
+  }
+}
 
     debugBox.textContent =
       '⏳ Iniciando carregamento do backend...\n';
@@ -1643,14 +1659,14 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
     debugBox.textContent +=
       '\nBaseRowsCount: ' +
       data.baseRowsCount;
-
+*/
     // =========================================
     // PRIMEIRA CHAMADA
     // =========================================
 
     const firstCall =
       Object.values(data.callsByTurma || {})[0];
-
+/
     debugBox.textContent +=
       '\n\n============================\n' +
       '📞 PRIMEIRA CALL\n' +
