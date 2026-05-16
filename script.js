@@ -1105,7 +1105,7 @@ async function saveCurrentCall({ silent = false } = {}) {
     turmaId: turma.TurmaID,
     chamadaId: call.chamadaId,
     oferta: call.oferta ?? 0,
-    visitantes: String(call.visitantes || 0),
+    visitantes: String(call.visitantes ?? 0),
     visitantesTexto: call.visitantesTexto || '',
     rowsJson: JSON.stringify(call.rows),
   };
