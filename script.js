@@ -194,7 +194,7 @@ function parseCurrencyBR(value) {
     return 0;
   }
 
-  // Remove tudo que não for dígito, vírgula, ponto ou sinal de menos
+  // Remove tudo que não for número, vírgula, ponto ou sinal de menos
   str = str.replace(/[^\d.,-]/g, '');
 
   if (!str) {
@@ -204,13 +204,11 @@ function parseCurrencyBR(value) {
   const hasComma = str.includes(',');
   const hasDot = str.includes('.');
 
-  // Se tiver vírgula e ponto, assume que o último separador é o decimal
   if (hasComma && hasDot) {
     const lastComma = str.lastIndexOf(',');
     const lastDot = str.lastIndexOf('.');
-    const decimalSep = lastComma > lastDot ? ',' : '.';
 
-    if (decimalSep === ',') {
+    if (lastComma > lastDot) {
       str = str.replace(/\./g, '');
       str = str.replace(',', '.');
     } else {
@@ -220,7 +218,6 @@ function parseCurrencyBR(value) {
     str = str.replace(/\./g, '');
     str = str.replace(',', '.');
   } else if (hasDot) {
-    // Se houver vários pontos, trata como milhar; se houver um só, mantém decimal
     const parts = str.split('.');
     if (parts.length > 2) {
       str = parts.join('');
