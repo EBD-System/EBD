@@ -1474,9 +1474,24 @@ function bindCallFieldValues() {
       const current = getCurrentCall();
       if (!current) return;
 
-      const value = parseCurrencyBR(event.target.value);
-      current.oferta = value;
-      event.target.value = formatCurrencyBR(value);
+      const parsed =
+  parseCurrencyBR(
+    event.target.value
+  );
+
+current.oferta = parsed;
+
+event.target.value =
+  formatCurrencyBR(parsed);
+
+console.log(
+  '[ofertaInput]',
+  {
+    digitado: event.target.value,
+    parsed,
+    armazenado: current.oferta,
+  }
+);
 
       persistDraft(current);
       markDirty();
