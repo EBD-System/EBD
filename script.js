@@ -1466,36 +1466,31 @@ function bindCallFieldValues() {
   if (visitantesTextoInput) visitantesTextoInput.value = call.visitantesTexto || '';
 
   if (ofertaInput && !ofertaInput.dataset.bound) {
-    ofertaInput.dataset.bound = '1';
-    ofertaInput.addEventListener('input', (event) => {
-      const current = getCurrentCall();
-      if (!current) return;
+  ofertaInput.dataset.bound = '1';
 
-      const parsed =
-  parseCurrencyBR(
-    event.target.value
-  );
+  ofertaInput.addEventListener('input', (event) => {
+    const current = getCurrentCall();
+    if (!current) return;
 
-current.oferta = parsed;
+    const rawValue = event.target.value;
+    const parsed = parseCurrencyBR(rawValue);
 
-event.target.value =
-  formatCurrencyBR(parsed);
+    current.oferta = parsed;
 
-console.log(
-  '[ofertaInput]',
-  {
-    digitado: event.target.value,
-    parsed,
-    armazenado: current.oferta,
-  }
-);
+    event.target.value = formatCurrencyBR(parsed);
 
-      persistDraft(current);
-      markDirty();
-      renderSummary();
-      renderReports();
+    console.log('[ofertaInput]', {
+      digitado: rawValue,
+      parsed,
+      armazenado: current.oferta,
     });
-  }
+
+    persistDraft(current);
+    markDirty();
+    renderSummary();
+    renderReports();
+  });
+}
 
   if (visitantesInput && !visitantesInput.dataset.bound) {
     visitantesInput.dataset.bound = '1';
