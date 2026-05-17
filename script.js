@@ -1518,6 +1518,7 @@ if (ofertaInput && !ofertaInput.dataset.bound) {
   }
 }
 
+
 async function refreshFromBackend(showMessage = false, { silent = false } = {}) {
   clearAutosaveTimer();
   state.loading = true;
@@ -1527,46 +1528,43 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
   }
 
   try {
+    const showDebugBox = true;
 
     // =========================================
     // DEBUG BOX
     // =========================================
+    if (showDebugBox) {
+      let debugBox = document.getElementById('debugBackendJson');
 
-    let showDebugBox = false;
-    
-    let debugBox = document.getElementById('debugBackendJson');
+      if (!debugBox) {
+        debugBox = document.createElement('pre');
+        debugBox.id = 'debugBackendJson';
 
-    if (!debugBox) {
+        debugBox.style.cssText = `
+          position:fixed;
+          left:10px;
+          right:10px;
+          bottom:10px;
+          max-height:45vh;
+          overflow:auto;
+          z-index:999999999;
+          background:#000;
+          color:#00ff88;
+          padding:14px;
+          border-radius:12px;
+          font-size:11px;
+          line-height:1.4;
+          border:2px solid #333;
+          white-space:pre-wrap;
+          word-break:break-word;
+          box-shadow:0 0 30px rgba(0,0,0,.5);
+        `;
 
-     showDebugBox && debugBox = document.createElement('pre');
-     showDebugBox &&  debugBox.id = 'debugBackendJson';
+        document.body.appendChild(debugBox);
+      }
 
-      
-     showDebugBox &&  debugBox.style.cssText = `
-        position:fixed;
-        left:10px;
-        right:10px;
-        bottom:10px;
-        max-height:45vh;
-        overflow:auto;
-        z-index:999999999;
-        background:#000;
-        color:#00ff88;
-        padding:14px;
-        border-radius:12px;
-        font-size:11px;
-        line-height:1.4;
-        border:2px solid #333;
-        white-space:pre-wrap;
-        word-break:break-word;
-        box-shadow:0 0 30px rgba(0,0,0,.5);
-      `;
-      
-     showDebugBox &&  document.body.appendChild(debugBox);
+      debugBox.textContent = '⏳ Iniciando carregamento do backend...\n';
     }
-
-     showDebugBox && debugBox.textContent =
-      '⏳ Iniciando carregamento do backend...\n';
 
     // =========================================
     // CHAMADA API
@@ -1577,8 +1575,12 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
       date: state.dateKey,
     });
 
-    showDebugBox && debugBox.textContent +=
-      '\n🌐 URL:\n' + urlFinal + '\n';
+    if (showDebugBox) {
+      const debugBox = document.getElementById('debugBackendJson');
+      if (debugBox) {
+        debugBox.textContent += '\n🌐 URL:\n' + urlFinal + '\n';
+      }
+    }
 
     const response = await fetch(urlFinal, {
       method: 'GET',
@@ -1586,30 +1588,46 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
       cache: 'no-store',
     });
 
-     showDebugBox && debugBox.textContent +=
-      '\n📡 STATUS HTTP:\n' +
-      response.status + ' ' + response.statusText + '\n';
+    if (showDebugBox) {
+      const debugBox = document.getElementById('debugBackendJson');
+      if (debugBox) {
+        debugBox.textContent +=
+          '\n📡 STATUS HTTP:\n' +
+          response.status + ' ' + response.statusText + '\n';
+      }
+    }
 
     const rawText = await response.text();
 
-     showDebugBox && debugBox.textContent +=
-      '\n📦 RAW RESPONSE:\n' +
-      rawText.slice(0, 15000) + '\n';
+    if (showDebugBox) {
+      const debugBox = document.getElementById('debugBackendJson');
+      if (debugBox) {
+        debugBox.textContent +=
+          '\n📦 RAW RESPONSE:\n' +
+          rawText.slice(0, 15000) + '\n';
+      }
+    }
 
     let data = null;
 
     try {
-
       data = JSON.parse(rawText);
 
-     showDebugBox && debugBox.textContent +=
-        '\n✅ JSON PARSEADO COM SUCESSO\n';
-
+      if (showDebugBox) {
+        const debugBox = document.getElementById('debugBackendJson');
+        if (debugBox) {
+          debugBox.textContent += '\n✅ JSON PARSEADO COM SUCESSO\n';
+        }
+      }
     } catch (jsonErr) {
-
-    showDebugBox && debugBox.textContent +=
-        '\n❌ ERRO AO PARSEAR JSON:\n' +
-        jsonErr.message + '\n';
+      if (showDebugBox) {
+        const debugBox = document.getElementById('debugBackendJson');
+        if (debugBox) {
+          debugBox.textContent +=
+            '\n❌ ERRO AO PARSEAR JSON:\n' +
+            jsonErr.message + '\n';
+        }
+      }
 
       throw jsonErr;
     }
@@ -1618,34 +1636,39 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
     // INSPEÇÃO DO JSON
     // =========================================
 
-  showDebugBox &&   debugBox.textContent +=
-      '\n============================\n' +
-      '📊 ESTRUTURA DO JSON\n' +
-      '============================\n';
+    if (showDebugBox) {
+      const debugBox = document.getElementById('debugBackendJson');
+      if (debugBox) {
+        debugBox.textContent +=
+          '\n============================\n' +
+          '📊 ESTRUTURA DO JSON\n' +
+          '============================\n';
 
-  showDebugBox &&   debugBox.textContent +=
-      '\nTurmas: ' +
-      (Array.isArray(data.turmas)
-        ? data.turmas.length
-        : 'NÃO É ARRAY');
+        debugBox.textContent +=
+          '\nTurmas: ' +
+          (Array.isArray(data.turmas)
+            ? data.turmas.length
+            : 'NÃO É ARRAY');
 
-  showDebugBox &&   debugBox.textContent +=
-      '\nAlunos: ' +
-      (Array.isArray(data.alunos)
-        ? data.alunos.length
-        : 'NÃO É ARRAY');
+        debugBox.textContent +=
+          '\nAlunos: ' +
+          (Array.isArray(data.alunos)
+            ? data.alunos.length
+            : 'NÃO É ARRAY');
 
- showDebugBox &&    debugBox.textContent +=
-      '\nCallsByTurma keys: ' +
-      Object.keys(data.callsByTurma || {}).length;
+        debugBox.textContent +=
+          '\nCallsByTurma keys: ' +
+          Object.keys(data.callsByTurma || {}).length;
 
-  showDebugBox &&   debugBox.textContent +=
-      '\nResumo geral existe: ' +
-      (!!data.resumoGeral);
+        debugBox.textContent +=
+          '\nResumo geral existe: ' +
+          (!!data.resumoGeral);
 
-  showDebugBox &&   debugBox.textContent +=
-      '\nBaseRowsCount: ' +
-      data.baseRowsCount;
+        debugBox.textContent +=
+          '\nBaseRowsCount: ' +
+          data.baseRowsCount;
+      }
+    }
 
     // =========================================
     // PRIMEIRA CHAMADA
@@ -1654,21 +1677,26 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
     const firstCall =
       Object.values(data.callsByTurma || {})[0];
 
-   showDebugBox &&  debugBox.textContent +=
-      '\n\n============================\n' +
-      '📞 PRIMEIRA CALL\n' +
-      '============================\n';
+    if (showDebugBox) {
+      const debugBox = document.getElementById('debugBackendJson');
+      if (debugBox) {
+        debugBox.textContent +=
+          '\n\n============================\n' +
+          '📞 PRIMEIRA CALL\n' +
+          '============================\n';
 
-  showDebugBox &&   debugBox.textContent += JSON.stringify({
-      chamadaId: firstCall?.chamadaId,
-      turmaId: firstCall?.turmaId,
-      turmaNome: firstCall?.turmaNome,
-      oferta: firstCall?.oferta,
-      visitantes: firstCall?.visitantes,
-      visitantesTexto: firstCall?.visitantesTexto,
-      totalRows: firstCall?.rows?.length,
-      firstRow: firstCall?.rows?.[0],
-    }, null, 2);
+        debugBox.textContent += JSON.stringify({
+          chamadaId: firstCall?.chamadaId,
+          turmaId: firstCall?.turmaId,
+          turmaNome: firstCall?.turmaNome,
+          oferta: firstCall?.oferta,
+          visitantes: firstCall?.visitantes,
+          visitantesTexto: firstCall?.visitantesTexto,
+          totalRows: firstCall?.rows?.length,
+          firstRow: firstCall?.rows?.[0],
+        }, null, 2);
+      }
+    }
 
     // =========================================
     // APLICAÇÃO NO STATE
@@ -1697,20 +1725,24 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
         0
       );
 
-  showDebugBox &&   debugBox.textContent +=
-      '\n\n✅ STATE ATUALIZADO';
+    if (showDebugBox) {
+      const debugBox = document.getElementById('debugBackendJson');
+      if (debugBox) {
+        debugBox.textContent += '\n\n✅ STATE ATUALIZADO';
 
-  showDebugBox &&   debugBox.textContent +=
-      '\nstate.turmas: ' +
-      state.turmas.length;
+        debugBox.textContent +=
+          '\nstate.turmas: ' +
+          state.turmas.length;
 
-   showDebugBox &&  debugBox.textContent +=
-      '\nstate.alunos: ' +
-      state.alunos.length;
+        debugBox.textContent +=
+          '\nstate.alunos: ' +
+          state.alunos.length;
 
-   showDebugBox &&  debugBox.textContent +=
-      '\nstate.calls: ' +
-      Object.keys(state.chamadasByTurma).length;
+        debugBox.textContent +=
+          '\nstate.calls: ' +
+          Object.keys(state.chamadasByTurma).length;
+      }
+    }
 
     // =========================================
     // TURMA SELECIONADA
@@ -1726,37 +1758,49 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
         state.turmas[0]?.TurmaID || '';
     }
 
-   showDebugBox &&  debugBox.textContent +=
-      '\n\n🎯 selectedTurmaId:\n' +
-      state.selectedTurmaId;
+    if (showDebugBox) {
+      const debugBox = document.getElementById('debugBackendJson');
+      if (debugBox) {
+        debugBox.textContent +=
+          '\n\n🎯 selectedTurmaId:\n' +
+          state.selectedTurmaId;
+      }
+    }
 
     // =========================================
     // TESTE getCurrentCall()
     // =========================================
 
     try {
-
       const testCall = getCurrentCall();
 
-    showDebugBox &&   debugBox.textContent +=
-        '\n\n============================\n' +
-        '🧪 TESTE getCurrentCall()\n' +
-        '============================\n';
+      if (showDebugBox) {
+        const debugBox = document.getElementById('debugBackendJson');
+        if (debugBox) {
+          debugBox.textContent +=
+            '\n\n============================\n' +
+            '🧪 TESTE getCurrentCall()\n' +
+            '============================\n';
 
-    showDebugBox &&   debugBox.textContent += JSON.stringify({
-        exists: !!testCall,
-        turmaId: testCall?.turmaId,
-        chamadaId: testCall?.chamadaId,
-        rows: testCall?.rows?.length,
-        oferta: testCall?.oferta,
-        visitantes: testCall?.visitantes,
-      }, null, 2);
-
+          debugBox.textContent += JSON.stringify({
+            exists: !!testCall,
+            turmaId: testCall?.turmaId,
+            chamadaId: testCall?.chamadaId,
+            rows: testCall?.rows?.length,
+            oferta: testCall?.oferta,
+            visitantes: testCall?.visitantes,
+          }, null, 2);
+        }
+      }
     } catch (err) {
-
-    showDebugBox &&   debugBox.textContent +=
-        '\n\n❌ ERRO getCurrentCall():\n' +
-        err.message;
+      if (showDebugBox) {
+        const debugBox = document.getElementById('debugBackendJson');
+        if (debugBox) {
+          debugBox.textContent +=
+            '\n\n❌ ERRO getCurrentCall():\n' +
+            err.message;
+        }
+      }
     }
 
     // =========================================
@@ -1764,50 +1808,56 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
     // =========================================
 
     try {
-
       renderAll();
 
-    showDebugBox &&   debugBox.textContent +=
-        '\n\n✅ renderAll() executado';
-
+      if (showDebugBox) {
+        const debugBox = document.getElementById('debugBackendJson');
+        if (debugBox) {
+          debugBox.textContent +=
+            '\n\n✅ renderAll() executado';
+        }
+      }
     } catch (renderErr) {
-
-   showDebugBox &&    debugBox.textContent +=
-        '\n\n❌ ERRO NO RENDER:\n' +
-        renderErr.message +
-        '\n\nSTACK:\n' +
-        renderErr.stack;
+      if (showDebugBox) {
+        const debugBox = document.getElementById('debugBackendJson');
+        if (debugBox) {
+          debugBox.textContent +=
+            '\n\n❌ ERRO NO RENDER:\n' +
+            renderErr.message +
+            '\n\nSTACK:\n' +
+            renderErr.stack;
+        }
+      }
     }
 
     if (showMessage) {
       showSuccess('Dados atualizados.');
     }
-  
   } catch (err) {
-
     console.error(err);
 
-  let debugBox =
-      document.getElementById('debugBackendJson');
+    const showDebugBox = false;
 
-   if (debugBox) {
+    if (showDebugBox) {
+      const debugBox =
+        document.getElementById('debugBackendJson');
 
-     showDebugBox &&  debugBox.textContent +=
-        '\n\n============================\n' +
-        '❌ ERRO GERAL\n' +
-        '============================\n' +
-        err.message +
-        '\n\nSTACK:\n' +
-        (err.stack || '');
+      if (debugBox) {
+        debugBox.textContent +=
+          '\n\n============================\n' +
+          '❌ ERRO GERAL\n' +
+          '============================\n' +
+          err.message +
+          '\n\nSTACK:\n' +
+          (err.stack || '');
+      }
     }
 
     showError(
       err?.message ||
       'Erro ao carregar dados.'
     );
-  
-  } finally { 
-
+  } finally {
     state.loading = false;
 
     if (!silent) {
@@ -1815,6 +1865,8 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
     }
   }
 }
+
+
 
 function validateApiUrl() {
   if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('COLE_AQUI')) {
