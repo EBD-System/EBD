@@ -25,7 +25,7 @@ const META_STUDENTS_SHEET = '__ALUNOS_META';
 const META_CLASSES_SHEET = '__TURMAS_META';
 const REPORTS_SHEET = '__RELATORIOS';
 
-const BASE_HEADERS = ['DATA', 'ANO', 'MÊS', 'ALUNO', 'CLASSE', 'PRESENÇA', 'ATRASO', 'AUSÊNCIA', 'OFERTA', 'BÍBLIAS', 'REVISTAS'];
+const BASE_HEADERS = ['DATA', 'ANO', 'MÊS', 'ALUNO', 'CLASSE', 'PRESENÇA', 'ATRASO', 'AUSÊNCIA', 'OFERTA', 'VISITANTES', 'BÍBLIAS', 'REVISTAS'];
 const META_STUDENTS_HEADERS = [
   'AlunoID', 'Nome', 'TurmaID', 'TurmaNome', 'Ativo',
   'FaltasConsecutivas', 'TotalPresencas', 'TotalFaltas', 'Percentual',
@@ -191,6 +191,7 @@ function saveCall_(p) {
   const dateKey = normalizeDateKey_(p.date || todayKey_());
   const turmaId = String(p.turmaId || p.turmaNome || p.turma || '').trim();
   const oferta = parseMoney_(p.oferta);
+  const visitantes = Number(p.visitantes || 0) || 0;
   const biblias = Number(p.biblias || 0) || 0;
   const revistas = Number(p.revistas || 0) || 0;
   const chamadaId = String(p.chamadaId || `${turmaId}_${dateKey}`).trim();
@@ -246,6 +247,7 @@ function saveCall_(p) {
     normalizedRows,
     {
       oferta,
+      visitantes,
       biblias,
       revistas,
     }
@@ -256,6 +258,7 @@ function saveCall_(p) {
     dateKey,
     turma.TurmaID,
     oferta,
+    visitantes,
     biblias,
     revistas,
     normalizedRows.length,
@@ -579,9 +582,10 @@ function buildTurmaReportText_(dateKey, turma, turmaCall, all) {
   const matriculados = activeRows.length;
   const presentes = activeRows.filter(r => isPresenceLikeRow_(r)).length;
   const ausentes = matriculados - presentes;
+  const visitantes = Number(turmaCall?.visitantes ?? 0) || 0;
   const biblias = Number(turmaCall?.biblias ?? 0) || 0;
   const revistas = Number(turmaCall?.revistas ?? 0) || 0;
-  const totalAssistencia = presentes + biblias + revistas;
+  const totalAssistencia = presentes + visitantes + biblias + revistas;
   const ofertas = (turmaCall?.oferta === '' || turmaCall?.oferta === null || turmaCall?.oferta === undefined)
     ? null
     : turmaCall?.oferta;
@@ -596,6 +600,7 @@ function buildTurmaReportText_(dateKey, turma, turmaCall, all) {
     matriculados,
     ausentes,
     presentes,
+    visitantes,
     biblias,
     revistas,
     totalAssistencia,
@@ -634,9 +639,10 @@ function buildGeneralReportText_(dateKey, geral, callsByTurma, all) {
     matriculados: geral.totalAlunos,
     ausentes: geral.ausentes,
     presentes: geral.presentes,
+    visitantes: geral.visitantesTotal,
     biblias: geral.bibliasTotal,
     revistas: geral.revistasTotal,
-    totalAssistencia: Number(geral.totalAssistencia || (Number(geral.presentes || 0) + Number(geral.bibliasTotal || 0) + Number(geral.revistasTotal || 0))),
+    totalAssistencia: Number(geral.totalAssistencia || (Number(geral.presentes || 0) + Number(geral.visitantesTotal || 0) + Number(geral.bibliasTotal || 0) + Number(geral.revistasTotal || 0))),
     ofertas,
   }).forEach(line => lines.push(line));
   lines.push('');
@@ -662,6 +668,7 @@ function buildDailyGeneralSummary_(dateKey, all, callsByTurma) {
   const atrasos = calls.reduce((sum, c) => sum + getActiveCallRows_(c.rows).filter(r => isDelayedRow_(r)).length, 0);
   const ausentes = totalAlunos - presentes;
   const ofertaTotal = calls.reduce((sum, c) => sum + parseMoney_(c.oferta), 0);
+  const visitantesTotal = calls.reduce((sum, c) => sum + Number(c.visitantes || 0), 0);
   const bibliasTotal = calls.reduce((sum, c) => sum + Number(c.biblias || 0), 0);
   const revistasTotal = calls.reduce((sum, c) => sum + Number(c.revistas || 0), 0);
   const percentual = totalAlunos ? round1_((presentes / totalAlunos) * 100) : 0;
@@ -675,9 +682,10 @@ function buildDailyGeneralSummary_(dateKey, all, callsByTurma) {
     percentual,
     atrasos,
     ofertaTotal,
+    visitantesTotal,
     bibliasTotal,
     revistasTotal,
-    totalAssistencia: presentes + bibliasTotal + revistasTotal,
+    totalAssistencia: presentes + visitantesTotal + bibliasTotal + revistasTotal,
   };
 }
 
@@ -751,6 +759,7 @@ function buildCallsByTurmaForDate_(dateKey, all) {
       turmaId: turma.TurmaID,
       turmaNome: turma.Nome,
       oferta: callMeta?.Oferta ?? '',
+      visitantes: Number(callMeta?.Visitantes ?? 0) || 0,
       biblias: Number(callMeta?.Biblias ?? 0) || 0,
       revistas: Number(callMeta?.Revistas ?? 0) || 0,
       totalAlunos: rows.length,
@@ -773,6 +782,7 @@ function buildCallsByTurmaForDate_(dateKey, all) {
         turmaId: turma.TurmaID,
         turmaNome: turma.Nome,
         oferta: '',
+        visitantes: 0,
         biblias: 0,
         revistas: 0,
         totalAlunos: 0,
@@ -1237,6 +1247,7 @@ function replaceBaseRowsForCall_(dateKey, turmaId, turmaNome, normalizedRows, ex
     r.atraso ? 1 : 0,
     r.presenca === 'nao' ? 1 : 0,
     Number(extra?.oferta || 0),
+    Number(extra?.visitantes || 0),
     Number(extra?.biblias || 0),
     Number(extra?.revistas || 0),
   ]));
@@ -1307,7 +1318,8 @@ function getBaseRowsAll_(forceReload) {
       atraso,
       ausencia: normalizeBool_(row[idx.AUSENCIA]),
       oferta: row[idx.OFERTA] ?? '',
-      biblias: Number(row[idx.Biblias] ?? 0) || 0,
+      visitantes: Number(getBaseCellValue_(row, idx.VISITANTES, idx.Biblias)) || 0,
+      biblias: Number(getBaseCellValue_(row, idx.Biblias, idx.VISITANTES)) || 0,
       revistas: Number(row[idx.Revistas] ?? 0) || 0,
       alunoId: buildStudentId_(aluno, turmaId, ''),
     });
@@ -1363,6 +1375,14 @@ function buildCallMetaFromBaseRows_(dateKey, turmaId) {
     ...rows.map(r => r.oferta)
   );
 
+  const visitantes = (() => {
+    for (const r of rows) {
+      const n = Number(r.visitantes || 0) || 0;
+      if (n > 0) return n;
+    }
+    return 0;
+  })();
+
   const biblias = (() => {
     for (const r of rows) {
       const n = Number(r.biblias || 0) || 0;
@@ -1380,13 +1400,14 @@ function buildCallMetaFromBaseRows_(dateKey, turmaId) {
   })();
 
   Logger.log('META VIA BASE:');
-  Logger.log(JSON.stringify({ oferta, biblias, revistas }, null, 2));
+  Logger.log(JSON.stringify({ oferta, visitantes, biblias, revistas }, null, 2));
 
   return {
     ChamadaID: `CALL_${turmaId}_${dateKey}`,
     Data: formatDateBR_(dateKey),
     TurmaID: turmaId,
     Oferta: String(oferta || '').trim(),
+    Visitantes: Number(visitantes || 0) || 0,
     Biblias: Number(biblias || 0) || 0,
     Revistas: Number(revistas || 0) || 0,
     EnviadoTelegram: 'nao',
@@ -1409,7 +1430,8 @@ function findCallMeta_(turmaId, dateKey) {
       Logger.log(JSON.stringify(parsed, null, 2));
 
       const parsedOferta = getFirstNonEmpty_(parsed.oferta, parsed.Oferta, log.Oferta, log.OFERTA);
-      const parsedBiblias = getFirstNonEmpty_(parsed.biblias, parsed.Biblias, log.Biblias, log.BIBLIAS, log.VISITANTES);
+      const parsedVisitantes = getFirstNonEmpty_(parsed.visitantes, parsed.Visitantes, log.Visitantes, log.VISITANTES);
+      const parsedBiblias = getFirstNonEmpty_(parsed.biblias, parsed.Biblias, log.Biblias, log.BIBLIAS);
       const parsedRevistas = getFirstNonEmpty_(parsed.revistas, parsed.Revistas, log.Revistas, log.REVISTAS);
 
       return {
@@ -1417,6 +1439,7 @@ function findCallMeta_(turmaId, dateKey) {
         Data: formatDateBR_(dateKey),
         TurmaID: turmaId,
         Oferta: parsedOferta ?? '',
+        Visitantes: Number(parsedVisitantes ?? 0) || 0,
         Biblias: Number(parsedBiblias ?? 0) || 0,
         Revistas: Number(parsedRevistas ?? 0) || 0,
         EnviadoTelegram: String(getFirstNonEmpty_(log.Enviado, parsed.enviadoTelegram, parsed.EnviadoTelegram) || 'nao'),
@@ -1429,7 +1452,8 @@ function findCallMeta_(turmaId, dateKey) {
       Data: formatDateBR_(dateKey),
       TurmaID: turmaId,
       Oferta: getFirstNonEmpty_(log.Oferta, log.oferta, log.OFERTA) ?? '',
-      Biblias: Number(getFirstNonEmpty_(log.Biblias, log.biblias, log.BIBLIAS, log.VISITANTES) ?? 0) || 0,
+      Visitantes: Number(getFirstNonEmpty_(log.Visitantes, log.visitantes, log.VISITANTES) ?? 0) || 0,
+      Biblias: Number(getFirstNonEmpty_(log.Biblias, log.biblias, log.BIBLIAS) ?? 0) || 0,
       Revistas: Number(getFirstNonEmpty_(log.Revistas, log.revistas, log.REVISTAS) ?? 0) || 0,
       EnviadoTelegram: String(getFirstNonEmpty_(log.Enviado, 'nao') || 'nao'),
       TelegramEnviadoEm: String(getFirstNonEmpty_(log.EnviadoEm, '') || ''),
@@ -1459,13 +1483,13 @@ function getCallMetaForTurmaAndDate_(turmaId, dateKey, cache) {
 
 
 
-function upsertCallMeta_(chamadaId, dateKey, turmaId, oferta, biblias, revistas, totalAlunos, presentes, ausentes, percentual, enviadoTelegram) {
+function upsertCallMeta_(chamadaId, dateKey, turmaId, oferta, visitantes, biblias, revistas, totalAlunos, presentes, ausentes, percentual, enviadoTelegram) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = getOrCreateSheet_(ss, REPORTS_SHEET, REPORTS_HEADERS, true);
   const reportId = `CALL_${turmaId}_${dateKey}`;
-  const hash = textHash_([dateKey, turmaId, oferta, biblias, revistas, totalAlunos, presentes, ausentes, percentual].join('|'));
+  const hash = textHash_([dateKey, turmaId, oferta, visitantes, biblias, revistas, totalAlunos, presentes, ausentes, percentual].join('|'));
   const now = new Date().toISOString();
-  const text = JSON.stringify({ chamadaId, dateKey, turmaId, oferta, biblias, revistas, totalAlunos, presentes, ausentes, percentual });
+  const text = JSON.stringify({ chamadaId, dateKey, turmaId, oferta, visitantes, biblias, revistas, totalAlunos, presentes, ausentes, percentual });
 
   let rowIndex = -1;
   const values = sheet.getDataRange().getValues();
@@ -1828,6 +1852,7 @@ function indexByHeader_(headers) {
   idx.ATRASO = lookup(['ATRASO', 'LATE']);
   idx.AUSENCIA = lookup(['AUSENCIA', 'AUSÊNCIA', 'FALTA']);
   idx.OFERTA = lookup(['OFERTA', 'VALOR', 'R', 'R$']);
+  idx.VISITANTES = lookup(['VISITANTES', 'VISITANTE']);
 
   idx.AlunoID = lookup(['ALUNOID', 'ALUNO_ID', 'ID']);
   idx.Nome = lookup(['NOME', 'ALUNO']);
@@ -1845,7 +1870,7 @@ function indexByHeader_(headers) {
   idx.RealocadoDe = lookup(['REALOCADODE']);
   idx.CriadoEm = lookup(['CRIADOEM']);
   idx.AtualizadoEm = lookup(['ATUALIZADOEM']);
-  idx.Biblias = lookup(['BIBLIAS', 'VISITANTES']);
+  idx.Biblias = lookup(['BIBLIAS', 'BIBLIA']);
   idx.Revistas = lookup(['REVISTAS']);
   idx.Enviado = lookup(['ENVIADO']);
   idx.EnviadoEm = lookup(['ENVIADOEM']);
@@ -2000,6 +2025,7 @@ function buildReportMetricLines_(dados) {
     `- *MATRICULADOS*: ${formatReportValue_(dados.matriculados)}`,
     `- *AUSENTES*: ${formatReportValue_(dados.ausentes)}`,
     `- *PRESENTES*: ${formatReportValue_(dados.presentes)}`,
+    `- *VISITANTES*: ${formatReportValue_(dados.visitantes)}`,
     `- *BÍBLIAS*: ${formatReportValue_(dados.biblias)}`,
     `- *REVISTAS*: ${formatReportValue_(dados.revistas)}`,
     `- *TOTAL DE ASSISTÊNCIA*: ${formatReportValue_(dados.totalAssistencia)}`,

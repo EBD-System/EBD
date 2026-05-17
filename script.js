@@ -65,6 +65,7 @@ const els = {
     ausentes: document.getElementById('statAusentes'),
     percentual: document.getElementById('statPercentual'),
     oferta: document.getElementById('statOferta'),
+    visitantes: document.getElementById('statVisitantes'),
     biblias: document.getElementById('statBiblias'),
     revistas: document.getElementById('statRevistas'),
   },
@@ -593,8 +594,9 @@ function buildSyncedCall(turma, serverCall = null, draft = null) {
     turmaId: turma.TurmaID,
     turmaNome: turma.Nome,
     oferta: draft?.oferta ?? serverCall?.oferta ?? '',
+    visitantes: Number(draft?.visitantes ?? serverCall?.visitantes ?? 0) || 0,
     biblias: Number(draft?.biblias ?? serverCall?.biblias ?? 0) || 0,
-    revistas: draft?.revistas ?? serverCall?.revistas ?? '',
+    revistas: Number(draft?.revistas ?? serverCall?.revistas ?? 0) || 0,
     totalAlunos: rows.length,
     presentes: presentCount,
     atrasos: delayCount,
@@ -657,6 +659,7 @@ function blankCallForTurma(turma) {
     turmaId: turma.TurmaID,
     turmaNome: turma.Nome,
     oferta: '',
+    visitantes: 0,
     biblias: 0,
     revistas: 0,
     totalAlunos: activeRoster.length,
@@ -687,6 +690,7 @@ function restoreDraft(call) {
   return {
     ...call,
     oferta: draft.oferta ?? call.oferta,
+    visitantes: Number(draft.visitantes ?? call.visitantes ?? 0) || 0,
     biblias: Number(draft.biblias ?? call.biblias ?? 0) || 0,
     revistas: Number(draft.revistas ?? call.revistas ?? 0) || 0,
     rows: Array.isArray(draft.rows)
@@ -701,6 +705,7 @@ function persistDraft(call) {
   data.drafts = data.drafts || {};
   data.drafts[call.chamadaId] = {
     oferta: call.oferta,
+    visitantes: Number(call.visitantes || 0),
     biblias: Number(call.biblias || 0),
     revistas: Number(call.revistas ?? 0) || 0,
     rows: call.rows.map((row) => syncRowPresenceFields({
@@ -754,11 +759,15 @@ function updateCallFromInputs() {
   call.data = state.dateKey;
 
   const ofertaInput = document.getElementById('ofertaInput');
+  const visitantesInput = document.getElementById('visitantesInput');
   const bibliasInput = document.getElementById('bibliasInput');
   const revistasInput = document.getElementById('revistasInput');
 
   // OFERTA
   call.oferta = parseCurrencyBR(ofertaInput?.value ?? 0);
+
+  // VISITANTES
+  call.visitantes = visitantesInput?.value === '' ? 0 : Number(visitantesInput.value);
 
   // BÍBLIAS
   call.biblias = bibliasInput?.value === '' ? 0 : Number(bibliasInput.value);
@@ -769,6 +778,7 @@ function updateCallFromInputs() {
   console.log('[updateCallFromInputs]', {
     ofertaInput: ofertaInput?.value,
     ofertaFinal: call.oferta,
+    visitantes: Number(call.visitantes || 0),
     biblias: Number(call.biblias || 0),
     revistas: call.revistas,
   });
@@ -836,6 +846,7 @@ function buildTurmaReportText() {
   const inactiveNames = getAlunosForTurma(turma.TurmaID).filter((a) => String(a.Status || '') === 'inativo').map((a) => a.Nome).join(', ') || 'nenhum';
   const faltandoMuito = getAlunosForTurma(turma.TurmaID).filter((a) => String(a.FaltandoMuito || '') === 'sim').map((a) => a.Nome).join(', ') || 'nenhum';
 
+  const visitantes = Number(call.visitantes || 0);
   const biblias = Number(call.biblias || 0);
   const revistas = Number(call.revistas || 0);
 
@@ -850,9 +861,10 @@ function buildTurmaReportText() {
     `Ausentes: ${stats.ausentes}`,
     `Presença: ${formatPercent(stats.percentual)}`,
     `Oferta da classe: ${call.oferta || '-'}`,
+    `Visitantes: ${visitantes}`,
     `Bíblias: ${biblias}`,
     `Revistas: ${revistas}`,
-    `Total de assistência: ${stats.presentes + biblias + revistas}`,
+    `Total de assistência: ${stats.presentes + visitantes + biblias + revistas}`,
     '',
     `Melhor aluno: ${best ? `${best.Nome} (${formatPercent(best.Percentual)})` : '—'}`,
     `Inativos: ${inactiveNames}`,
@@ -878,15 +890,16 @@ function buildGeneralReportText() {
     `Ausentes: ${geral.ausentes}`,
     `Presença geral: ${formatPercent(geral.percentual)}`,
     `Oferta total: ${formatMoney(geral.ofertaTotal)}`,
+    `Visitantes: ${geral.visitantesTotal || 0}`,
     `Bíblias: ${geral.bibliasTotal || 0}`,
     `Revistas: ${geral.revistasTotal || 0}`,
-    `Total de assistência: ${geral.totalAssistencia ?? ((geral.presentes || 0) + (geral.bibliasTotal || 0) + (geral.revistasTotal || 0))}`,
+    `Total de assistência: ${geral.totalAssistencia ?? ((geral.presentes || 0) + (geral.visitantesTotal || 0) + (geral.bibliasTotal || 0) + (geral.revistasTotal || 0))}`,
     '',
     'Resumo por turma:',
   ];
 
   (geral.turmaSummaries || []).forEach((item) => {
-    lines.push(`- ${item.nome}: ${item.presentes}/${item.totalAlunos} (${formatPercent(item.percentual)}) | Oferta ${item.oferta || '-'} | Bíblias ${item.biblias || 0} | Revistas ${item.revistas || 0}`);
+    lines.push(`- ${item.nome}: ${item.presentes}/${item.totalAlunos} (${formatPercent(item.percentual)}) | Oferta ${item.oferta || '-'} | Visitantes ${item.visitantes || 0} | Bíblias ${item.biblias || 0} | Revistas ${item.revistas || 0}`);
   });
 
   lines.push('');
@@ -927,6 +940,7 @@ function renderSummary() {
     els.summary.ausentes.textContent = '0';
     els.summary.percentual.textContent = '0%';
     els.summary.oferta.textContent = 'R$ 0,00';
+    if (els.summary.visitantes) els.summary.visitantes.textContent = '0';
     if (els.summary.biblias) els.summary.biblias.textContent = '0';
     if (els.summary.revistas) els.summary.revistas.textContent = '0';
     els.turmaMeta.textContent = isRestrictedMode() ? 'Chamada não salva.' : 'Selecione uma turma para carregar a chamada.';
@@ -940,6 +954,7 @@ function renderSummary() {
   els.summary.ausentes.textContent = String(stats.ausentes);
   els.summary.percentual.textContent = formatPercent(stats.percentual);
   els.summary.oferta.textContent = formatMoney(call.oferta);
+  if (els.summary.visitantes) els.summary.visitantes.textContent = String(Number(call.visitantes || 0));
   if (els.summary.biblias) els.summary.biblias.textContent = String(Number(call.biblias || 0));
   if (els.summary.revistas) els.summary.revistas.textContent = String(Number(call.revistas || 0));
 
@@ -1110,6 +1125,7 @@ async function saveCurrentCall({ silent = false } = {}) {
     turmaId: turma.TurmaID,
     chamadaId: call.chamadaId,
     oferta: call.oferta ?? 0,
+    visitantes: String(call.visitantes ?? 0),
     biblias: String(call.biblias ?? 0),
     revistas: Number(call.revistas ?? 0) || 0,
     rowsJson: JSON.stringify(call.rows),
@@ -1461,12 +1477,14 @@ function bindCallFieldValues() {
   if (!call) return;
 
   const ofertaInput = document.getElementById('ofertaInput');
+  const visitantesInput = document.getElementById('visitantesInput');
   const bibliasInput = document.getElementById('bibliasInput');
   const revistasInput = document.getElementById('revistasInput');
 
   if (ofertaInput) {
     ofertaInput.value = formatCurrencyBR(call.oferta ?? 0);
   }
+  if (visitantesInput) visitantesInput.value = String(Number(call.visitantes || 0));
   if (bibliasInput) bibliasInput.value = String(Number(call.biblias || 0));
   if (revistasInput) revistasInput.value = String(Number(call.revistas || 0));
 
@@ -1480,6 +1498,19 @@ function bindCallFieldValues() {
 
       current.oferta = parseCurrencyBR(event.target.value);
 
+      persistDraft(current);
+      markDirty();
+      renderSummary();
+      renderReports();
+    });
+  }
+
+  if (visitantesInput && !visitantesInput.dataset.bound) {
+    visitantesInput.dataset.bound = '1';
+    visitantesInput.addEventListener('input', (event) => {
+      const current = getCurrentCall();
+      if (!current) return;
+      current.visitantes = Number(event.target.value || 0) || 0;
       persistDraft(current);
       markDirty();
       renderSummary();
