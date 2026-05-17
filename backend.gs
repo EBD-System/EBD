@@ -917,12 +917,28 @@ function buildCallMetaFromBaseRows_(dateKey, turmaId) {
     return 0;
   })();
 
+  const biblias = (() => {
+    for (const r of rows) {
+      const n = Number(r.biblias || 0) || 0;
+      if (n > 0) return n;
+    }
+    return 0;
+  })();
+
+  const revistas = (() => {
+    for (const r of rows) {
+      const n = Number(r.revistas || 0) || 0;
+      if (n > 0) return n;
+    }
+    return 0;
+  })();
+
   const visitantesTexto = getFirstNonEmpty_(
     ...rows.map(r => r.visitantesTexto)
   );
 
   Logger.log('META VIA BASE:');
-  Logger.log(JSON.stringify({ oferta, visitantes, visitantesTexto }, null, 2));
+  Logger.log(JSON.stringify({ oferta, visitantes, biblias, revistas, visitantesTexto }, null, 2));
 
   return {
     ChamadaID: `CALL_${turmaId}_${dateKey}`,
@@ -930,6 +946,8 @@ function buildCallMetaFromBaseRows_(dateKey, turmaId) {
     TurmaID: turmaId,
     Oferta: String(oferta || '').trim(),
     Visitantes: Number(visitantes || 0) || 0,
+    Biblias: Number(biblias || 0) || 0,
+    Revistas: Number(revistas || 0) || 0,
     VisitantesTexto: String(visitantesTexto || '').trim(),
     EnviadoTelegram: 'nao',
     TelegramEnviadoEm: '',
@@ -952,6 +970,8 @@ function findCallMeta_(turmaId, dateKey) {
 
       const parsedOferta = getFirstNonEmpty_(parsed.oferta, parsed.Oferta, log.Oferta, log.OFERTA);
       const parsedVisitantes = getFirstNonEmpty_(parsed.visitantes, parsed.Visitantes, log.Visitantes, log.VISITANTES);
+      const parsedBiblias = getFirstNonEmpty_(parsed.biblias, parsed.Biblias, log.Biblias, log.BIBLIAS);
+      const parsedRevistas = getFirstNonEmpty_(parsed.revistas, parsed.Revistas, log.Revistas, log.REVISTAS);
       const parsedVisitantesTexto = getFirstNonEmpty_(parsed.visitantesTexto, parsed.VisitantesTexto, log.VisitantesTexto, log.VISITANTESTEXTO);
 
       return {
@@ -960,6 +980,8 @@ function findCallMeta_(turmaId, dateKey) {
         TurmaID: turmaId,
         Oferta: parsedOferta ?? '',
         Visitantes: Number(parsedVisitantes ?? 0) || 0,
+        Biblias: Number(parsedBiblias ?? 0) || 0,
+        Revistas: Number(parsedRevistas ?? 0) || 0,
         VisitantesTexto: parsedVisitantesTexto ?? '',
         EnviadoTelegram: String(getFirstNonEmpty_(log.Enviado, parsed.enviadoTelegram, parsed.EnviadoTelegram) || 'nao'),
         TelegramEnviadoEm: String(getFirstNonEmpty_(log.EnviadoEm, parsed.telegramEnviadoEm, parsed.TelegramEnviadoEm) || ''),
@@ -972,6 +994,8 @@ function findCallMeta_(turmaId, dateKey) {
       TurmaID: turmaId,
       Oferta: getFirstNonEmpty_(log.Oferta, log.oferta, log.OFERTA) ?? '',
       Visitantes: Number(getFirstNonEmpty_(log.Visitantes, log.visitantes, log.VISITANTES) ?? 0) || 0,
+      Biblias: Number(getFirstNonEmpty_(log.Biblias, log.biblias, log.BIBLIAS) ?? 0) || 0,
+      Revistas: Number(getFirstNonEmpty_(log.Revistas, log.revistas, log.REVISTAS) ?? 0) || 0,
       VisitantesTexto: getFirstNonEmpty_(log.VisitantesTexto, log.visitantesTexto, log.VISITANTESTEXTO) ?? '',
       EnviadoTelegram: String(getFirstNonEmpty_(log.Enviado, 'nao') || 'nao'),
       TelegramEnviadoEm: String(getFirstNonEmpty_(log.EnviadoEm, '') || ''),
@@ -1001,13 +1025,13 @@ function getCallMetaForTurmaAndDate_(turmaId, dateKey, cache) {
 
 
 
-function upsertCallMeta_(chamadaId, dateKey, turmaId, oferta, visitantes, visitantesTexto, totalAlunos, presentes, ausentes, percentual, enviadoTelegram) {
+function upsertCallMeta_(chamadaId, dateKey, turmaId, oferta, visitantes, biblias, revistas, visitantesTexto, totalAlunos, presentes, ausentes, percentual, enviadoTelegram) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = getOrCreateSheet_(ss, REPORTS_SHEET, REPORTS_HEADERS, true);
   const reportId = `CALL_${turmaId}_${dateKey}`;
-  const hash = textHash_([dateKey, turmaId, oferta, visitantes, visitantesTexto, totalAlunos, presentes, ausentes, percentual].join('|'));
+  const hash = textHash_([dateKey, turmaId, oferta, visitantes, biblias, revistas, visitantesTexto, totalAlunos, presentes, ausentes, percentual].join('|'));
   const now = new Date().toISOString();
-  const text = JSON.stringify({ chamadaId, dateKey, turmaId, oferta, visitantes, visitantesTexto, totalAlunos, presentes, ausentes, percentual });
+  const text = JSON.stringify({ chamadaId, dateKey, turmaId, oferta, visitantes, biblias, revistas, visitantesTexto, totalAlunos, presentes, ausentes, percentual });
 
   let rowIndex = -1;
   const values = sheet.getDataRange().getValues();
@@ -1081,6 +1105,9 @@ function markCallAsSent_(turmaId, dateKey, text) {
 
 
 
+function getActiveCallRows_(rows) {
+  return (Array.isArray(rows) ? rows : []).filter(row => String(row?.statusAluno || '').trim().toLowerCase() !== 'inativo');
+}
 
 
 function buildDailyGeneralSummary_(dateKey, all, callsByTurma) {
@@ -1652,7 +1679,7 @@ function buildReportMetricLines_(dados) {
     `- *TOTAL DE ASSISTÊNCIA*: ${formatReportValue_(dados.totalAssistencia)}`,
     `- *BÍBLIAS*: ${formatReportValue_(dados.biblias)}`,
     `- *REVISTAS*: ${formatReportValue_(dados.revistas)}`,
-    `- *OFERTAS*: ${formatReportValue_(dados.ofertas)}`,
+    `- *OFERTA*: ${formatReportValue_(dados.ofertas)}`,
   ];
 }
 
