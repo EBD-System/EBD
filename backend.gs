@@ -603,13 +603,13 @@ function buildTurmaReportText_(dateKey, turma, turmaCall, all) {
   }).forEach(line => lines.push(line));
   lines.push('');
   lines.push(`Resumo interno`);
-  lines.push(`- *MAIS FALTAS*: ${getMostAbsentLabel_(topStats)}`);
-  lines.push(`- *INATIVOS*: ${formatReportValue_(inativos)}`);
+  lines.push(`- **MAIS FALTAS**: ${getMostAbsentLabel_(topStats)}`);
+  lines.push(`- **INATIVOS**: ${formatReportValue_(inativos)}`);
   lines.push('');
   lines.push(`Lista de presença:`);
   if (rows.length) {
     rows.forEach(row => {
-      lines.push(`${row.nome || 'Sem nome'}: *${getPresenceStatusLabel_(row)}*`);
+      lines.push(`${row.nome || 'Sem nome'}: **${getPresenceStatusLabel_(row)}**`);
     });
   } else {
     lines.push(`null`);
@@ -642,8 +642,8 @@ function buildGeneralReportText_(dateKey, geral, callsByTurma, all) {
   }).forEach(line => lines.push(line));
   lines.push('');
   lines.push(`Resumo interno`);
-  lines.push(`- *MAIS FALTAS*: ${getMostAbsentLabel_({ mostAbsent: mostAbsentOverall })}`);
-  lines.push(`- *INATIVOS*: ${formatReportValue_(inativos)}`);
+  lines.push(`- **MAIS FALTAS**: ${getMostAbsentLabel_({ mostAbsent: mostAbsentOverall })}`);
+  lines.push(`- **INATIVOS**: ${formatReportValue_(inativos)}`);
 
   return lines.join('\n');
 }
