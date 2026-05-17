@@ -194,11 +194,10 @@ function saveCall_(p) {
   const visitantes = Number(p.visitantes || 0) || 0;
   const biblias = Number(p.biblias || 0) || 0;
   const revistas = Number(p.revistas || 0) || 0;
+  const visitantesTexto = String(p.visitantesTexto || '').trim();
   const chamadaId = String(p.chamadaId || `${turmaId}_${dateKey}`).trim();
   const rowsJson = String(p.rowsJson || '[]');
-  const autoSend = normalizeBool_(p.sendTelegram ?? p.autoSend ?? 'sim');
-
-  if (!turmaId) throw new Error('Turma inválida.');
+  const autoSend = normalizeBool_(p.sendTelegram ?? p.autoSend ?? false);
 
   let rows;
   try {
@@ -206,44 +205,32 @@ function saveCall_(p) {
   } catch (err) {
     throw new Error('rowsJson inválido.');
   }
-  if (!Array.isArray(rows)) throw new Error('Lista de presenças inválida.');
 
-  const allBefore = loadAllData_();
-  const turma = getTurmaByIdOrName_(turmaId, allBefore.turmas);
-  if (!turma) throw new Error('Turma não encontrada.');
+  if (!Array.isArray(rows)) {
+    throw new Error('rowsJson deve ser um array.');
+  }
 
-  const roster = getRosterForTurma_(turma.TurmaID, allBefore);
-  const byAlunoId = {};
-  rows.forEach(item => {
-    const alunoId = String(item.alunoId || item.AlunoID || '').trim();
-    if (alunoId) byAlunoId[alunoId] = item;
-  });
+  const normalizedRows = rows.map((row) => syncRowPresenceFields({
+    alunoId: row.alunoId,
+    nome: row.nome,
+    presenca: row.presenca,
+    atraso: row.atraso,
+    observacao: row.observacao || '',
+    statusAluno: row.statusAluno || 'ativo',
+  }));
 
-  const normalizedRows = roster.map(aluno => {
-    const payload = byAlunoId[aluno.AlunoID] || {};
-    const presencaRaw = normalizePresence_(payload.presenca ?? payload.PRESENCA ?? payload.presencaStatus);
-    const atraso = normalizeBool_(payload.atraso ?? payload.Atraso) || String(payload.presenca || '').toLowerCase().trim() === 'atrasado';
-    const presenca = atraso ? 'nao' : presencaRaw;
-    return {
-      alunoId: aluno.AlunoID,
-      nome: aluno.Nome,
-      turmaId: aluno.TurmaID,
-      turmaNome: aluno.TurmaNome,
-      presenca,
-      atraso,
-      observacao: String(payload.observacao || payload.obs || '').trim(),
-      statusAluno: String(aluno.Status || 'ativo').trim(),
-    };
-  });
-
-  const presentes = normalizedRows.filter(r => isPresenceLikeRow_(r)).length;
-  const ausentes = normalizedRows.length - presentes;
-  const percentual = normalizedRows.length ? round1_((presentes / normalizedRows.length) * 100) : 0;
+  const presentRows = normalizedRows.filter(isPresenceLikeRow_);
+  const delayedRows = normalizedRows.filter(isDelayedRow_);
+  const activeRows = normalizedRows.filter(r => String(r.statusAluno || '').trim().toLowerCase() !== 'inativo');
+  const totalAlunos = activeRows.length;
+  const presentes = presentRows.filter(r => String(r.statusAluno || '').trim().toLowerCase() !== 'inativo').length;
+  const ausentes = totalAlunos - presentes;
+  const percentual = totalAlunos ? round1_((presentes / totalAlunos) * 100) : 0;
 
   const baseWrite = replaceBaseRowsForCall_(
     dateKey,
-    turma.TurmaID,
-    turma.Nome,
+    turmaId,
+    getTurmaNameById_(turmaId),
     normalizedRows,
     {
       oferta,
@@ -256,11 +243,12 @@ function saveCall_(p) {
   upsertCallMeta_(
     chamadaId,
     dateKey,
-    turma.TurmaID,
+    turmaId,
     oferta,
     visitantes,
     biblias,
     revistas,
+    visitantesTexto,
     normalizedRows.length,
     presentes,
     ausentes,
@@ -268,448 +256,29 @@ function saveCall_(p) {
     false
   );
 
-  recalculateAndPersistStudentStats_();
-
+  recalculateAndPersistStudents_(dateKey, turmaId, normalizedRows);
   invalidateRuntimeCache_();
-  const allAfter = loadAllData_();
-  const callsByTurma = buildCallsByTurmaForDate_(dateKey, allAfter);
-  const geral = buildDailyGeneralSummary_(dateKey, allAfter, callsByTurma);
-  const turmaCall = callsByTurma[turma.TurmaID];
 
-  let telegram = { sent: false, alreadySent: false, message: '' };
   if (autoSend) {
-    try {
-      telegram = sendTelegramForTurma_(dateKey, turma.TurmaID, allAfter, callsByTurma[turma.TurmaID]);
-      if (telegram && telegram.sent) {
-        markCallAsSent_(turma.TurmaID, dateKey, telegram.text);
-      }
-    } catch (err) {
-      telegram = {
-        ok: false,
-        sent: false,
-        alreadySent: false,
-        message: `Erro ao enviar ao Telegram: ${String(err && err.message ? err.message : err)}`,
-        error: String(err && err.message ? err.message : err),
-      };
-    }
+    const sendResult = sendTelegramForCall_(turmaId, dateKey, {
+      force: true,
+      silent: true,
+    });
+    return {
+      ok: true,
+      sent: !!(sendResult && sendResult.sent),
+      telegram: sendResult || null,
+      baseWrite,
+      message: 'Chamada salva e Telegram processado.',
+    };
   }
 
   return {
     ok: true,
-    message: 'Chamada salva com sucesso.',
-    chamadaId,
-    turmaId: turma.TurmaID,
-    dateKey,
-    turmaCall,
-    resumoGeral: geral,
-    telegram,
+    sent: false,
     baseWrite,
+    message: 'Chamada salva com sucesso.',
   };
-}
-
-
-
-
-function sendReport_(p) {
-  ensureSheets_();
-
-  const dateKey = normalizeDateKey_(p.date || todayKey_());
-  const scope = String(p.scope || 'turma').toLowerCase();
-  const turmaId = String(p.turmaId || '').trim();
-
-  const all = loadAllData_();
-  const callsByTurma = buildCallsByTurmaForDate_(dateKey, all);
-  const geral = buildDailyGeneralSummary_(dateKey, all, callsByTurma);
-
-  if (scope === 'geral') {
-    const text = buildGeneralReportText_(dateKey, geral, callsByTurma, all);
-    return sendTelegramByText_({
-      reportId: `GERAL_${dateKey}`,
-      tipo: 'geral',
-      dateKey,
-      turmaId: '',
-      text,
-    });
-  }
-
-  const turma = getTurmaByIdOrName_(turmaId, all.turmas);
-  if (!turma) throw new Error('Turma inválida.');
-
-  const turmaCall = callsByTurma[turma.TurmaID];
-  if (!turmaCall) throw new Error('Não existe chamada salva para esta turma nesta data.');
-
-  const text = buildTurmaReportText_(dateKey, turma, turmaCall, all);
-  const result = sendTelegramByText_({
-    reportId: `TURMA_${turma.TurmaID}_${dateKey}`,
-    tipo: 'turma',
-    dateKey,
-    turmaId: turma.TurmaID,
-    text,
-  });
-
-  if (result.sent) {
-    markCallAsSent_(turma.TurmaID, dateKey, text);
-  }
-
-  return result;
-}
-
-
-
-
-function addTurma_(p) {
-  ensureSheets_();
-  const nome = String(p.nome || '').trim();
-  const ordem = Number(p.ordem || 0) || 0;
-  if (!nome) throw new Error('Informe o nome da turma.');
-
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = getOrCreateSheet_(ss, META_CLASSES_SHEET, META_CLASSES_HEADERS, true);
-  const turmaId = buildTurmaId_(nome);
-
-  const existing = findMetaClassById_(turmaId);
-  const now = new Date().toISOString();
-  if (existing) {
-    updateMetaClass_(turmaId, { Nome: nome, Ordem: ordem, Ativa: 'sim', AtualizadoEm: now });
-    return { ok: true, message: 'Turma atualizada com sucesso.', turmaId };
-  }
-
-  sheet.appendRow([turmaId, nome, ordem, 'sim', now, now]);
-  invalidateRuntimeCache_();
-  return { ok: true, message: 'Turma cadastrada com sucesso.', turmaId };
-}
-
-
-
-
-function addAluno_(p) {
-  ensureSheets_();
-  const nome = String(p.nome || '').trim();
-  const cpf = normalizeCpf_(p.cpf || '');
-  const turmaId = String(p.turmaId || p.turma || '').trim();
-  if (!nome) throw new Error('Informe o nome do aluno.');
-  if (!turmaId) throw new Error('Informe a turma.');
-
-  const all = loadAllData_();
-  const turma = getTurmaByIdOrName_(turmaId, all.turmas);
-  if (!turma) throw new Error('Turma não encontrada.');
-
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const readSheet = getOrCreateSheet_(ss, READ_SHEET_NAME, getReadBaseHeaders_(), false);
-  const now = new Date().toISOString();
-  const alunoId = buildStudentId_(nome, turma.TurmaID, cpf);
-
-  appendReadBaseStudent_(readSheet, nome, turma.Nome, cpf, alunoId, now);
-  upsertStudentMeta_({
-    AlunoID: alunoId,
-    Nome: nome,
-    TurmaID: turma.TurmaID,
-    TurmaNome: turma.Nome,
-    Ativo: 'sim',
-    FaltasConsecutivas: 0,
-    TotalPresencas: 0,
-    TotalFaltas: 0,
-    Percentual: 0,
-    Status: 'ativo',
-    StatusManual: '',
-    UltimaPresenca: '',
-    UltimaAusencia: '',
-    RealocadoDe: '',
-    CriadoEm: now,
-    AtualizadoEm: now,
-  });
-
-  invalidateRuntimeCache_();
-  return { ok: true, message: 'Aluno cadastrado com sucesso.', alunoId };
-}
-
-
-
-
-function moveAluno_(p) {
-  ensureSheets_();
-  const alunoId = String(p.alunoId || '').trim();
-  const turmaId = String(p.turmaId || p.novaTurmaId || '').trim();
-  if (!alunoId) throw new Error('Aluno inválido.');
-  if (!turmaId) throw new Error('Turma destino inválida.');
-
-  const all = loadAllData_();
-  const turma = getTurmaByIdOrName_(turmaId, all.turmas);
-  if (!turma) throw new Error('Turma destino não encontrada.');
-
-  const meta = findStudentMetaById_(alunoId);
-  if (!meta) throw new Error('Aluno não encontrado no controle interno.');
-
-  const now = new Date().toISOString();
-  upsertStudentMeta_({
-    ...meta,
-    TurmaID: turma.TurmaID,
-    TurmaNome: turma.Nome,
-    RealocadoDe: meta.TurmaNome || meta.TurmaID || '',
-    AtualizadoEm: now,
-  });
-
-  invalidateRuntimeCache_();
-  return { ok: true, message: 'Aluno realocado com sucesso.', alunoId, turmaId: turma.TurmaID };
-}
-
-
-
-
-function toggleAluno_(p) {
-  ensureSheets_();
-  const alunoId = String(p.alunoId || '').trim();
-  const ativo = normalizeBool_(p.ativo ?? p.status ?? '');
-  if (!alunoId) throw new Error('Aluno inválido.');
-
-  const meta = findStudentMetaById_(alunoId);
-  if (!meta) throw new Error('Aluno não encontrado no controle interno.');
-
-  const now = new Date().toISOString();
-  const statusManual = ativo ? 'ativo' : 'inativo';
-  upsertStudentMeta_({
-    ...meta,
-    Ativo: ativo ? 'sim' : 'nao',
-    StatusManual: statusManual,
-    Status: ativo ? 'ativo' : 'inativo',
-    AtualizadoEm: now,
-  });
-
-  invalidateRuntimeCache_();
-  return { ok: true, message: `Aluno marcado como ${ativo ? 'ativo' : 'inativo'}.`, alunoId, ativo };
-}
-
-
-
-function getReportText_(p) {
-  const dateKey = normalizeDateKey_(p.date || todayKey_());
-  const scope = String(p.scope || 'turma').toLowerCase();
-  const turmaId = String(p.turmaId || '').trim();
-
-  const all = loadAllData_();
-  const callsByTurma = buildCallsByTurmaForDate_(dateKey, all);
-  const geral = buildDailyGeneralSummary_(dateKey, all, callsByTurma);
-
-  if (scope === 'geral') {
-    return {
-      ok: true,
-      text: buildGeneralReportText_(dateKey, geral, callsByTurma, all),
-    };
-  }
-
-  const turma = getTurmaByIdOrName_(turmaId, all.turmas);
-  if (!turma) throw new Error('Turma inválida.');
-  const turmaCall = callsByTurma[turma.TurmaID];
-  if (!turmaCall) throw new Error('Não existe chamada salva para esta turma nesta data.');
-
-  return {
-    ok: true,
-    text: buildTurmaReportText_(dateKey, turma, turmaCall, all),
-  };
-}
-
-function sendTelegramForTurma_(dateKey, turmaId, all, turmaCall) {
-  const turma = getTurmaByIdOrName_(turmaId, all.turmas);
-  if (!turma) throw new Error('Turma não encontrada.');
-  if (!turmaCall) throw new Error('Não existe chamada salva para esta turma nesta data.');
-
-  const text = buildTurmaReportText_(dateKey, turma, turmaCall, all);
-  return sendTelegramByText_({
-    reportId: `TURMA_${turma.TurmaID}_${dateKey}`,
-    tipo: 'turma',
-    dateKey,
-    turmaId: turma.TurmaID,
-    text,
-  });
-}
-
-function sendTelegramByText_({ reportId, tipo, dateKey, turmaId, text }) {
-  const hash = textHash_(text);
-  const existing = getReportLogById_(reportId);
-
-  if (existing && String(existing.Enviado || '').toLowerCase() === 'sim' && String(existing.Hash || '') === hash) {
-    return {
-      ok: true,
-      sent: false,
-      alreadySent: true,
-      message: 'Relatório já havia sido enviado.',
-      text,
-    };
-  }
-
-  const telegramResult = sendTelegram_(text);
-  if (!telegramResult || !telegramResult.sent) {
-    return {
-      ok: false,
-      sent: false,
-      alreadySent: false,
-      message: (telegramResult && telegramResult.message) || 'Telegram não configurado.',
-      text,
-      telegramResult,
-    };
-  }
-
-  upsertReportLog_({
-    reportId,
-    tipo,
-    dateKey,
-    turmaId,
-    hash,
-    enviado: 'sim',
-    texto: text,
-  });
-
-  return {
-    ok: true,
-    sent: true,
-    alreadySent: false,
-    message: tipo === 'geral' ? 'Relatório geral enviado ao Telegram.' : 'Relatório da turma enviado ao Telegram.',
-    text,
-    telegramResult,
-  };
-}
-
-
-function getActiveCallRows_(rows) {
-  return (rows || []).filter(r => String(r.statusAluno || '').trim().toLowerCase() !== 'inativo');
-}
-
-
-function buildTurmaReportText_(dateKey, turma, turmaCall, all) {
-  const rows = Array.isArray(turmaCall?.rows) ? turmaCall.rows : [];
-  const activeRows = getActiveCallRows_(rows);
-  const inativos = rows.filter(r => String(r.statusAluno || '').trim().toLowerCase() === 'inativo').length;
-  const matriculados = activeRows.length;
-  const presentes = activeRows.filter(r => isPresenceLikeRow_(r)).length;
-  const ausentes = matriculados - presentes;
-  const visitantes = Number(turmaCall?.visitantes ?? 0) || 0;
-  const biblias = Number(turmaCall?.biblias ?? 0) || 0;
-  const revistas = Number(turmaCall?.revistas ?? 0) || 0;
-  const totalAssistencia = presentes + visitantes + biblias + revistas;
-  const ofertas = (turmaCall?.oferta === '' || turmaCall?.oferta === null || turmaCall?.oferta === undefined)
-    ? null
-    : turmaCall?.oferta;
-
-  const topStats = getTopStatsForTurma_(turma.TurmaID, all);
-  const lines = [];
-  lines.push(`Relatório da turma`);
-  lines.push(`Data: ${formatDateBR_(dateKey)}`);
-  lines.push(`Turma: ${turma.Nome}`);
-  lines.push('');
-  buildReportMetricLines_({
-    matriculados,
-    ausentes,
-    presentes,
-    visitantes,
-    biblias,
-    revistas,
-    totalAssistencia,
-    ofertas,
-  }).forEach(line => lines.push(line));
-  lines.push('');
-  lines.push(`Resumo interno`);
-  lines.push(`- **MAIS FALTAS**: ${getMostAbsentLabel_(topStats)}`);
-  lines.push(`- **INATIVOS**: ${formatReportValue_(inativos)}`);
-  lines.push('');
-  lines.push(`Lista de presença:`);
-  if (rows.length) {
-    rows.forEach(row => {
-      lines.push(`${row.nome || 'Sem nome'}: **${getPresenceStatusLabel_(row)}**`);
-    });
-  } else {
-    lines.push(`null`);
-  }
-
-  return lines.join('\n');
-}
-
-
-
-function buildGeneralReportText_(dateKey, geral, callsByTurma, all) {
-  const inativos = (all.alunos || []).filter(a => String(a.Status || '').trim().toLowerCase() === 'inativo').length;
-  const mostAbsentOverall = getMostAbsentStudentOverall_(all);
-  const hasCalls = Object.values(callsByTurma || {}).some(call => !!call && (call.isSaved || Number(call.totalAlunos || 0) > 0));
-  const ofertas = hasCalls ? geral.ofertaTotal : null;
-
-  const lines = [];
-  lines.push(`Relatório geral`);
-  lines.push(`Data: ${formatDateBR_(dateKey)}`);
-  lines.push('');
-  buildReportMetricLines_({
-    matriculados: geral.totalAlunos,
-    ausentes: geral.ausentes,
-    presentes: geral.presentes,
-    visitantes: geral.visitantesTotal,
-    biblias: geral.bibliasTotal,
-    revistas: geral.revistasTotal,
-    totalAssistencia: Number(geral.totalAssistencia || (Number(geral.presentes || 0) + Number(geral.visitantesTotal || 0) + Number(geral.bibliasTotal || 0) + Number(geral.revistasTotal || 0))),
-    ofertas,
-  }).forEach(line => lines.push(line));
-  lines.push('');
-  lines.push(`Resumo interno`);
-  lines.push(`- **MAIS FALTAS**: ${getMostAbsentLabel_({ mostAbsent: mostAbsentOverall })}`);
-  lines.push(`- **INATIVOS**: ${formatReportValue_(inativos)}`);
-
-  return lines.join('\n');
-}
-
-
-
-
-
-
-
-
-
-function buildDailyGeneralSummary_(dateKey, all, callsByTurma) {
-  const calls = Object.values(callsByTurma || {});
-  const totalAlunos = calls.reduce((sum, c) => sum + getActiveCallRows_(c.rows).length, 0);
-  const presentes = calls.reduce((sum, c) => sum + getActiveCallRows_(c.rows).filter(r => isPresenceLikeRow_(r)).length, 0);
-  const atrasos = calls.reduce((sum, c) => sum + getActiveCallRows_(c.rows).filter(r => isDelayedRow_(r)).length, 0);
-  const ausentes = totalAlunos - presentes;
-  const ofertaTotal = calls.reduce((sum, c) => sum + parseMoney_(c.oferta), 0);
-  const visitantesTotal = calls.reduce((sum, c) => sum + Number(c.visitantes || 0), 0);
-  const bibliasTotal = calls.reduce((sum, c) => sum + Number(c.biblias || 0), 0);
-  const revistasTotal = calls.reduce((sum, c) => sum + Number(c.revistas || 0), 0);
-  const percentual = totalAlunos ? round1_((presentes / totalAlunos) * 100) : 0;
-
-  return {
-    dateKey,
-    totalTurmas: calls.length,
-    totalAlunos,
-    presentes,
-    ausentes,
-    percentual,
-    atrasos,
-    ofertaTotal,
-    visitantesTotal,
-    bibliasTotal,
-    revistasTotal,
-    totalAssistencia: presentes + visitantesTotal + bibliasTotal + revistasTotal,
-  };
-}
-
-function getTopStatsForTurma_(turmaId, all) {
-  const turmaAlunos = (all.alunos || []).filter(a => String(a.TurmaID || '') === String(turmaId || ''));
-  if (!turmaAlunos.length) {
-    return { bestStudent: null, mostAbsent: null, inactiveCount: 0 };
-  }
-
-  const sortedByPercent = turmaAlunos.slice().sort((a, b) => Number(b.Percentual || 0) - Number(a.Percentual || 0));
-  const sortedByAbsences = turmaAlunos.slice().sort((a, b) => Number(b.TotalFaltas || 0) - Number(a.TotalFaltas || 0));
-  const inactiveCount = turmaAlunos.filter(a => String(a.Status || '').toLowerCase() === 'inativo').length;
-  return {
-    bestStudent: sortedByPercent[0] || null,
-    mostAbsent: sortedByAbsences[0] || null,
-    inactiveCount,
-  };
-}
-
-function getTopStudentsOverall_(all) {
-  return (all.alunos || [])
-    .filter(a => Number(a.TotalPresencas || 0) + Number(a.TotalFaltas || 0) > 0)
-    .slice()
-    .sort((a, b) => Number(b.Percentual || 0) - Number(a.Percentual || 0));
 }
 
 
@@ -762,6 +331,7 @@ function buildCallsByTurmaForDate_(dateKey, all) {
       visitantes: Number(callMeta?.Visitantes ?? 0) || 0,
       biblias: Number(callMeta?.Biblias ?? 0) || 0,
       revistas: Number(callMeta?.Revistas ?? 0) || 0,
+      visitantesTexto: callMeta?.VisitantesTexto ?? '',
       totalAlunos: rows.length,
       presentes,
       atrasos,
@@ -785,6 +355,7 @@ function buildCallsByTurmaForDate_(dateKey, all) {
         visitantes: 0,
         biblias: 0,
         revistas: 0,
+        visitantesTexto: '',
         totalAlunos: 0,
         presentes: 0,
         atrasos: 0,
@@ -800,7 +371,6 @@ function buildCallsByTurmaForDate_(dateKey, all) {
 
   return callsByTurma;
 }
-
 
 
 function getRosterForTurma_(turmaId, all) {
@@ -1209,69 +779,38 @@ function replaceBaseRowsForCall_(dateKey, turmaId, turmaNome, normalizedRows, ex
   const turmaNomeFinal = String(turmaNome || getTurmaNameById_(turmaId) || '').trim();
   const beforeRows = Math.max(0, sheet.getLastRow() - 1);
 
-  if (!normalizedRows || !normalizedRows.length) {
-    throw new Error('Não há linhas para salvar.');
-  }
+  const oferta = parseMoney_(extra?.oferta);
+  const visitantes = Number(extra?.visitantes || 0) || 0;
+  const biblias = Number(extra?.biblias || 0) || 0;
+  const revistas = Number(extra?.revistas || 0) || 0;
 
-  const values = sheet.getDataRange().getValues();
-  const rowsToDelete = [];
-
-  if (values.length > 1) {
-    const headers = values[0].map(normalizeHeader_);
-    const idx = indexByHeader_(headers);
-
-    for (let i = 1; i < values.length; i++) {
-      const row = values[i];
-      const rowDateKey = normalizeDateFromBaseCell_(row[idx.DATA]);
-      const rowTurma = String(row[idx.CLASSE] || '').trim();
-
-      if (rowDateKey === dateKey && normalizeKey_(rowTurma) === normalizeKey_(turmaNomeFinal)) {
-        rowsToDelete.push(i + 1);
-      }
-    }
-  }
-
-  deleteRowsByNumberDesc_(sheet, rowsToDelete);
-
-  const [year, month] = String(dateKey).split('-');
-  const dataBr = formatDateBR_(dateKey);
-  const mesTxt = monthToAbbrev_(month);
-
-  const rowsToAppend = normalizedRows.map((r) => ([
-    dataBr,
-    Number(year),
-    mesTxt,
-    r.nome,
+  const rowsToAppend = (normalizedRows || []).map(row => [
+    dateKey,
+    yearFromDateKey_(dateKey),
+    monthNameShortFromDateKey_(dateKey),
+    row.nome || '',
     turmaNomeFinal,
-    r.presenca === 'sim' ? 1 : 0,
-    r.atraso ? 1 : 0,
-    r.presenca === 'nao' ? 1 : 0,
-    Number(extra?.oferta || 0),
-    Number(extra?.visitantes || 0),
-    Number(extra?.biblias || 0),
-    Number(extra?.revistas || 0),
-  ]));
+    isPresenceLikeRow_(row) ? 1 : 0,
+    isDelayedRow_(row) ? 1 : 0,
+    (!isPresenceLikeRow_(row) && !isDelayedRow_(row)) ? 1 : 0,
+    oferta,
+    visitantes,
+    biblias,
+    revistas,
+  ]);
 
-  Logger.log('LINHAS PARA INSERIR:');
-  Logger.log(JSON.stringify(rowsToAppend, null, 2));
-
-  const startRow = sheet.getLastRow() + 1;
-  sheet.getRange(startRow, 1, rowsToAppend.length, rowsToAppend[0].length).setValues(rowsToAppend);
-  SpreadsheetApp.flush();
-
-  invalidateRuntimeCache_();
-
-  const afterRows = Math.max(0, sheet.getLastRow() - 1);
+  if (rowsToAppend.length) {
+    const startRow = sheet.getLastRow() + 1;
+    sheet.getRange(startRow, 1, rowsToAppend.length, rowsToAppend[0].length).setValues(rowsToAppend);
+  }
 
   Logger.log('SALVAMENTO FINALIZADO');
-
   return {
     beforeRows,
-    afterRows,
-    insertedRows: Math.max(0, afterRows - beforeRows),
+    afterRows: Math.max(0, sheet.getLastRow() - 1),
+    insertedRows: rowsToAppend.length,
   };
 }
-
 
 
 function getBaseRowsCount_() {
@@ -1295,41 +834,36 @@ function getBaseRowsAll_(forceReload) {
   const values = sheet.getDataRange().getValues();
   const headers = values[0].map(normalizeHeader_);
   const idx = indexByHeader_(headers);
-  const result = [];
 
+  const result = [];
   for (let i = 1; i < values.length; i++) {
     const row = values[i];
-    const aluno = String(row[idx.ALUNO] || '').trim();
-    const classe = String(row[idx.CLASSE] || '').trim();
-    if (!aluno || !classe) continue;
-
-    const turmaId = buildTurmaId_(classe);
-    const atraso = normalizeBool_(row[idx.ATRASO]);
-    const presenca = atraso ? 'atrasado' : normalizePresence_(row[idx.PRESENCA]);
-
+    const dateKey = normalizeDateKey_(row[idx.DATA] || row[0] || '');
+    const turmaNome = String(row[idx.CLASSE] || row[4] || '').trim();
+    const alunoNome = String(row[idx.ALUNO] || row[3] || '').trim();
+    if (!dateKey || !turmaNome || !alunoNome) continue;
     result.push({
-      dateKey: normalizeDateFromBaseCell_(row[idx.DATA]),
-      ano: row[idx.ANO],
-      mes: row[idx.MES],
-      nome: aluno,
-      turmaId,
-      turmaNome: classe,
-      presenca,
-      atraso,
-      ausencia: normalizeBool_(row[idx.AUSENCIA]),
-      oferta: row[idx.OFERTA] ?? '',
-      visitantes: Number(getBaseCellValue_(row, idx.VISITANTES, idx.Biblias)) || 0,
-      biblias: Number(getBaseCellValue_(row, idx.Biblias, idx.VISITANTES)) || 0,
-      revistas: Number(row[idx.Revistas] ?? 0) || 0,
-      alunoId: buildStudentId_(aluno, turmaId, ''),
+      dateKey,
+      ano: String(row[idx.ANO] || row[1] || ''),
+      mes: String(row[idx.MES] || row[2] || ''),
+      aluno: alunoNome,
+      turma: turmaNome,
+      turmaId: buildTurmaId_(turmaNome),
+      presenca: row[idx.PRESENCA] ?? row[5] ?? '',
+      atraso: Number(row[idx.ATRASO] ?? row[6] ?? 0) || 0,
+      ausencia: Number(row[idx.AUSENCIA] ?? row[7] ?? 0) || 0,
+      oferta: parseMoney_(row[idx.OFERTA] ?? row[8] ?? 0),
+      visitantes: Number(row[idx.Visitantes] ?? row[idx.VISITANTES] ?? row[9] ?? 0) || 0,
+      biblias: Number(row[idx.Biblias] ?? row[idx.BIBLIAS] ?? row[10] ?? 0) || 0,
+      revistas: Number(row[idx.Revistas] ?? row[idx.REVISTAS] ?? row[11] ?? 0) || 0,
+      visitantesTexto: String(row[idx.VisitantesTexto] ?? row[idx.VISITANTESTEXTO] ?? '').trim(),
+      alunoId: buildStudentId_(alunoNome, turmaNome, ''),
     });
   }
 
   __BACKEND_RUNTIME_CACHE__.baseRowsAll = result;
   return result;
 }
-
-
 
 
 function getBaseRowsForDate_(dateKey) {
@@ -1383,24 +917,12 @@ function buildCallMetaFromBaseRows_(dateKey, turmaId) {
     return 0;
   })();
 
-  const biblias = (() => {
-    for (const r of rows) {
-      const n = Number(r.biblias || 0) || 0;
-      if (n > 0) return n;
-    }
-    return 0;
-  })();
-
-  const revistas = (() => {
-    for (const r of rows) {
-      const n = Number(r.revistas || 0) || 0;
-      if (n > 0) return n;
-    }
-    return 0;
-  })();
+  const visitantesTexto = getFirstNonEmpty_(
+    ...rows.map(r => r.visitantesTexto)
+  );
 
   Logger.log('META VIA BASE:');
-  Logger.log(JSON.stringify({ oferta, visitantes, biblias, revistas }, null, 2));
+  Logger.log(JSON.stringify({ oferta, visitantes, visitantesTexto }, null, 2));
 
   return {
     ChamadaID: `CALL_${turmaId}_${dateKey}`,
@@ -1408,8 +930,7 @@ function buildCallMetaFromBaseRows_(dateKey, turmaId) {
     TurmaID: turmaId,
     Oferta: String(oferta || '').trim(),
     Visitantes: Number(visitantes || 0) || 0,
-    Biblias: Number(biblias || 0) || 0,
-    Revistas: Number(revistas || 0) || 0,
+    VisitantesTexto: String(visitantesTexto || '').trim(),
     EnviadoTelegram: 'nao',
     TelegramEnviadoEm: '',
   };
@@ -1431,8 +952,7 @@ function findCallMeta_(turmaId, dateKey) {
 
       const parsedOferta = getFirstNonEmpty_(parsed.oferta, parsed.Oferta, log.Oferta, log.OFERTA);
       const parsedVisitantes = getFirstNonEmpty_(parsed.visitantes, parsed.Visitantes, log.Visitantes, log.VISITANTES);
-      const parsedBiblias = getFirstNonEmpty_(parsed.biblias, parsed.Biblias, log.Biblias, log.BIBLIAS);
-      const parsedRevistas = getFirstNonEmpty_(parsed.revistas, parsed.Revistas, log.Revistas, log.REVISTAS);
+      const parsedVisitantesTexto = getFirstNonEmpty_(parsed.visitantesTexto, parsed.VisitantesTexto, log.VisitantesTexto, log.VISITANTESTEXTO);
 
       return {
         ChamadaID: reportId,
@@ -1440,8 +960,7 @@ function findCallMeta_(turmaId, dateKey) {
         TurmaID: turmaId,
         Oferta: parsedOferta ?? '',
         Visitantes: Number(parsedVisitantes ?? 0) || 0,
-        Biblias: Number(parsedBiblias ?? 0) || 0,
-        Revistas: Number(parsedRevistas ?? 0) || 0,
+        VisitantesTexto: parsedVisitantesTexto ?? '',
         EnviadoTelegram: String(getFirstNonEmpty_(log.Enviado, parsed.enviadoTelegram, parsed.EnviadoTelegram) || 'nao'),
         TelegramEnviadoEm: String(getFirstNonEmpty_(log.EnviadoEm, parsed.telegramEnviadoEm, parsed.TelegramEnviadoEm) || ''),
       };
@@ -1453,8 +972,7 @@ function findCallMeta_(turmaId, dateKey) {
       TurmaID: turmaId,
       Oferta: getFirstNonEmpty_(log.Oferta, log.oferta, log.OFERTA) ?? '',
       Visitantes: Number(getFirstNonEmpty_(log.Visitantes, log.visitantes, log.VISITANTES) ?? 0) || 0,
-      Biblias: Number(getFirstNonEmpty_(log.Biblias, log.biblias, log.BIBLIAS) ?? 0) || 0,
-      Revistas: Number(getFirstNonEmpty_(log.Revistas, log.revistas, log.REVISTAS) ?? 0) || 0,
+      VisitantesTexto: getFirstNonEmpty_(log.VisitantesTexto, log.visitantesTexto, log.VISITANTESTEXTO) ?? '',
       EnviadoTelegram: String(getFirstNonEmpty_(log.Enviado, 'nao') || 'nao'),
       TelegramEnviadoEm: String(getFirstNonEmpty_(log.EnviadoEm, '') || ''),
     };
@@ -1483,13 +1001,13 @@ function getCallMetaForTurmaAndDate_(turmaId, dateKey, cache) {
 
 
 
-function upsertCallMeta_(chamadaId, dateKey, turmaId, oferta, visitantes, biblias, revistas, totalAlunos, presentes, ausentes, percentual, enviadoTelegram) {
+function upsertCallMeta_(chamadaId, dateKey, turmaId, oferta, visitantes, visitantesTexto, totalAlunos, presentes, ausentes, percentual, enviadoTelegram) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = getOrCreateSheet_(ss, REPORTS_SHEET, REPORTS_HEADERS, true);
   const reportId = `CALL_${turmaId}_${dateKey}`;
-  const hash = textHash_([dateKey, turmaId, oferta, visitantes, biblias, revistas, totalAlunos, presentes, ausentes, percentual].join('|'));
+  const hash = textHash_([dateKey, turmaId, oferta, visitantes, visitantesTexto, totalAlunos, presentes, ausentes, percentual].join('|'));
   const now = new Date().toISOString();
-  const text = JSON.stringify({ chamadaId, dateKey, turmaId, oferta, visitantes, biblias, revistas, totalAlunos, presentes, ausentes, percentual });
+  const text = JSON.stringify({ chamadaId, dateKey, turmaId, oferta, visitantes, visitantesTexto, totalAlunos, presentes, ausentes, percentual });
 
   let rowIndex = -1;
   const values = sheet.getDataRange().getValues();
@@ -1562,6 +1080,110 @@ function markCallAsSent_(turmaId, dateKey, text) {
 
 
 
+
+
+
+function buildDailyGeneralSummary_(dateKey, all, callsByTurma) {
+  const calls = Object.values(callsByTurma || {});
+  const totalAlunos = calls.reduce((sum, c) => sum + getActiveCallRows_(c.rows).length, 0);
+  const presentes = calls.reduce((sum, c) => sum + getActiveCallRows_(c.rows).filter(r => isPresenceLikeRow_(r)).length, 0);
+  const atrasos = calls.reduce((sum, c) => sum + getActiveCallRows_(c.rows).filter(r => isDelayedRow_(r)).length, 0);
+  const ausentes = totalAlunos - presentes;
+  const ofertaTotal = calls.reduce((sum, c) => sum + parseMoney_(c.oferta), 0);
+  const visitantesTotal = calls.reduce((sum, c) => sum + Number(c.visitantes || 0), 0);
+  const bibliasTotal = calls.reduce((sum, c) => sum + Number(c.biblias || 0), 0);
+  const revistasTotal = calls.reduce((sum, c) => sum + Number(c.revistas || 0), 0);
+  const percentual = totalAlunos ? round1_((presentes / totalAlunos) * 100) : 0;
+
+  return {
+    dateKey,
+    totalTurmas: calls.length,
+    totalAlunos,
+    presentes,
+    ausentes,
+    percentual,
+    atrasos,
+    ofertaTotal,
+    visitantesTotal,
+    bibliasTotal,
+    revistasTotal,
+  };
+}
+
+function buildTurmaReportText_(dateKey, turma, turmaCall, all) {
+  const rows = Array.isArray(turmaCall?.rows) ? turmaCall.rows : [];
+  const activeRows = getActiveCallRows_(rows);
+  const inativos = rows.filter(r => String(r.statusAluno || '').trim().toLowerCase() === 'inativo').length;
+  const matriculados = activeRows.length;
+  const presentes = activeRows.filter(r => isPresenceLikeRow_(r)).length;
+  const ausentes = matriculados - presentes;
+  const visitantes = Number(turmaCall?.visitantes ?? 0) || 0;
+  const biblias = Number(turmaCall?.biblias ?? 0) || 0;
+  const revistas = Number(turmaCall?.revistas ?? 0) || 0;
+  const totalAssistencia = presentes + visitantes;
+  const ofertas = (turmaCall?.oferta === '' || turmaCall?.oferta === null || turmaCall?.oferta === undefined)
+    ? null
+    : turmaCall?.oferta;
+
+  const topStats = getTopStatsForTurma_(turma.TurmaID, all);
+  const lines = [];
+  lines.push(`Relatório da turma`);
+  lines.push(`Data: ${formatDateBR_(dateKey)}`);
+  lines.push(`Turma: ${turma.Nome}`);
+  lines.push('');
+  buildReportMetricLines_({
+    matriculados,
+    ausentes,
+    presentes,
+    visitantes,
+    totalAssistencia,
+    biblias,
+    revistas,
+    ofertas,
+  }).forEach(line => lines.push(line));
+  lines.push('');
+  lines.push(`Resumo interno`);
+  lines.push(`- **MAIS FALTAS**: ${getMostAbsentLabel_(topStats)}`);
+  lines.push(`- **INATIVOS**: ${formatReportValue_(inativos)}`);
+  lines.push('');
+  lines.push(`Lista de presença:`);
+  if (rows.length) {
+    rows.forEach(row => {
+      lines.push(`${row.nome || 'Sem nome'}: **${getPresenceStatusLabel_(row)}**`);
+    });
+  } else {
+    lines.push(`null`);
+  }
+
+  return lines.join('\n');
+}
+
+function buildGeneralReportText_(dateKey, geral, callsByTurma, all) {
+  const inativos = (all.alunos || []).filter(a => String(a.Status || '').trim().toLowerCase() === 'inativo').length;
+  const mostAbsentOverall = getMostAbsentStudentOverall_(all);
+  const hasCalls = Object.values(callsByTurma || {}).some(call => !!call && (call.isSaved || Number(call.totalAlunos || 0) > 0));
+  const ofertas = hasCalls ? geral.ofertaTotal : null;
+
+  const lines = [];
+  lines.push(`Relatório geral`);
+  lines.push(`Data: ${formatDateBR_(dateKey)}`);
+  lines.push('');
+  buildReportMetricLines_({
+    matriculados: geral.totalAlunos,
+    ausentes: geral.ausentes,
+    presentes: geral.presentes,
+    visitantes: geral.visitantesTotal,
+    totalAssistencia: Number(geral.presentes || 0) + Number(geral.visitantesTotal || 0),
+    biblias: geral.bibliasTotal,
+    revistas: geral.revistasTotal,
+    ofertas,
+  }).forEach(line => lines.push(line));
+  lines.push('');
+  lines.push(`Resumo interno`);
+  lines.push(`- **MAIS FALTAS**: ${getMostAbsentLabel_({ mostAbsent: mostAbsentOverall })}`);
+  lines.push(`- **INATIVOS**: ${formatReportValue_(inativos)}`);
+  return lines.join('\n');
+}
 
 function getReportLogById_(reportId) {
   if (!__BACKEND_RUNTIME_CACHE__.reportLogsById) {
@@ -1852,7 +1474,6 @@ function indexByHeader_(headers) {
   idx.ATRASO = lookup(['ATRASO', 'LATE']);
   idx.AUSENCIA = lookup(['AUSENCIA', 'AUSÊNCIA', 'FALTA']);
   idx.OFERTA = lookup(['OFERTA', 'VALOR', 'R', 'R$']);
-  idx.VISITANTES = lookup(['VISITANTES', 'VISITANTE']);
 
   idx.AlunoID = lookup(['ALUNOID', 'ALUNO_ID', 'ID']);
   idx.Nome = lookup(['NOME', 'ALUNO']);
@@ -1870,8 +1491,10 @@ function indexByHeader_(headers) {
   idx.RealocadoDe = lookup(['REALOCADODE']);
   idx.CriadoEm = lookup(['CRIADOEM']);
   idx.AtualizadoEm = lookup(['ATUALIZADOEM']);
-  idx.Biblias = lookup(['BIBLIAS', 'BIBLIA']);
+  idx.Biblias = lookup(['BIBLIAS']);
   idx.Revistas = lookup(['REVISTAS']);
+  idx.Visitantes = lookup(['VISITANTES']);
+  idx.VisitantesTexto = lookup(['VISITANTESTEXTO']);
   idx.Enviado = lookup(['ENVIADO']);
   idx.EnviadoEm = lookup(['ENVIADOEM']);
   idx.Texto = lookup(['TEXTO']);
@@ -2026,9 +1649,9 @@ function buildReportMetricLines_(dados) {
     `- *AUSENTES*: ${formatReportValue_(dados.ausentes)}`,
     `- *PRESENTES*: ${formatReportValue_(dados.presentes)}`,
     `- *VISITANTES*: ${formatReportValue_(dados.visitantes)}`,
+    `- *TOTAL DE ASSISTÊNCIA*: ${formatReportValue_(dados.totalAssistencia)}`,
     `- *BÍBLIAS*: ${formatReportValue_(dados.biblias)}`,
     `- *REVISTAS*: ${formatReportValue_(dados.revistas)}`,
-    `- *TOTAL DE ASSISTÊNCIA*: ${formatReportValue_(dados.totalAssistencia)}`,
     `- *OFERTAS*: ${formatReportValue_(dados.ofertas)}`,
   ];
 }
@@ -2218,8 +1841,8 @@ function debugRoundTripChamada_() {
 
     const chamadaId = `CALL_${turma.TurmaID}_${dateKey}`;
     const oferta = 'R$ 4,00';
-    const biblias = 4;
-    const revistas = '4 biblias';
+    const visitantes = 4;
+    const visitantesTexto = '4 visitantes';
 
     Logger.log('========== TESTE ROUND-TRIP ==========');
     Logger.log('TURMA: ' + JSON.stringify({
@@ -2235,8 +1858,8 @@ function debugRoundTripChamada_() {
       turmaId: turma.TurmaID,
       chamadaId,
       oferta,
-      biblias,
-      revistas,
+      visitantes,
+      visitantesTexto,
       rowsJson: sampleRows,
     }, null, 2));
 
@@ -2245,8 +1868,8 @@ function debugRoundTripChamada_() {
       turmaId: turma.TurmaID,
       chamadaId,
       oferta,
-      biblias: String(biblias),
-      revistas,
+      visitantes: String(visitantes),
+      visitantesTexto,
       rowsJson: JSON.stringify(sampleRows),
       sendTelegram: 'nao',
       autoSend: 'nao',

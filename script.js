@@ -690,9 +690,9 @@ function restoreDraft(call) {
   return {
     ...call,
     oferta: draft.oferta ?? call.oferta,
-    visitantes: Number(draft.visitantes ?? call.visitantes ?? 0) || 0,
-    biblias: Number(draft.biblias ?? call.biblias ?? 0) || 0,
-    revistas: Number(draft.revistas ?? call.revistas ?? 0) || 0,
+    visitantes: draft.visitantes ?? call.visitantes,
+    biblias: draft.biblias ?? call.biblias,
+    revistas: draft.revistas ?? call.revistas,
     rows: Array.isArray(draft.rows)
       ? draft.rows.map((row) => syncRowPresenceFields({ ...row }))
       : call.rows,
@@ -705,9 +705,9 @@ function persistDraft(call) {
   data.drafts = data.drafts || {};
   data.drafts[call.chamadaId] = {
     oferta: call.oferta,
-    visitantes: Number(call.visitantes || 0),
-    biblias: Number(call.biblias || 0),
-    revistas: Number(call.revistas ?? 0) || 0,
+    visitantes: call.visitantes,
+    biblias: call.biblias,
+    revistas: call.revistas,
     rows: call.rows.map((row) => syncRowPresenceFields({
       alunoId: row.alunoId,
       nome: row.nome,
@@ -767,20 +767,26 @@ function updateCallFromInputs() {
   call.oferta = parseCurrencyBR(ofertaInput?.value ?? 0);
 
   // VISITANTES
-  call.visitantes = visitantesInput?.value === '' ? 0 : Number(visitantesInput.value);
+  call.visitantes =
+    visitantesInput?.value === ''
+      ? 0
+      : Number(visitantesInput.value);
 
   // BÍBLIAS
-  call.biblias = bibliasInput?.value === '' ? 0 : Number(bibliasInput.value);
+  call.biblias =
+    bibliasInput?.value === ''
+      ? 0
+      : Number(bibliasInput.value);
 
   // REVISTAS
-  call.revistas = revistasInput?.value === '' ? 0 : Number(revistasInput.value);
+  call.revistas =
+    revistasInput?.value === ''
+      ? 0
+      : Number(revistasInput.value);
 
   console.log('[updateCallFromInputs]', {
     ofertaInput: ofertaInput?.value,
     ofertaFinal: call.oferta,
-    visitantes: Number(call.visitantes || 0),
-    biblias: Number(call.biblias || 0),
-    revistas: call.revistas,
   });
 }
 
@@ -846,10 +852,6 @@ function buildTurmaReportText() {
   const inactiveNames = getAlunosForTurma(turma.TurmaID).filter((a) => String(a.Status || '') === 'inativo').map((a) => a.Nome).join(', ') || 'nenhum';
   const faltandoMuito = getAlunosForTurma(turma.TurmaID).filter((a) => String(a.FaltandoMuito || '') === 'sim').map((a) => a.Nome).join(', ') || 'nenhum';
 
-  const visitantes = Number(call.visitantes || 0);
-  const biblias = Number(call.biblias || 0);
-  const revistas = Number(call.revistas || 0);
-
   return [
     '📋 RELATÓRIO DA TURMA',
     `Turma: ${turma.Nome}`,
@@ -860,11 +862,10 @@ function buildTurmaReportText() {
     `Atrasados: ${stats.atrasos}`,
     `Ausentes: ${stats.ausentes}`,
     `Presença: ${formatPercent(stats.percentual)}`,
-    `Oferta da classe: ${call.oferta || '-'}`,
-    `Visitantes: ${visitantes}`,
-    `Bíblias: ${biblias}`,
-    `Revistas: ${revistas}`,
-    `Total de assistência: ${stats.presentes + visitantes + biblias + revistas}`,
+    `Oferta: ${call.oferta || '-'}`,
+    `Visitantes: ${Number(call.visitantes || 0) > 0 ? call.visitantes : 0}`,
+    `Bíblias: ${Number(call.biblias || 0)}`,
+    `Revistas: ${Number(call.revistas || 0)}`,
     '',
     `Melhor aluno: ${best ? `${best.Nome} (${formatPercent(best.Percentual)})` : '—'}`,
     `Inativos: ${inactiveNames}`,
@@ -890,10 +891,9 @@ function buildGeneralReportText() {
     `Ausentes: ${geral.ausentes}`,
     `Presença geral: ${formatPercent(geral.percentual)}`,
     `Oferta total: ${formatMoney(geral.ofertaTotal)}`,
-    `Visitantes: ${geral.visitantesTotal || 0}`,
+    `Visitantes: ${geral.visitantesTotal}`,
     `Bíblias: ${geral.bibliasTotal || 0}`,
     `Revistas: ${geral.revistasTotal || 0}`,
-    `Total de assistência: ${geral.totalAssistencia ?? ((geral.presentes || 0) + (geral.visitantesTotal || 0) + (geral.bibliasTotal || 0) + (geral.revistasTotal || 0))}`,
     '',
     'Resumo por turma:',
   ];
@@ -940,9 +940,9 @@ function renderSummary() {
     els.summary.ausentes.textContent = '0';
     els.summary.percentual.textContent = '0%';
     els.summary.oferta.textContent = 'R$ 0,00';
-    if (els.summary.visitantes) els.summary.visitantes.textContent = '0';
-    if (els.summary.biblias) els.summary.biblias.textContent = '0';
-    if (els.summary.revistas) els.summary.revistas.textContent = '0';
+    els.summary.visitantes.textContent = '0';
+    els.summary.biblias.textContent = '0';
+    els.summary.revistas.textContent = '0';
     els.turmaMeta.textContent = isRestrictedMode() ? 'Chamada não salva.' : 'Selecione uma turma para carregar a chamada.';
     if (isRestrictedMode()) els.turmaMeta.classList.add('turma-meta--warn');
     return;
@@ -954,9 +954,9 @@ function renderSummary() {
   els.summary.ausentes.textContent = String(stats.ausentes);
   els.summary.percentual.textContent = formatPercent(stats.percentual);
   els.summary.oferta.textContent = formatMoney(call.oferta);
-  if (els.summary.visitantes) els.summary.visitantes.textContent = String(Number(call.visitantes || 0));
-  if (els.summary.biblias) els.summary.biblias.textContent = String(Number(call.biblias || 0));
-  if (els.summary.revistas) els.summary.revistas.textContent = String(Number(call.revistas || 0));
+  els.summary.visitantes.textContent = String(Number(call.visitantes || 0));
+  els.summary.biblias.textContent = String(Number(call.biblias || 0));
+  els.summary.revistas.textContent = String(Number(call.revistas || 0));
 
   if (isRestrictedMode()) {
     els.turmaMeta.textContent = call.isSaved ? 'Chamada salva.' : 'Chamada não salva.';
@@ -1127,7 +1127,7 @@ async function saveCurrentCall({ silent = false } = {}) {
     oferta: call.oferta ?? 0,
     visitantes: String(call.visitantes ?? 0),
     biblias: String(call.biblias ?? 0),
-    revistas: Number(call.revistas ?? 0) || 0,
+    revistas: String(call.revistas ?? 0),
     rowsJson: JSON.stringify(call.rows),
   };
 
@@ -1430,8 +1430,9 @@ function clearCurrentCall() {
     row.observacao = '';
   });
   call.oferta = '';
+  call.visitantes = 0;
   call.biblias = 0;
-  call.revistas = '';
+  call.revistas = 0;
   state.dirty = true;
   persistDraft(call);
   renderAll();
@@ -1484,9 +1485,9 @@ function bindCallFieldValues() {
   if (ofertaInput) {
     ofertaInput.value = formatCurrencyBR(call.oferta ?? 0);
   }
-  if (visitantesInput) visitantesInput.value = String(Number(call.visitantes || 0));
-  if (bibliasInput) bibliasInput.value = String(Number(call.biblias || 0));
-  if (revistasInput) revistasInput.value = String(Number(call.revistas || 0));
+  if (visitantesInput) visitantesInput.value = String(call.visitantes || 0);
+  if (bibliasInput) bibliasInput.value = String(call.biblias || 0);
+  if (revistasInput) revistasInput.value = String(call.revistas || 0);
 
   if (ofertaInput && !ofertaInput.dataset.bound) {
     ofertaInput.dataset.bound = '1';
@@ -1505,46 +1506,24 @@ function bindCallFieldValues() {
     });
   }
 
-  if (visitantesInput && !visitantesInput.dataset.bound) {
-    visitantesInput.dataset.bound = '1';
-    visitantesInput.addEventListener('input', (event) => {
+  const bindNumberInput = (inputEl, fieldName) => {
+    if (!inputEl || inputEl.dataset.bound) return;
+    inputEl.dataset.bound = '1';
+    inputEl.addEventListener('input', (event) => {
       const current = getCurrentCall();
       if (!current) return;
-      current.visitantes = Number(event.target.value || 0) || 0;
+      current[fieldName] = Number(event.target.value || 0) || 0;
       persistDraft(current);
       markDirty();
       renderSummary();
       renderReports();
     });
-  }
+  };
 
-  if (bibliasInput && !bibliasInput.dataset.bound) {
-    bibliasInput.dataset.bound = '1';
-    bibliasInput.addEventListener('input', (event) => {
-      const current = getCurrentCall();
-      if (!current) return;
-      current.biblias = Number(event.target.value || 0) || 0;
-      persistDraft(current);
-      markDirty();
-      renderSummary();
-      renderReports();
-    });
-  }
-
-  if (revistasInput && !revistasInput.dataset.bound) {
-    revistasInput.dataset.bound = '1';
-    revistasInput.addEventListener('input', (event) => {
-      const current = getCurrentCall();
-      if (!current) return;
-      current.revistas = Number(event.target.value || 0) || 0;
-      persistDraft(current);
-      markDirty();
-      renderSummary();
-      renderReports();
-    });
-  }
+  bindNumberInput(visitantesInput, 'visitantes');
+  bindNumberInput(bibliasInput, 'biblias');
+  bindNumberInput(revistasInput, 'revistas');
 }
-
 
 async function refreshFromBackend(showMessage = false, { silent = false } = {}) {
   clearAutosaveTimer();
@@ -1715,6 +1694,7 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
           turmaId: firstCall?.turmaId,
           turmaNome: firstCall?.turmaNome,
           oferta: firstCall?.oferta,
+          visitantes: firstCall?.visitantes,
           biblias: firstCall?.biblias,
           revistas: firstCall?.revistas,
           totalRows: firstCall?.rows?.length,
@@ -1813,7 +1793,7 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
             chamadaId: testCall?.chamadaId,
             rows: testCall?.rows?.length,
             oferta: testCall?.oferta,
-            biblias: testCall?.biblias,
+            visitantes: testCall?.visitantes,
           }, null, 2);
         }
       }
