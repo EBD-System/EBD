@@ -1528,7 +1528,7 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
   }
 
   try {
-    const showDebugBox = false;
+    const showDebugBox = true;
 
     // =========================================
     // DEBUG BOX
