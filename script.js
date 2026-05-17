@@ -1531,16 +1531,18 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
     // =========================================
     // DEBUG BOX
     // =========================================
-if (false) {
+
+    let showDebugBox = false;
+    
     let debugBox = document.getElementById('debugBackendJson');
 
     if (!debugBox) {
 
-      debugBox = document.createElement('pre');
-      debugBox.id = 'debugBackendJson';
+     showDebugBox && debugBox = document.createElement('pre');
+     showDebugBox &&  debugBox.id = 'debugBackendJson';
 
       
-      debugBox.style.cssText = `
+     showDebugBox &&  debugBox.style.cssText = `
         position:fixed;
         left:10px;
         right:10px;
@@ -1560,10 +1562,10 @@ if (false) {
         box-shadow:0 0 30px rgba(0,0,0,.5);
       `;
       
-      document.body.appendChild(debugBox);
+     showDebugBox &&  document.body.appendChild(debugBox);
     }
 
-    debugBox.textContent =
+     showDebugBox && debugBox.textContent =
       '⏳ Iniciando carregamento do backend...\n';
 
     // =========================================
@@ -1575,7 +1577,7 @@ if (false) {
       date: state.dateKey,
     });
 
-    debugBox.textContent +=
+    showDebugBox && debugBox.textContent +=
       '\n🌐 URL:\n' + urlFinal + '\n';
 
     const response = await fetch(urlFinal, {
@@ -1584,13 +1586,13 @@ if (false) {
       cache: 'no-store',
     });
 
-    debugBox.textContent +=
+     showDebugBox && debugBox.textContent +=
       '\n📡 STATUS HTTP:\n' +
       response.status + ' ' + response.statusText + '\n';
 
     const rawText = await response.text();
 
-    debugBox.textContent +=
+     showDebugBox && debugBox.textContent +=
       '\n📦 RAW RESPONSE:\n' +
       rawText.slice(0, 15000) + '\n';
 
@@ -1600,12 +1602,12 @@ if (false) {
 
       data = JSON.parse(rawText);
 
-      debugBox.textContent +=
+     showDebugBox && debugBox.textContent +=
         '\n✅ JSON PARSEADO COM SUCESSO\n';
 
     } catch (jsonErr) {
 
-      debugBox.textContent +=
+    showDebugBox && debugBox.textContent +=
         '\n❌ ERRO AO PARSEAR JSON:\n' +
         jsonErr.message + '\n';
 
@@ -1616,32 +1618,32 @@ if (false) {
     // INSPEÇÃO DO JSON
     // =========================================
 
-    debugBox.textContent +=
+  showDebugBox &&   debugBox.textContent +=
       '\n============================\n' +
       '📊 ESTRUTURA DO JSON\n' +
       '============================\n';
 
-    debugBox.textContent +=
+  showDebugBox &&   debugBox.textContent +=
       '\nTurmas: ' +
       (Array.isArray(data.turmas)
         ? data.turmas.length
         : 'NÃO É ARRAY');
 
-    debugBox.textContent +=
+  showDebugBox &&   debugBox.textContent +=
       '\nAlunos: ' +
       (Array.isArray(data.alunos)
         ? data.alunos.length
         : 'NÃO É ARRAY');
 
-    debugBox.textContent +=
+ showDebugBox &&    debugBox.textContent +=
       '\nCallsByTurma keys: ' +
       Object.keys(data.callsByTurma || {}).length;
 
-    debugBox.textContent +=
+  showDebugBox &&   debugBox.textContent +=
       '\nResumo geral existe: ' +
       (!!data.resumoGeral);
 
-    debugBox.textContent +=
+  showDebugBox &&   debugBox.textContent +=
       '\nBaseRowsCount: ' +
       data.baseRowsCount;
 
@@ -1652,12 +1654,12 @@ if (false) {
     const firstCall =
       Object.values(data.callsByTurma || {})[0];
 
-    debugBox.textContent +=
+   showDebugBox &&  debugBox.textContent +=
       '\n\n============================\n' +
       '📞 PRIMEIRA CALL\n' +
       '============================\n';
 
-    debugBox.textContent += JSON.stringify({
+  showDebugBox &&   debugBox.textContent += JSON.stringify({
       chamadaId: firstCall?.chamadaId,
       turmaId: firstCall?.turmaId,
       turmaNome: firstCall?.turmaNome,
@@ -1695,18 +1697,18 @@ if (false) {
         0
       );
 
-    debugBox.textContent +=
+  showDebugBox &&   debugBox.textContent +=
       '\n\n✅ STATE ATUALIZADO';
 
-    debugBox.textContent +=
+  showDebugBox &&   debugBox.textContent +=
       '\nstate.turmas: ' +
       state.turmas.length;
 
-    debugBox.textContent +=
+   showDebugBox &&  debugBox.textContent +=
       '\nstate.alunos: ' +
       state.alunos.length;
 
-    debugBox.textContent +=
+   showDebugBox &&  debugBox.textContent +=
       '\nstate.calls: ' +
       Object.keys(state.chamadasByTurma).length;
 
@@ -1724,7 +1726,7 @@ if (false) {
         state.turmas[0]?.TurmaID || '';
     }
 
-    debugBox.textContent +=
+   showDebugBox &&  debugBox.textContent +=
       '\n\n🎯 selectedTurmaId:\n' +
       state.selectedTurmaId;
 
@@ -1736,12 +1738,12 @@ if (false) {
 
       const testCall = getCurrentCall();
 
-      debugBox.textContent +=
+    showDebugBox &&   debugBox.textContent +=
         '\n\n============================\n' +
         '🧪 TESTE getCurrentCall()\n' +
         '============================\n';
 
-      debugBox.textContent += JSON.stringify({
+    showDebugBox &&   debugBox.textContent += JSON.stringify({
         exists: !!testCall,
         turmaId: testCall?.turmaId,
         chamadaId: testCall?.chamadaId,
@@ -1752,7 +1754,7 @@ if (false) {
 
     } catch (err) {
 
-      debugBox.textContent +=
+    showDebugBox &&   debugBox.textContent +=
         '\n\n❌ ERRO getCurrentCall():\n' +
         err.message;
     }
@@ -1765,12 +1767,12 @@ if (false) {
 
       renderAll();
 
-      debugBox.textContent +=
+    showDebugBox &&   debugBox.textContent +=
         '\n\n✅ renderAll() executado';
 
     } catch (renderErr) {
 
-      debugBox.textContent +=
+   showDebugBox &&    debugBox.textContent +=
         '\n\n❌ ERRO NO RENDER:\n' +
         renderErr.message +
         '\n\nSTACK:\n' +
@@ -1780,19 +1782,17 @@ if (false) {
     if (showMessage) {
       showSuccess('Dados atualizados.');
     }
-
-}// FIM DO IF QUE MOTRA OU NAO O DEBUGBOX
   
   } catch (err) {
 
     console.error(err);
 
-    let debugBox =
+  let debugBox =
       document.getElementById('debugBackendJson');
 
-    if (debugBox) {
+   if (debugBox) {
 
-      debugBox.textContent +=
+     showDebugBox &&  debugBox.textContent +=
         '\n\n============================\n' +
         '❌ ERRO GERAL\n' +
         '============================\n' +
