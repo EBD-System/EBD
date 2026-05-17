@@ -571,81 +571,83 @@ function getActiveCallRows_(rows) {
   return (rows || []).filter(r => String(r.statusAluno || '').trim().toLowerCase() !== 'inativo');
 }
 
+
 function buildTurmaReportText_(dateKey, turma, turmaCall, all) {
   const rows = Array.isArray(turmaCall?.rows) ? turmaCall.rows : [];
   const activeRows = getActiveCallRows_(rows);
-  const totalAtivos = activeRows.length;
+  const inativos = rows.filter(r => String(r.statusAluno || '').trim().toLowerCase() === 'inativo').length;
+  const matriculados = activeRows.length;
   const presentes = activeRows.filter(r => isPresenceLikeRow_(r)).length;
-  const atrasos = activeRows.filter(r => isDelayedRow_(r)).length;
-  const ausentes = totalAtivos - presentes;
-  const percentual = totalAtivos ? round1_((presentes / totalAtivos) * 100) : 0;
+  const ausentes = matriculados - presentes;
+  const visitantes = Number(turmaCall?.visitantes ?? 0) || 0;
+  const totalAssistencia = presentes + visitantes;
+  const ofertas = (turmaCall?.oferta === '' || turmaCall?.oferta === null || turmaCall?.oferta === undefined)
+    ? null
+    : turmaCall?.oferta;
 
   const topStats = getTopStatsForTurma_(turma.TurmaID, all);
   const lines = [];
   lines.push(`Relatório da turma`);
   lines.push(`Data: ${formatDateBR_(dateKey)}`);
   lines.push(`Turma: ${turma.Nome}`);
-  lines.push(`Alunos ativos: ${totalAtivos}`);
-  lines.push(`Presentes: ${presentes}`);
-  lines.push(`Atrasos: ${atrasos}`);
-  lines.push(`Ausentes: ${ausentes}`);
-  lines.push(`Presença: ${formatPercent_(percentual)}`);
-  lines.push(`Oferta: ${formatMoney_(turmaCall?.oferta || 0) || '-'}`);
-  lines.push(`Visitantes: ${Number(turmaCall?.visitantes || 0) || 0}`);
   lines.push('');
-
-  if (topStats.bestStudent || topStats.mostAbsent || Number(topStats.inactiveCount || 0) > 0) {
-    lines.push(`Resumo interno`);
-    if (topStats.bestStudent) {
-      lines.push(`Melhor aluno: ${topStats.bestStudent.Nome} (${formatPercent_(topStats.bestStudent.Percentual)})`);
-    }
-    if (topStats.mostAbsent) {
-      lines.push(`Mais faltas: ${topStats.mostAbsent.Nome} (${Number(topStats.mostAbsent.TotalFaltas || 0)})`);
-    }
-    if (Number(topStats.inactiveCount || 0) > 0) {
-      lines.push(`Inativos na turma: ${Number(topStats.inactiveCount || 0)}`);
-    }
+  buildReportMetricLines_({
+    matriculados,
+    ausentes,
+    presentes,
+    visitantes,
+    totalAssistencia,
+    biblias: null,
+    revistas: null,
+    ofertas,
+  }).forEach(line => lines.push(line));
+  lines.push('');
+  lines.push(`Resumo interno`);
+  lines.push(`- *MAIS FALTAS*: ${getMostAbsentLabel_(topStats)}`);
+  lines.push(`- *INATIVOS*: ${formatReportValue_(inativos)}`);
+  lines.push('');
+  lines.push(`Lista de presença:`);
+  if (rows.length) {
+    rows.forEach(row => {
+      lines.push(`${row.nome || 'Sem nome'}: *${getPresenceStatusLabel_(row)}*`);
+    });
+  } else {
+    lines.push(`null`);
   }
 
   return lines.join('\n');
 }
+
+
 
 function buildGeneralReportText_(dateKey, geral, callsByTurma, all) {
+  const inativos = (all.alunos || []).filter(a => String(a.Status || '').trim().toLowerCase() === 'inativo').length;
+  const mostAbsentOverall = getMostAbsentStudentOverall_(all);
+  const hasCalls = Object.values(callsByTurma || {}).some(call => !!call && (call.isSaved || Number(call.totalAlunos || 0) > 0));
+  const ofertas = hasCalls ? geral.ofertaTotal : null;
+
   const lines = [];
-  lines.push(`*Relatório geral*`);
+  lines.push(`Relatório geral`);
   lines.push(`Data: ${formatDateBR_(dateKey)}`);
-  lines.push(`Turmas com chamada: ${geral.totalTurmas}`);
-  lines.push(`Total de alunos: ${geral.totalAlunos}`);
-  lines.push(`Presentes: ${geral.presentes}`);
-  lines.push(`Ausentes: ${geral.ausentes}`);
-  lines.push(`Presença geral: ${formatPercent_(geral.percentual)}`);
-  lines.push(`Oferta total: ${formatMoney_(geral.ofertaTotal)}`);
-  lines.push(`Visitantes: ${geral.visitantesTotal ?? 0}`);
   lines.push('');
-  lines.push('*Resumo por turma:*');
-
-  const turmasOrdenadas = sortTurmas_(all.turmas).filter(t => callsByTurma[t.TurmaID]);
-  turmasOrdenadas.forEach(turma => {
-    const call = callsByTurma[turma.TurmaID];
-    const activeRows = getActiveCallRows_(call.rows);
-    const totalAtivos = activeRows.length;
-    const presentesAtivos = activeRows.filter(r => isPresenceLikeRow_(r)).length;
-    const atrasosAtivos = activeRows.filter(r => isDelayedRow_(r)).length;
-    const percentualAtivos = totalAtivos ? round1_((presentesAtivos / totalAtivos) * 100) : 0;
-    lines.push(`• ${turma.Nome}: ${presentesAtivos}/${totalAtivos} presentes (${formatPercent_(percentualAtivos)}) | atrasos ${atrasosAtivos} | Oferta ${formatMoney_(call.oferta) || '-'} | Visitantes ${Number(call.visitantes ?? 0)}`);
-  });
-
-  const top = getTopStudentsOverall_(all);
-  if (top.length) {
-    lines.push('');
-    lines.push('*Melhores alunos no período:*');
-    top.slice(0, 5).forEach((s, idx) => {
-      lines.push(`${idx + 1}. ${s.Nome} — ${s.TurmaNome} — ${formatPercent_(s.Percentual)}`);
-    });
-  }
+  buildReportMetricLines_({
+    matriculados: geral.totalAlunos,
+    ausentes: geral.ausentes,
+    presentes: geral.presentes,
+    visitantes: geral.visitantesTotal,
+    totalAssistencia: Number(geral.presentes || 0) + Number(geral.visitantesTotal || 0),
+    biblias: null,
+    revistas: null,
+    ofertas,
+  }).forEach(line => lines.push(line));
+  lines.push('');
+  lines.push(`Resumo interno`);
+  lines.push(`- *MAIS FALTAS*: ${getMostAbsentLabel_({ mostAbsent: mostAbsentOverall })}`);
+  lines.push(`- *INATIVOS*: ${formatReportValue_(inativos)}`);
 
   return lines.join('\n');
 }
+
 
 
 
@@ -1944,6 +1946,71 @@ function parseMoney_(value) {
     : 0;
 }
 
+
+
+function formatReportValue_(value) {
+  if (value === null || value === undefined) return 'null';
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed || trimmed.toLowerCase() === 'null') return 'null';
+    return trimmed;
+  }
+
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return 'null';
+    return Number.isInteger(value)
+      ? String(value)
+      : String(round1_(value)).replace('.', ',');
+  }
+
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && String(value).trim() !== '') {
+    return Number.isInteger(numeric)
+      ? String(numeric)
+      : String(round1_(numeric)).replace('.', ',');
+  }
+
+  const fallback = String(value).trim();
+  return fallback ? fallback : 'null';
+}
+
+function getPresenceStatusLabel_(row) {
+  if (String(row?.statusAluno || '').trim().toLowerCase() === 'inativo') {
+    return 'INATIVO';
+  }
+
+  if (isPresenceLikeRow_(row)) {
+    return 'PRESENTE';
+  }
+
+  return 'Falta';
+}
+
+function buildReportMetricLines_(dados) {
+  return [
+    `- *MATRICULADOS*: ${formatReportValue_(dados.matriculados)}`,
+    `- *AUSENTES*: ${formatReportValue_(dados.ausentes)}`,
+    `- *PRESENTES*: ${formatReportValue_(dados.presentes)}`,
+    `- *VISITANTES*: ${formatReportValue_(dados.visitantes)}`,
+    `- *TOTAL DE ASSISTÊNCIA*: ${formatReportValue_(dados.totalAssistencia)}`,
+    `- *BÍBLIAS*: ${formatReportValue_(dados.biblias)}`,
+    `- *REVISTAS*: ${formatReportValue_(dados.revistas)}`,
+    `- *OFERTAS*: ${formatReportValue_(dados.ofertas)}`,
+  ];
+}
+
+function getMostAbsentLabel_(topStats) {
+  if (!topStats || !topStats.mostAbsent) return 'null';
+  const faltas = Number(topStats.mostAbsent.TotalFaltas || 0);
+  return `${topStats.mostAbsent.Nome} (${formatReportValue_(faltas)})`;
+}
+
+function getMostAbsentStudentOverall_(all) {
+  const alunos = (all.alunos || []).slice();
+  if (!alunos.length) return null;
+  return alunos.sort((a, b) => Number(b.TotalFaltas || 0) - Number(a.TotalFaltas || 0))[0] || null;
+}
 
 function formatMoney_(value) {
   try {
