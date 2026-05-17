@@ -1534,7 +1534,7 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
 
     let debugBox = document.getElementById('debugBackendJson');
 
-    if (!debugBox) {
+    if (!debugBox && false) {
 
       debugBox = document.createElement('pre');
       debugBox.id = 'debugBackendJson';
