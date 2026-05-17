@@ -1532,7 +1532,7 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
     // DEBUG BOX
     // =========================================
 
-    let showDebugBox = false;
+    let showDebugBox = true;
     
     let debugBox = document.getElementById('debugBackendJson');
 
