@@ -1018,7 +1018,12 @@ function renderStudents() {
 
     clone.querySelector('.student-percent').textContent = `Presença individual: ${formatPercent(percent)}`;
     clone.querySelector('.student-absence').textContent = `Faltas: ${faltas}`;
-    clone.querySelector('.student-run').textContent = `Faltas seguidas: ${run}`;
+    const runEl = clone.querySelector('.student-run');
+if (runEl) {
+  runEl.textContent = `Faltas seguidas: ${run}`;
+  runEl.style.color = run >= 4 ? '#c46a6a' : '';
+  runEl.style.fontWeight = run >= 4 ? '700' : '';
+}
 
     const presentBtn = clone.querySelector('[data-action="present"]');
     const absentBtn = clone.querySelector('[data-action="absent"]');
