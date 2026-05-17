@@ -1531,7 +1531,7 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
     // =========================================
     // DEBUG BOX
     // =========================================
-
+if (false) {
     let debugBox = document.getElementById('debugBackendJson');
 
     if (!debugBox) {
@@ -1781,6 +1781,8 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
       showSuccess('Dados atualizados.');
     }
 
+}// FIM DO IF QUE MOTRA OU NAO O DEBUGBOX
+  
   } catch (err) {
 
     console.error(err);
@@ -1803,8 +1805,8 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
       err?.message ||
       'Erro ao carregar dados.'
     );
-
-  } finally {
+  
+  } finally { 
 
     state.loading = false;
 
