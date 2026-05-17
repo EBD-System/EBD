@@ -1539,7 +1539,7 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
       debugBox = document.createElement('pre');
       debugBox.id = 'debugBackendJson';
 
-      if (false) {
+      
       debugBox.style.cssText = `
         position:fixed;
         left:10px;
@@ -1559,7 +1559,7 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
         word-break:break-word;
         box-shadow:0 0 30px rgba(0,0,0,.5);
       `;
-      }
+      
       document.body.appendChild(debugBox);
     }
 
