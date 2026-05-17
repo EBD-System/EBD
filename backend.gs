@@ -195,7 +195,7 @@ function saveCall_(p) {
   const visitantesTexto = String(p.visitantesTexto || '').trim();
   const chamadaId = String(p.chamadaId || `${turmaId}_${dateKey}`).trim();
   const rowsJson = String(p.rowsJson || '[]');
-  const autoSend = normalizeBool_(p.sendTelegram || p.autoSend || 'nao');
+  const autoSend = normalizeBool_(p.sendTelegram ?? p.autoSend ?? 'sim');
 
   if (!turmaId) throw new Error('Turma inválida.');
 
@@ -275,7 +275,20 @@ function saveCall_(p) {
 
   let telegram = { sent: false, alreadySent: false, message: '' };
   if (autoSend) {
-    telegram = sendTelegramForTurma_(dateKey, turma.TurmaID, allAfter, callsByTurma[turma.TurmaID]);
+    try {
+      telegram = sendTelegramForTurma_(dateKey, turma.TurmaID, allAfter, callsByTurma[turma.TurmaID]);
+      if (telegram && telegram.sent) {
+        markCallAsSent_(turma.TurmaID, dateKey, telegram.text);
+      }
+    } catch (err) {
+      telegram = {
+        ok: false,
+        sent: false,
+        alreadySent: false,
+        message: `Erro ao enviar ao Telegram: ${String(err && err.message ? err.message : err)}`,
+        error: String(err && err.message ? err.message : err),
+      };
+    }
   }
 
   return {
@@ -521,7 +534,18 @@ function sendTelegramByText_({ reportId, tipo, dateKey, turmaId, text }) {
     };
   }
 
-  sendTelegram_(text);
+  const telegramResult = sendTelegram_(text);
+  if (!telegramResult || !telegramResult.sent) {
+    return {
+      ok: false,
+      sent: false,
+      alreadySent: false,
+      message: (telegramResult && telegramResult.message) || 'Telegram não configurado.',
+      text,
+      telegramResult,
+    };
+  }
+
   upsertReportLog_({
     reportId,
     tipo,
@@ -538,12 +562,52 @@ function sendTelegramByText_({ reportId, tipo, dateKey, turmaId, text }) {
     alreadySent: false,
     message: tipo === 'geral' ? 'Relatório geral enviado ao Telegram.' : 'Relatório da turma enviado ao Telegram.',
     text,
+    telegramResult,
   };
 }
 
 
 function getActiveCallRows_(rows) {
   return (rows || []).filter(r => String(r.statusAluno || '').trim().toLowerCase() !== 'inativo');
+}
+
+function buildTurmaReportText_(dateKey, turma, turmaCall, all) {
+  const rows = Array.isArray(turmaCall?.rows) ? turmaCall.rows : [];
+  const activeRows = getActiveCallRows_(rows);
+  const totalAtivos = activeRows.length;
+  const presentes = activeRows.filter(r => isPresenceLikeRow_(r)).length;
+  const atrasos = activeRows.filter(r => isDelayedRow_(r)).length;
+  const ausentes = totalAtivos - presentes;
+  const percentual = totalAtivos ? round1_((presentes / totalAtivos) * 100) : 0;
+
+  const topStats = getTopStatsForTurma_(turma.TurmaID, all);
+  const lines = [];
+  lines.push(`Relatório da turma`);
+  lines.push(`Data: ${formatDateBR_(dateKey)}`);
+  lines.push(`Turma: ${turma.Nome}`);
+  lines.push(`Alunos ativos: ${totalAtivos}`);
+  lines.push(`Presentes: ${presentes}`);
+  lines.push(`Atrasos: ${atrasos}`);
+  lines.push(`Ausentes: ${ausentes}`);
+  lines.push(`Presença: ${formatPercent_(percentual)}`);
+  lines.push(`Oferta: ${formatMoney_(turmaCall?.oferta || 0) || '-'}`);
+  lines.push(`Visitantes: ${Number(turmaCall?.visitantes || 0) || 0}`);
+  lines.push('');
+
+  if (topStats.bestStudent || topStats.mostAbsent || Number(topStats.inactiveCount || 0) > 0) {
+    lines.push(`Resumo interno`);
+    if (topStats.bestStudent) {
+      lines.push(`Melhor aluno: ${topStats.bestStudent.Nome} (${formatPercent_(topStats.bestStudent.Percentual)})`);
+    }
+    if (topStats.mostAbsent) {
+      lines.push(`Mais faltas: ${topStats.mostAbsent.Nome} (${Number(topStats.mostAbsent.TotalFaltas || 0)})`);
+    }
+    if (Number(topStats.inactiveCount || 0) > 0) {
+      lines.push(`Inativos na turma: ${Number(topStats.inactiveCount || 0)}`);
+    }
+  }
+
+  return lines.join('\n');
 }
 
 function buildGeneralReportText_(dateKey, geral, callsByTurma, all) {
@@ -1928,6 +1992,48 @@ function compareDateKey_(a, b) {
   return String(a || '').localeCompare(String(b || ''));
 }
 
+function chunkTextForTelegram_(text, maxLen) {
+  const limit = Math.max(1, Number(maxLen || 3800));
+  const source = String(text || '');
+  if (source.length <= limit) return [source];
+
+  const lines = source.split('\n');
+  const chunks = [];
+  let current = '';
+
+  const pushCurrent = () => {
+    if (current) chunks.push(current);
+    current = '';
+  };
+
+  lines.forEach(line => {
+    const candidate = current ? `${current}\n${line}` : line;
+    if (candidate.length <= limit) {
+      current = candidate;
+      return;
+    }
+
+    pushCurrent();
+
+    if (line.length <= limit) {
+      current = line;
+      return;
+    }
+
+    for (let i = 0; i < line.length; i += limit) {
+      const slice = line.slice(i, i + limit);
+      if (slice.length === limit) {
+        chunks.push(slice);
+      } else {
+        current = slice;
+      }
+    }
+  });
+
+  pushCurrent();
+  return chunks.filter(Boolean);
+}
+
 function sendTelegram_(text) {
   if (
     !TELEGRAM_BOT_TOKEN ||
@@ -1935,23 +2041,37 @@ function sendTelegram_(text) {
     String(TELEGRAM_BOT_TOKEN).includes('COLE_SEU_TOKEN_AQUI') ||
     String(TELEGRAM_CHAT_ID).includes('COLE_SEU_CHAT_ID_AQUI')
   ) {
-    return;
+    return { ok: false, skipped: true, sentCount: 0, message: 'Telegram não configurado.' };
   }
 
+  const chunks = chunkTextForTelegram_(String(text || ''), 3800);
   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-  const payload = {
-    chat_id: TELEGRAM_CHAT_ID,
-    text: String(text || ''),
-    disable_web_page_preview: true,
-    parse_mode: 'Markdown',
-  };
+  let lastResponse = null;
 
-  UrlFetchApp.fetch(url, {
-    method: 'post',
-    contentType: 'application/json',
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true,
+  chunks.forEach((chunk, index) => {
+    const payload = {
+      chat_id: TELEGRAM_CHAT_ID,
+      text: chunk,
+      disable_web_page_preview: true,
+    };
+
+    const response = UrlFetchApp.fetch(url, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true,
+    });
+
+    const code = response.getResponseCode();
+    const body = response.getContentText();
+    if (code < 200 || code >= 300) {
+      throw new Error(`Falha ao enviar ao Telegram (parte ${index + 1}/${chunks.length}, HTTP ${code}): ${body}`);
+    }
+
+    lastResponse = { code, body };
   });
+
+  return { ok: true, sent: true, sentCount: chunks.length, lastResponse };
 }
 
 function json_(obj) {
