@@ -1490,7 +1490,9 @@ function bindCallFieldValues() {
 
   const ofertaInput = document.getElementById('ofertaInput');
   const visitantesInput = document.getElementById('visitantesInput');
-  const visitantesTextoInput = document.getElementById('visitantesTextoInput');
+  const bibliasInput = document.getElementById('bibliasInput');
+  const revistasInput = document.getElementById('revistasInput');
+  //const visitantesTextoInput = document.getElementById('visitantesTextoInput');
 
   if (ofertaInput) {
   ofertaInput.value =
@@ -1499,7 +1501,9 @@ function bindCallFieldValues() {
     );
 }
   if (visitantesInput) visitantesInput.value = String(call.visitantes || 0);
-  if (visitantesTextoInput) visitantesTextoInput.value = call.visitantesTexto || '';
+  if (bibliasInput) bibliasInput.value = String(call.biblias || 0);
+  if (revistasInput) visitantesInput.value = String(call.revistas || 0);
+  //if (visitantesTextoInput) visitantesTextoInput.value = call.visitantesTexto || '';
 
 if (ofertaInput && !ofertaInput.dataset.bound) {
 
