@@ -1248,6 +1248,8 @@ function replaceBaseRowsForCall_(dateKey, turmaId, turmaNome, normalizedRows, ex
     r.presenca === 'nao' ? 1 : 0,
     Number(extra?.oferta || 0),
     Number(extra?.visitantes || 0),
+    Number(extra?.biblias || 0),
+    Number(extra?.revistas || 0),
   ]));
 
   Logger.log('LINHAS PARA INSERIR:');
