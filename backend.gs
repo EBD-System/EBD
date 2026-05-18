@@ -192,7 +192,9 @@ function saveCall_(p) {
   const turmaId = String(p.turmaId || p.turmaNome || p.turma || '').trim();
   const oferta = parseMoney_(p.oferta);
   const visitantes = Number(p.visitantes || 0) || 0;
-  const visitantesTexto = String(p.visitantesTexto || '').trim();
+  const biblias = Number(p.biblias || 0) || 0;
+  const revistas = Number(p.revistas || 0) || 0;
+  //const visitantesTexto = String(p.visitantesTexto || '').trim();
   const chamadaId = String(p.chamadaId || `${turmaId}_${dateKey}`).trim();
   const rowsJson = String(p.rowsJson || '[]');
   const autoSend = normalizeBool_(p.sendTelegram ?? p.autoSend ?? 'sim');
@@ -247,7 +249,8 @@ function saveCall_(p) {
     {
       oferta,
       visitantes,
-      visitantesTexto,
+      biblias,
+      revistas,
     }
   );
 
@@ -257,7 +260,8 @@ function saveCall_(p) {
     turma.TurmaID,
     oferta,
     visitantes,
-    visitantesTexto,
+    biblias,
+    revistas,
     normalizedRows.length,
     presentes,
     ausentes,
