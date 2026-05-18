@@ -1556,7 +1556,7 @@ if (ofertaInput && !ofertaInput.dataset.bound) {
     bibliasInput.addEventListener('input', (event) => {
       const current = getCurrentCall();
       if (!current) return;
-      current.visitantes = Number(event.target.value || 0) || 0;
+      current.biblias = Number(event.target.value || 0) || 0;
       persistDraft(current);
       markDirty();
       renderSummary();
