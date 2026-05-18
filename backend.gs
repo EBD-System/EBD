@@ -1871,7 +1871,8 @@ function indexByHeader_(headers) {
   idx.CriadoEm = lookup(['CRIADOEM']);
   idx.AtualizadoEm = lookup(['ATUALIZADOEM']);
   idx.Visitantes = lookup(['VISITANTES']);
-  idx.VisitantesTexto = lookup(['VISITANTESTEXTO']);
+  idx.Biblias = lookup(['BIBLIAS']);
+  idx.Revistas = lookup(['REVISTAS']);
   idx.Enviado = lookup(['ENVIADO']);
   idx.EnviadoEm = lookup(['ENVIADOEM']);
   idx.Texto = lookup(['TEXTO']);
