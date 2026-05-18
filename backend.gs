@@ -2022,15 +2022,21 @@ function getPresenceStatusLabel_(row) {
 }
 
 function buildReportMetricLines_(dados) {
+  const percentual =
+    dados.matriculados
+      ? ((dados.presentes / dados.matriculados) * 100).toFixed(1)
+      : '0.0';
+
   return [
-    `- *MATRICULADOS*: ${formatReportValue_(dados.matriculados)}`,
-    `- *AUSENTES*: ${formatReportValue_(dados.ausentes)}`,
-    `- *PRESENTES*: ${formatReportValue_(dados.presentes)}`,
-    `- *VISITANTES*: ${formatReportValue_(dados.visitantes)}`,
-    `- *TOTAL DE ASSISTÊNCIA*: ${formatReportValue_(dados.totalAssistencia)}`,
-    `- *BÍBLIAS*: ${formatReportValue_(dados.biblias)}`,
-    `- *REVISTAS*: ${formatReportValue_(dados.revistas)}`,
-    `- *OFERTAS*: ${formatReportValue_(dados.ofertas)}`,
+    `- *MATRICULADOS*: *${formatReportValue_(dados.matriculados)}*`,
+    `- *AUSENTES*: *${formatReportValue_(dados.ausentes)}*`,
+    `- *PRESENTES*: *${formatReportValue_(dados.presentes)}*`,
+    `- *VISITANTES*: *${formatReportValue_(dados.visitantes)}*`,
+    `- *TOTAL DE ASSISTÊNCIA*: *${formatReportValue_(dados.totalAssistencia)}*`,
+    `- *BÍBLIAS*: *${formatReportValue_(dados.biblias)}*`,
+    `- *REVISTAS*: *${formatReportValue_(dados.revistas)}*`,
+    `- *OFERTAS*: *${formatReportValue_(dados.ofertas)}*`,
+    `- *PERCENTUAL*: *${percentual}%*`,
   ];
 }
 
