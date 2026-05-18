@@ -642,8 +642,8 @@ function buildGeneralReportText_(dateKey, geral, callsByTurma, all) {
     presentes: geral.presentes,
     visitantes: geral.visitantesTotal,
     totalAssistencia: Number(geral.presentes || 0) + Number(geral.visitantesTotal || 0),
-    biblias: null,
-    revistas: null,
+    biblias: geral.bibliasTotal,
+    revistas: geral.revistasTotal,
     ofertas,
   }).forEach(line => lines.push(line));
   lines.push('');
@@ -670,6 +670,8 @@ function buildDailyGeneralSummary_(dateKey, all, callsByTurma) {
   const ausentes = totalAlunos - presentes;
   const ofertaTotal = calls.reduce((sum, c) => sum + parseMoney_(c.oferta), 0);
   const visitantesTotal = calls.reduce((sum, c) => sum + Number(c.visitantes || 0), 0);
+  const bibliasTotal = calls.reduce((sum, c) => sum + Number(c.biblias || 0), 0);
+  const revistasTotal = calls.reduce((sum, c) => sum + Number(c.revistas || 0), 0);
   const percentual = totalAlunos ? round1_((presentes / totalAlunos) * 100) : 0;
 
   return {
@@ -682,6 +684,8 @@ function buildDailyGeneralSummary_(dateKey, all, callsByTurma) {
     atrasos,
     ofertaTotal,
     visitantesTotal,
+    bibliasTotal,
+    revistasTotal
   };
 }
 
@@ -756,7 +760,8 @@ function buildCallsByTurmaForDate_(dateKey, all) {
       turmaNome: turma.Nome,
       oferta: callMeta?.Oferta ?? '',
       visitantes: Number(callMeta?.Visitantes ?? 0) || 0,
-      visitantesTexto: callMeta?.VisitantesTexto ?? '',
+      biblias: Number(callMeta?.Biblias ?? 0) || 0,
+      visitantes: Number(callMeta?.Revistas ?? 0) || 0,
       totalAlunos: rows.length,
       presentes,
       atrasos,
@@ -778,7 +783,8 @@ function buildCallsByTurmaForDate_(dateKey, all) {
         turmaNome: turma.Nome,
         oferta: '',
         visitantes: 0,
-        visitantesTexto: '',
+        biblias: 0,
+        revistas: 0,
         totalAlunos: 0,
         presentes: 0,
         atrasos: 0,
