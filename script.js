@@ -767,8 +767,20 @@ function updateCallFromInputs() {
       ? 0
       : Number(visitantesInput.value);
 
+  // BÍBLIAS
+  call.biblias =
+    bibliasInput?.value === ''
+      ? 0
+      : Number(bibliasInput.value);
+
+  // REVISTAS
+  call.revistas =
+    revistasInput?.value === ''
+      ? 0
+      : Number(revistasInput.value);
+
   // TEXTO VISITANTES
-  call.visitantesTexto = visitantesTextoInput?.value?.trim?.() ?? '';
+  // ANTIGO // call.visitantesTexto = visitantesTextoInput?.value?.trim?.() ?? '';
 
   console.log('[updateCallFromInputs]', {
     ofertaInput: ofertaInput?.value,
