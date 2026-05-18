@@ -195,7 +195,7 @@ function saveCall_(p) {
   const visitantesTexto = String(p.visitantesTexto || '').trim();
   const chamadaId = String(p.chamadaId || `${turmaId}_${dateKey}`).trim();
   const rowsJson = String(p.rowsJson || '[]');
-  const autoSend = normalizeBool_(p.sendTelegram || p.autoSend || 'nao');
+  const autoSend = normalizeBool_(p.sendTelegram ?? p.autoSend ?? 'sim');
 
   if (!turmaId) throw new Error('Turma inválida.');
 
@@ -275,7 +275,20 @@ function saveCall_(p) {
 
   let telegram = { sent: false, alreadySent: false, message: '' };
   if (autoSend) {
-    telegram = sendTelegramForTurma_(dateKey, turma.TurmaID, allAfter, callsByTurma[turma.TurmaID]);
+    try {
+      telegram = sendTelegramForTurma_(dateKey, turma.TurmaID, allAfter, callsByTurma[turma.TurmaID]);
+      if (telegram && telegram.sent) {
+        markCallAsSent_(turma.TurmaID, dateKey, telegram.text);
+      }
+    } catch (err) {
+      telegram = {
+        ok: false,
+        sent: false,
+        alreadySent: false,
+        message: `Erro ao enviar ao Telegram: ${String(err && err.message ? err.message : err)}`,
+        error: String(err && err.message ? err.message : err),
+      };
+    }
   }
 
   return {
@@ -521,7 +534,18 @@ function sendTelegramByText_({ reportId, tipo, dateKey, turmaId, text }) {
     };
   }
 
-  sendTelegram_(text);
+  const telegramResult = sendTelegram_(text);
+  if (!telegramResult || !telegramResult.sent) {
+    return {
+      ok: false,
+      sent: false,
+      alreadySent: false,
+      message: (telegramResult && telegramResult.message) || 'Telegram não configurado.',
+      text,
+      telegramResult,
+    };
+  }
+
   upsertReportLog_({
     reportId,
     tipo,
@@ -538,6 +562,7 @@ function sendTelegramByText_({ reportId, tipo, dateKey, turmaId, text }) {
     alreadySent: false,
     message: tipo === 'geral' ? 'Relatório geral enviado ao Telegram.' : 'Relatório da turma enviado ao Telegram.',
     text,
+    telegramResult,
   };
 }
 
@@ -546,42 +571,83 @@ function getActiveCallRows_(rows) {
   return (rows || []).filter(r => String(r.statusAluno || '').trim().toLowerCase() !== 'inativo');
 }
 
-function buildGeneralReportText_(dateKey, geral, callsByTurma, all) {
+
+function buildTurmaReportText_(dateKey, turma, turmaCall, all) {
+  const rows = Array.isArray(turmaCall?.rows) ? turmaCall.rows : [];
+  const activeRows = getActiveCallRows_(rows);
+  const inativos = rows.filter(r => String(r.statusAluno || '').trim().toLowerCase() === 'inativo').length;
+  const matriculados = activeRows.length;
+  const presentes = activeRows.filter(r => isPresenceLikeRow_(r)).length;
+  const ausentes = matriculados - presentes;
+  const visitantes = Number(turmaCall?.visitantes ?? 0) || 0;
+  const totalAssistencia = presentes + visitantes;
+  const ofertas = (turmaCall?.oferta === '' || turmaCall?.oferta === null || turmaCall?.oferta === undefined)
+    ? null
+    : turmaCall?.oferta;
+
+  const topStats = getTopStatsForTurma_(turma.TurmaID, all);
   const lines = [];
-  lines.push(`*Relatório geral*`);
+  lines.push(`Relatório da turma`);
   lines.push(`Data: ${formatDateBR_(dateKey)}`);
-  lines.push(`Turmas com chamada: ${geral.totalTurmas}`);
-  lines.push(`Total de alunos: ${geral.totalAlunos}`);
-  lines.push(`Presentes: ${geral.presentes}`);
-  lines.push(`Ausentes: ${geral.ausentes}`);
-  lines.push(`Presença geral: ${formatPercent_(geral.percentual)}`);
-  lines.push(`Oferta total: ${formatMoney_(geral.ofertaTotal)}`);
-  lines.push(`Visitantes: ${geral.visitantesTotal ?? 0}`);
+  lines.push(`Turma: ${turma.Nome}`);
   lines.push('');
-  lines.push('*Resumo por turma:*');
-
-  const turmasOrdenadas = sortTurmas_(all.turmas).filter(t => callsByTurma[t.TurmaID]);
-  turmasOrdenadas.forEach(turma => {
-    const call = callsByTurma[turma.TurmaID];
-    const activeRows = getActiveCallRows_(call.rows);
-    const totalAtivos = activeRows.length;
-    const presentesAtivos = activeRows.filter(r => isPresenceLikeRow_(r)).length;
-    const atrasosAtivos = activeRows.filter(r => isDelayedRow_(r)).length;
-    const percentualAtivos = totalAtivos ? round1_((presentesAtivos / totalAtivos) * 100) : 0;
-    lines.push(`• ${turma.Nome}: ${presentesAtivos}/${totalAtivos} presentes (${formatPercent_(percentualAtivos)}) | atrasos ${atrasosAtivos} | Oferta ${formatMoney_(call.oferta) || '-'} | Visitantes ${Number(call.visitantes ?? 0)}`);
-  });
-
-  const top = getTopStudentsOverall_(all);
-  if (top.length) {
-    lines.push('');
-    lines.push('*Melhores alunos no período:*');
-    top.slice(0, 5).forEach((s, idx) => {
-      lines.push(`${idx + 1}. ${s.Nome} — ${s.TurmaNome} — ${formatPercent_(s.Percentual)}`);
+  buildReportMetricLines_({
+    matriculados,
+    ausentes,
+    presentes,
+    visitantes,
+    totalAssistencia,
+    biblias: null,
+    revistas: null,
+    ofertas,
+  }).forEach(line => lines.push(line));
+  lines.push('');
+  lines.push(`Resumo interno`);
+  lines.push(`- *MAIS FALTAS*: ${getMostAbsentLabel_(topStats)}`);
+  lines.push(`- *INATIVOS*: ${formatReportValue_(inativos)}`);
+  lines.push('');
+  lines.push(`Lista de presença:`);
+  if (rows.length) {
+    rows.forEach(row => {
+      lines.push(`${row.nome || 'Sem nome'}: *${getPresenceStatusLabel_(row)}*`);
     });
+  } else {
+    lines.push(`null`);
   }
 
   return lines.join('\n');
 }
+
+
+
+function buildGeneralReportText_(dateKey, geral, callsByTurma, all) {
+  const inativos = (all.alunos || []).filter(a => String(a.Status || '').trim().toLowerCase() === 'inativo').length;
+  const mostAbsentOverall = getMostAbsentStudentOverall_(all);
+  const hasCalls = Object.values(callsByTurma || {}).some(call => !!call && (call.isSaved || Number(call.totalAlunos || 0) > 0));
+  const ofertas = hasCalls ? geral.ofertaTotal : null;
+
+  const lines = [];
+  lines.push(`Relatório geral`);
+  lines.push(`Data: ${formatDateBR_(dateKey)}`);
+  lines.push('');
+  buildReportMetricLines_({
+    matriculados: geral.totalAlunos,
+    ausentes: geral.ausentes,
+    presentes: geral.presentes,
+    visitantes: geral.visitantesTotal,
+    totalAssistencia: Number(geral.presentes || 0) + Number(geral.visitantesTotal || 0),
+    biblias: null,
+    revistas: null,
+    ofertas,
+  }).forEach(line => lines.push(line));
+  lines.push('');
+  lines.push(`Resumo interno`);
+  lines.push(`- *MAIS FALTAS*: ${getMostAbsentLabel_({ mostAbsent: mostAbsentOverall })}`);
+  lines.push(`- *INATIVOS*: ${formatReportValue_(inativos)}`);
+
+  return lines.join('\n');
+}
+
 
 
 
@@ -1881,6 +1947,71 @@ function parseMoney_(value) {
 }
 
 
+
+function formatReportValue_(value) {
+  if (value === null || value === undefined) return 'null';
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed || trimmed.toLowerCase() === 'null') return 'null';
+    return trimmed;
+  }
+
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return 'null';
+    return Number.isInteger(value)
+      ? String(value)
+      : String(round1_(value)).replace('.', ',');
+  }
+
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && String(value).trim() !== '') {
+    return Number.isInteger(numeric)
+      ? String(numeric)
+      : String(round1_(numeric)).replace('.', ',');
+  }
+
+  const fallback = String(value).trim();
+  return fallback ? fallback : 'null';
+}
+
+function getPresenceStatusLabel_(row) {
+  if (String(row?.statusAluno || '').trim().toLowerCase() === 'inativo') {
+    return 'INATIVO';
+  }
+
+  if (isPresenceLikeRow_(row)) {
+    return 'PRESENTE';
+  }
+
+  return 'Falta';
+}
+
+function buildReportMetricLines_(dados) {
+  return [
+    `- *MATRICULADOS*: ${formatReportValue_(dados.matriculados)}`,
+    `- *AUSENTES*: ${formatReportValue_(dados.ausentes)}`,
+    `- *PRESENTES*: ${formatReportValue_(dados.presentes)}`,
+    `- *VISITANTES*: ${formatReportValue_(dados.visitantes)}`,
+    `- *TOTAL DE ASSISTÊNCIA*: ${formatReportValue_(dados.totalAssistencia)}`,
+    `- *BÍBLIAS*: ${formatReportValue_(dados.biblias)}`,
+    `- *REVISTAS*: ${formatReportValue_(dados.revistas)}`,
+    `- *OFERTAS*: ${formatReportValue_(dados.ofertas)}`,
+  ];
+}
+
+function getMostAbsentLabel_(topStats) {
+  if (!topStats || !topStats.mostAbsent) return 'null';
+  const faltas = Number(topStats.mostAbsent.TotalFaltas || 0);
+  return `${topStats.mostAbsent.Nome} (${formatReportValue_(faltas)})`;
+}
+
+function getMostAbsentStudentOverall_(all) {
+  const alunos = (all.alunos || []).slice();
+  if (!alunos.length) return null;
+  return alunos.sort((a, b) => Number(b.TotalFaltas || 0) - Number(a.TotalFaltas || 0))[0] || null;
+}
+
 function formatMoney_(value) {
   try {
     return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -1928,6 +2059,48 @@ function compareDateKey_(a, b) {
   return String(a || '').localeCompare(String(b || ''));
 }
 
+function chunkTextForTelegram_(text, maxLen) {
+  const limit = Math.max(1, Number(maxLen || 3800));
+  const source = String(text || '');
+  if (source.length <= limit) return [source];
+
+  const lines = source.split('\n');
+  const chunks = [];
+  let current = '';
+
+  const pushCurrent = () => {
+    if (current) chunks.push(current);
+    current = '';
+  };
+
+  lines.forEach(line => {
+    const candidate = current ? `${current}\n${line}` : line;
+    if (candidate.length <= limit) {
+      current = candidate;
+      return;
+    }
+
+    pushCurrent();
+
+    if (line.length <= limit) {
+      current = line;
+      return;
+    }
+
+    for (let i = 0; i < line.length; i += limit) {
+      const slice = line.slice(i, i + limit);
+      if (slice.length === limit) {
+        chunks.push(slice);
+      } else {
+        current = slice;
+      }
+    }
+  });
+
+  pushCurrent();
+  return chunks.filter(Boolean);
+}
+
 function sendTelegram_(text) {
   if (
     !TELEGRAM_BOT_TOKEN ||
@@ -1935,23 +2108,37 @@ function sendTelegram_(text) {
     String(TELEGRAM_BOT_TOKEN).includes('COLE_SEU_TOKEN_AQUI') ||
     String(TELEGRAM_CHAT_ID).includes('COLE_SEU_CHAT_ID_AQUI')
   ) {
-    return;
+    return { ok: false, skipped: true, sentCount: 0, message: 'Telegram não configurado.' };
   }
 
+  const chunks = chunkTextForTelegram_(String(text || ''), 3800);
   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-  const payload = {
-    chat_id: TELEGRAM_CHAT_ID,
-    text: String(text || ''),
-    disable_web_page_preview: true,
-    parse_mode: 'Markdown',
-  };
+  let lastResponse = null;
 
-  UrlFetchApp.fetch(url, {
-    method: 'post',
-    contentType: 'application/json',
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true,
+  chunks.forEach((chunk, index) => {
+    const payload = {
+      chat_id: TELEGRAM_CHAT_ID,
+      text: chunk,
+      disable_web_page_preview: true,
+    };
+
+    const response = UrlFetchApp.fetch(url, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true,
+    });
+
+    const code = response.getResponseCode();
+    const body = response.getContentText();
+    if (code < 200 || code >= 300) {
+      throw new Error(`Falha ao enviar ao Telegram (parte ${index + 1}/${chunks.length}, HTTP ${code}): ${body}`);
+    }
+
+    lastResponse = { code, body };
   });
+
+  return { ok: true, sent: true, sentCount: chunks.length, lastResponse };
 }
 
 function json_(obj) {
