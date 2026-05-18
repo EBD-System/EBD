@@ -66,6 +66,8 @@ const els = {
     percentual: document.getElementById('statPercentual'),
     oferta: document.getElementById('statOferta'),
     visitantes: document.getElementById('statVisitantes'),
+    biblias: document.getElementById('statBiblias'),
+    revistas: document.getElementById('statRevistas'),
   },
   studentsList: document.getElementById('studentsList'),
   emptyState: document.getElementById('emptyState'),
