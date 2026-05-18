@@ -754,7 +754,9 @@ function updateCallFromInputs() {
 
   const ofertaInput = document.getElementById('ofertaInput');
   const visitantesInput = document.getElementById('visitantesInput');
-  const visitantesTextoInput = document.getElementById('visitantesTextoInput');
+  const bibliasInput = document.getElementById('bibliasInput');
+  const revistasInput = document.getElementById('revistasInput');
+  // ANTIGO // const visitantesTextoInput = document.getElementById('visitantesTextoInput');
 
   // OFERTA
   call.oferta = parseCurrencyBR(ofertaInput?.value ?? 0);
