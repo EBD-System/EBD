@@ -1496,12 +1496,18 @@ async function saveAndAdvance() {
 
 function loadSelectedTurma() {
   const turma = getCurrentTurma();
+
   if (!turma) return;
-  let call = state.chamadasByTurma[turma.TurmaID];
-  if (!call) {
-    call = blankCallForTurma(turma);
-    call = restoreDraft(call);
-    state.chamadasByTurma[turma.TurmaID] = call;
+
+  const call =
+    state.chamadasByTurma[turma.TurmaID];
+
+  const invalidRows =
+    !Array.isArray(call?.rows) ||
+    call.rows.length === 0;
+
+  if (!call || invalidRows) {
+    hydrateCallForTurma(turma);
   }
 }
 
