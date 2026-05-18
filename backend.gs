@@ -1319,6 +1319,8 @@ function getBaseRowsAll_(forceReload) {
       ausencia: normalizeBool_(row[idx.AUSENCIA]),
       oferta: row[idx.OFERTA] ?? '',
       visitantes: Number(row[idx.Visitantes] ?? row[idx.VISITANTES] ?? 0) || 0,
+      biblias: Number(row[idx.Biblias] ?? row[idx.BIBLIAS] ?? 0) || 0,
+      revistas: Number(row[idx.Visitantes] ?? row[idx.REVISTAS] ?? 0) || 0,
       alunoId: buildStudentId_(aluno, turmaId, ''),
     });
   }
