@@ -1441,7 +1441,9 @@ function clearCurrentCall() {
   });
   call.oferta = '';
   call.visitantes = 0;
-  call.visitantesTexto = '';
+  call.biblias = 0;
+  call.revistas = 0;
+  //call.visitantesTexto = '';
   state.dirty = true;
   persistDraft(call);
   renderAll();
