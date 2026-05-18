@@ -2220,7 +2220,8 @@ function debugRoundTripChamada_() {
     const chamadaId = `CALL_${turma.TurmaID}_${dateKey}`;
     const oferta = 'R$ 4,00';
     const visitantes = 4;
-    const visitantesTexto = '4 visitantes';
+    const biblias = 4;
+    const revistas = 4;
 
     Logger.log('========== TESTE ROUND-TRIP ==========');
     Logger.log('TURMA: ' + JSON.stringify({
@@ -2237,7 +2238,8 @@ function debugRoundTripChamada_() {
       chamadaId,
       oferta,
       visitantes,
-      visitantesTexto,
+      biblias,
+      revistas,
       rowsJson: sampleRows,
     }, null, 2));
 
@@ -2247,7 +2249,8 @@ function debugRoundTripChamada_() {
       chamadaId,
       oferta,
       visitantes: String(visitantes),
-      visitantesTexto,
+      biblias: String(biblias),
+      revistas: String(revistas),
       rowsJson: JSON.stringify(sampleRows),
       sendTelegram: 'nao',
       autoSend: 'nao',
