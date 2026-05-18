@@ -1502,7 +1502,7 @@ function bindCallFieldValues() {
 }
   if (visitantesInput) visitantesInput.value = String(call.visitantes || 0);
   if (bibliasInput) bibliasInput.value = String(call.biblias || 0);
-  if (revistasInput) visitantesInput.value = String(call.revistas || 0);
+  if (revistasInput) revistasInput.value = String(call.revistas || 0);
   //if (visitantesTextoInput) visitantesTextoInput.value = call.visitantesTexto || '';
 
 if (ofertaInput && !ofertaInput.dataset.bound) {
