@@ -5,7 +5,7 @@ const APPS_SCRIPT_URL =
 const STORAGE_KEY = 'prb_presenca_turmas_v2';
 const ROSTER_CACHE_KEY = 'prb_roster_cache_v1';
 const ROSTER_CACHE_VERSION = 1;
-const showDebugBox = true;
+const showDebugBox = false;
 
 // Se false, o carregamento inicial usa somente o que vem do backend.
 // Se true, o rascunho local pode voltar a ser aplicado quando existir.
@@ -66,8 +66,6 @@ const els = {
     percentual: document.getElementById('statPercentual'),
     oferta: document.getElementById('statOferta'),
     visitantes: document.getElementById('statVisitantes'),
-    biblias: document.getElementById('statBiblias'),
-    revistas: document.getElementById('statRevistas'),
   },
   studentsList: document.getElementById('studentsList'),
   emptyState: document.getElementById('emptyState'),
@@ -595,8 +593,7 @@ function buildSyncedCall(turma, serverCall = null, draft = null) {
     turmaNome: turma.Nome,
     oferta: draft?.oferta ?? serverCall?.oferta ?? '',
     visitantes: Number(draft?.visitantes ?? serverCall?.visitantes ?? 0) || 0,
-    biblias: Number(draft?.biblias ?? serverCall?.biblias ?? 0) || 0,
-    revistas: Number(draft?.revistas ?? serverCall?.revistas ?? 0) || 0,
+    visitantesTexto: draft?.visitantesTexto ?? serverCall?.visitantesTexto ?? '',
     totalAlunos: rows.length,
     presentes: presentCount,
     atrasos: delayCount,
@@ -660,8 +657,7 @@ function blankCallForTurma(turma) {
     turmaNome: turma.Nome,
     oferta: '',
     visitantes: 0,
-    biblias: 0,
-    revistas: 0,
+    visitantesTexto: '',
     totalAlunos: activeRoster.length,
     presentes: 0,
     atrasos: 0,
@@ -691,8 +687,7 @@ function restoreDraft(call) {
     ...call,
     oferta: draft.oferta ?? call.oferta,
     visitantes: draft.visitantes ?? call.visitantes,
-    biblias: draft.biblias ?? call.biblias,
-    revistas: draft.revistas ?? call.revistas,
+    visitantesTexto: draft.visitantesTexto ?? call.visitantesTexto,
     rows: Array.isArray(draft.rows)
       ? draft.rows.map((row) => syncRowPresenceFields({ ...row }))
       : call.rows,
@@ -706,8 +701,7 @@ function persistDraft(call) {
   data.drafts[call.chamadaId] = {
     oferta: call.oferta,
     visitantes: call.visitantes,
-    biblias: call.biblias,
-    revistas: call.revistas,
+    visitantesTexto: call.visitantesTexto || '',
     rows: call.rows.map((row) => syncRowPresenceFields({
       alunoId: row.alunoId,
       nome: row.nome,
@@ -760,8 +754,7 @@ function updateCallFromInputs() {
 
   const ofertaInput = document.getElementById('ofertaInput');
   const visitantesInput = document.getElementById('visitantesInput');
-  const bibliasInput = document.getElementById('bibliasInput');
-  const revistasInput = document.getElementById('revistasInput');
+  const visitantesTextoInput = document.getElementById('visitantesTextoInput');
 
   // OFERTA
   call.oferta = parseCurrencyBR(ofertaInput?.value ?? 0);
@@ -772,17 +765,8 @@ function updateCallFromInputs() {
       ? 0
       : Number(visitantesInput.value);
 
-  // BÍBLIAS
-  call.biblias =
-    bibliasInput?.value === ''
-      ? 0
-      : Number(bibliasInput.value);
-
-  // REVISTAS
-  call.revistas =
-    revistasInput?.value === ''
-      ? 0
-      : Number(revistasInput.value);
+  // TEXTO VISITANTES
+  call.visitantesTexto = visitantesTextoInput?.value?.trim?.() ?? '';
 
   console.log('[updateCallFromInputs]', {
     ofertaInput: ofertaInput?.value,
@@ -862,10 +846,9 @@ function buildTurmaReportText() {
     `Atrasados: ${stats.atrasos}`,
     `Ausentes: ${stats.ausentes}`,
     `Presença: ${formatPercent(stats.percentual)}`,
-    `Oferta: ${call.oferta || '-'}`,
-    `Visitantes: ${Number(call.visitantes || 0) > 0 ? call.visitantes : 0}`,
-    `Bíblias: ${Number(call.biblias || 0)}`,
-    `Revistas: ${Number(call.revistas || 0)}`,
+    `Oferta da classe: ${call.oferta || '-'}`,
+    `Visitantes: ${Number(call.visitantes || 0) > 0 ? call.visitantes : 'não informado'}`,
+    call.visitantesTexto ? `Detalhe visitantes: ${call.visitantesTexto}` : '',
     '',
     `Melhor aluno: ${best ? `${best.Nome} (${formatPercent(best.Percentual)})` : '—'}`,
     `Inativos: ${inactiveNames}`,
@@ -892,14 +875,12 @@ function buildGeneralReportText() {
     `Presença geral: ${formatPercent(geral.percentual)}`,
     `Oferta total: ${formatMoney(geral.ofertaTotal)}`,
     `Visitantes: ${geral.visitantesTotal}`,
-    `Bíblias: ${geral.bibliasTotal || 0}`,
-    `Revistas: ${geral.revistasTotal || 0}`,
     '',
     'Resumo por turma:',
   ];
 
   (geral.turmaSummaries || []).forEach((item) => {
-    lines.push(`- ${item.nome}: ${item.presentes}/${item.totalAlunos} (${formatPercent(item.percentual)}) | Oferta ${item.oferta || '-'} | Visitantes ${item.visitantes || 0} | Bíblias ${item.biblias || 0} | Revistas ${item.revistas || 0}`);
+    lines.push(`- ${item.nome}: ${item.presentes}/${item.totalAlunos} (${formatPercent(item.percentual)}) | Oferta ${item.oferta || '-'} | Visitantes ${item.visitantes || 0}`);
   });
 
   lines.push('');
@@ -941,8 +922,6 @@ function renderSummary() {
     els.summary.percentual.textContent = '0%';
     els.summary.oferta.textContent = 'R$ 0,00';
     els.summary.visitantes.textContent = '0';
-    els.summary.biblias.textContent = '0';
-    els.summary.revistas.textContent = '0';
     els.turmaMeta.textContent = isRestrictedMode() ? 'Chamada não salva.' : 'Selecione uma turma para carregar a chamada.';
     if (isRestrictedMode()) els.turmaMeta.classList.add('turma-meta--warn');
     return;
@@ -955,8 +934,6 @@ function renderSummary() {
   els.summary.percentual.textContent = formatPercent(stats.percentual);
   els.summary.oferta.textContent = formatMoney(call.oferta);
   els.summary.visitantes.textContent = String(Number(call.visitantes || 0));
-  els.summary.biblias.textContent = String(Number(call.biblias || 0));
-  els.summary.revistas.textContent = String(Number(call.revistas || 0));
 
   if (isRestrictedMode()) {
     els.turmaMeta.textContent = call.isSaved ? 'Chamada salva.' : 'Chamada não salva.';
@@ -1126,8 +1103,7 @@ async function saveCurrentCall({ silent = false } = {}) {
     chamadaId: call.chamadaId,
     oferta: call.oferta ?? 0,
     visitantes: String(call.visitantes ?? 0),
-    biblias: String(call.biblias ?? 0),
-    revistas: String(call.revistas ?? 0),
+    visitantesTexto: call.visitantesTexto || '',
     rowsJson: JSON.stringify(call.rows),
   };
 
@@ -1431,8 +1407,7 @@ function clearCurrentCall() {
   });
   call.oferta = '';
   call.visitantes = 0;
-  call.biblias = 0;
-  call.revistas = 0;
+  call.visitantesTexto = '';
   state.dirty = true;
   persistDraft(call);
   renderAll();
@@ -1479,51 +1454,76 @@ function bindCallFieldValues() {
 
   const ofertaInput = document.getElementById('ofertaInput');
   const visitantesInput = document.getElementById('visitantesInput');
-  const bibliasInput = document.getElementById('bibliasInput');
-  const revistasInput = document.getElementById('revistasInput');
+  const visitantesTextoInput = document.getElementById('visitantesTextoInput');
 
   if (ofertaInput) {
-    ofertaInput.value = formatCurrencyBR(call.oferta ?? 0);
-  }
-  if (visitantesInput) visitantesInput.value = String(call.visitantes || 0);
-  if (bibliasInput) bibliasInput.value = String(call.biblias || 0);
-  if (revistasInput) revistasInput.value = String(call.revistas || 0);
-
-  if (ofertaInput && !ofertaInput.dataset.bound) {
-    ofertaInput.dataset.bound = '1';
-    ofertaInput.addEventListener('input', (event) => {
-      formatTensToBRL(event);
-
-      const current = getCurrentCall();
-      if (!current) return;
-
-      current.oferta = parseCurrencyBR(event.target.value);
-
-      persistDraft(current);
-      markDirty();
-      renderSummary();
-      renderReports();
-    });
-  }
-
-  const bindNumberInput = (inputEl, fieldName) => {
-    if (!inputEl || inputEl.dataset.bound) return;
-    inputEl.dataset.bound = '1';
-    inputEl.addEventListener('input', (event) => {
-      const current = getCurrentCall();
-      if (!current) return;
-      current[fieldName] = Number(event.target.value || 0) || 0;
-      persistDraft(current);
-      markDirty();
-      renderSummary();
-      renderReports();
-    });
-  };
-
-  bindNumberInput(visitantesInput, 'visitantes');
-  bindNumberInput(bibliasInput, 'biblias');
-  bindNumberInput(revistasInput, 'revistas');
+  ofertaInput.value =
+    formatCurrencyBR(
+      call.oferta ?? 0
+    );
 }
+  if (visitantesInput) visitantesInput.value = String(call.visitantes || 0);
+  if (visitantesTextoInput) visitantesTextoInput.value = call.visitantesTexto || '';
+
+if (ofertaInput && !ofertaInput.dataset.bound) {
+
+  ofertaInput.dataset.bound = '1';
+
+  ofertaInput.addEventListener('input', (event) => {
+
+    formatTensToBRL(event);
+
+    const current = getCurrentCall();
+
+    if (!current) return;
+
+    current.oferta =
+      parseCurrencyBR(event.target.value);
+
+    console.log(
+      '[ofertaInput]',
+      {
+        digitado: event.target.value,
+        armazenado: current.oferta,
+      }
+    );
+
+    persistDraft(current);
+
+    markDirty();
+
+    renderSummary();
+
+    renderReports();
+  });
+}
+
+  if (visitantesInput && !visitantesInput.dataset.bound) {
+    visitantesInput.dataset.bound = '1';
+    visitantesInput.addEventListener('input', (event) => {
+      const current = getCurrentCall();
+      if (!current) return;
+      current.visitantes = Number(event.target.value || 0) || 0;
+      persistDraft(current);
+      markDirty();
+      renderSummary();
+      renderReports();
+    });
+  }
+
+  if (visitantesTextoInput && !visitantesTextoInput.dataset.bound) {
+    visitantesTextoInput.dataset.bound = '1';
+    visitantesTextoInput.addEventListener('input', (event) => {
+      const current = getCurrentCall();
+      if (!current) return;
+      current.visitantesTexto = event.target.value;
+      persistDraft(current);
+      markDirty();
+      renderReports();
+    });
+  }
+}
+
 
 async function refreshFromBackend(showMessage = false, { silent = false } = {}) {
   clearAutosaveTimer();
@@ -1695,8 +1695,7 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
           turmaNome: firstCall?.turmaNome,
           oferta: firstCall?.oferta,
           visitantes: firstCall?.visitantes,
-          biblias: firstCall?.biblias,
-          revistas: firstCall?.revistas,
+          visitantesTexto: firstCall?.visitantesTexto,
           totalRows: firstCall?.rows?.length,
           firstRow: firstCall?.rows?.[0],
         }, null, 2);

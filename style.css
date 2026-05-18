@@ -183,7 +183,6 @@ textarea:focus{
 .call-data__grid{
   display:grid;
   gap:12px;
-  grid-template-columns:1fr;
 }
 .call-data__wide{
   grid-column:1/-1;
@@ -558,7 +557,6 @@ body.access-restricted .student__actions{
 .call-data__grid{
   display:grid;
   gap:12px;
-  grid-template-columns:1fr;
 }
 .call-data__wide{
   grid-column:1/-1;
@@ -594,7 +592,6 @@ body.access-restricted .student__actions{
 .call-data__grid{
   display:grid;
   gap:12px;
-  grid-template-columns:1fr;
 }
 .call-data__wide{
   grid-column:1/-1;
