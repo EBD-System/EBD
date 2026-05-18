@@ -1765,7 +1765,7 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
           oferta: firstCall?.oferta,
           visitantes: firstCall?.visitantes,
           biblias: firstCall?.biblias,
-          revistas: firstCall?.revistas
+          revistas: firstCall?.revistas,
           //visitantesTexto: firstCall?.visitantesTexto,
           totalRows: firstCall?.rows?.length,
           firstRow: firstCall?.rows?.[0],
