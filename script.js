@@ -1029,92 +1029,119 @@ function renderReports() {
 
 function renderStudents() {
   const call = getCurrentCall();
-  els.studentsList.innerHTML = '';
+  const container = els.studentsList;
 
-  if (!call || !call.rows.length) {
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  if (!call || !Array.isArray(call.rows) || call.rows.length === 0) {
     els.emptyState.style.display = 'block';
-    els.studentsList.classList.add('hidden');
+    els.emptyState.textContent = 'Nenhum aluno nesta turma.';
+    container.classList.add('hidden');
     return;
   }
 
   const query = String(state.search || '').trim().toLowerCase();
   const rosterMap = currentStudentsMap();
+
   const filtered = call.rows.filter((row) => {
     const aluno = rosterMap[row.alunoId];
     const matchSearch = !query || String(row.nome || '').toLowerCase().includes(query);
-    const isInactive = String(aluno?.Status || row.statusAluno || '') === 'inativo';
+    const isInactive = String(aluno?.Status || row.statusAluno || '').trim().toLowerCase() === 'inativo';
     const matchInactive = state.showInactive || !isInactive;
     return matchSearch && matchInactive;
   });
 
-  els.emptyState.style.display = filtered.length ? 'none' : 'block';
-  els.emptyState.textContent = query ? 'Nenhum aluno encontrado com este filtro.' : 'Nenhum aluno nesta turma.';
-  els.studentsList.classList.toggle('hidden', !filtered.length);
+  if (!filtered.length) {
+    els.emptyState.style.display = 'block';
+    els.emptyState.textContent = query
+      ? 'Nenhum aluno encontrado com este filtro.'
+      : 'Nenhum aluno nesta turma.';
+    container.classList.add('hidden');
+    return;
+  }
+
+  els.emptyState.style.display = 'none';
+  container.classList.remove('hidden');
 
   filtered.forEach((row) => {
-    const aluno = rosterMap[row.alunoId] || {};
-    const clone = els.studentTemplate.content.cloneNode(true);
-    const article = clone.querySelector('.student');
+    try {
+      const aluno = rosterMap[row.alunoId] || {};
+      const fragment = els.studentTemplate.content.cloneNode(true);
 
-    const isInactive = String(aluno.Status || row.statusAluno || '') === 'inativo';
-    const isFaltandoMuito = String(aluno.FaltandoMuito || '') === 'sim';
-    const isReativado = String(aluno.Reativado || '') === 'sim';
-    const presence = normalizePresenceValue(row.presenca);
-    const isDelayed = presence === 'atrasado';
+      const article = fragment.querySelector('.student');
+      const nameEl = fragment.querySelector('.student-name');
+      const badgesEl = fragment.querySelector('.student-badges');
+      const percentEl = fragment.querySelector('.student-percent');
+      const absenceEl = fragment.querySelector('.student-absence');
+      const runEl = fragment.querySelector('.student-run');
+      const presentBtn = fragment.querySelector('[data-action="present"]');
+      const absentBtn = fragment.querySelector('[data-action="absent"]');
+      const delayBtn = fragment.querySelector('[data-action="delay"]');
+      const editBtn = fragment.querySelector('[data-action="edit"]');
+      const toggleBtn = fragment.querySelector('[data-action="toggle"]');
+      const noteInput = fragment.querySelector('.student-observacao');
 
-    article.dataset.alunoId = row.alunoId;
-    article.classList.toggle('is-inactive', isInactive);
+      if (!article || !nameEl || !badgesEl || !percentEl || !absenceEl || !runEl || !presentBtn || !absentBtn || !delayBtn || !editBtn || !toggleBtn || !noteInput) {
+        console.warn('Template do aluno incompleto:', row);
+        return;
+      }
 
-    const statusLabel = isInactive ? 'Inativo' : 'Ativo';
-    clone.querySelector('.student-name').innerHTML = `<span class="student-status ${isInactive ? 'student-status--inactive' : 'student-status--active'}">${statusLabel}</span> - ${escapeHtml(row.nome)}`;
-    const badges = clone.querySelector('.student-badges');
-    badges.innerHTML = [
-      isDelayed ? '<span class="badge-pill badge-pill--warn">Atrasado(a)</span>' : '',
-      isFaltandoMuito ? '<span class="badge-pill badge-pill--warn">Faltando muito</span>' : '',
-      isReativado ? '<span class="badge-pill badge-pill--info">Reativado</span>' : '',
-      aluno.RealocadoDe ? `<span class="badge-pill badge-pill--info">Veio de ${escapeHtml(aluno.RealocadoDe)}</span>` : '',
-    ].filter(Boolean).join('');
+      const isInactive = String(aluno.Status || row.statusAluno || '').trim().toLowerCase() === 'inativo';
+      const isFaltandoMuito = String(aluno.FaltandoMuito || '').trim().toLowerCase() === 'sim';
+      const isReativado = String(aluno.Reativado || '').trim().toLowerCase() === 'sim';
+      const presence = normalizePresenceValue(row.presenca);
+      const isDelayed = presence === 'atrasado';
 
-    const percent = Number(aluno.Percentual || 0);
-    const faltas = Number(aluno.TotalFaltas || 0);
-    const run = Number(aluno.FaltasConsecutivas || 0);
+      article.dataset.alunoId = row.alunoId;
+      article.classList.toggle('is-inactive', isInactive);
 
-    clone.querySelector('.student-percent').textContent = `Presença individual: ${formatPercent(percent)}`;
-    clone.querySelector('.student-absence').textContent = `Faltas: ${faltas}`;
-    const runEl = clone.querySelector('.student-run');
-if (runEl) {
-  runEl.textContent = `Faltas seguidas: ${run}`;
-  runEl.style.color = run >= 4 ? '#c46a6a' : '';
-  runEl.style.fontWeight = run >= 4 ? '700' : '';
-}
+      const statusLabel = isInactive ? 'Inativo' : 'Ativo';
+      nameEl.innerHTML = `<span class="student-status ${isInactive ? 'student-status--inactive' : 'student-status--active'}">${statusLabel}</span> - ${escapeHtml(row.nome || '')}`;
 
-    const presentBtn = clone.querySelector('[data-action="present"]');
-    const absentBtn = clone.querySelector('[data-action="absent"]');
-    const delayBtn = clone.querySelector('[data-action="delay"]');
-    const editBtn = clone.querySelector('[data-action="edit"]');
-    const toggleBtn = clone.querySelector('[data-action="toggle"]');
-    const noteInput = clone.querySelector('.student-observacao');
+      badgesEl.innerHTML = [
+        isDelayed ? '<span class="badge-pill badge-pill--warn">Atrasado(a)</span>' : '',
+        isFaltandoMuito ? '<span class="badge-pill badge-pill--warn">Faltando muito</span>' : '',
+        isReativado ? '<span class="badge-pill badge-pill--info">Reativado</span>' : '',
+        aluno.RealocadoDe ? `<span class="badge-pill badge-pill--info">Veio de ${escapeHtml(aluno.RealocadoDe)}</span>` : '',
+      ].filter(Boolean).join('');
 
-    presentBtn.classList.toggle('is-selected-present', presence === 'sim');
-    absentBtn.classList.toggle('is-selected-absent', presence === 'nao');
-    delayBtn.classList.toggle('is-selected-delay', presence === 'atrasado');
-    toggleBtn.textContent = isInactive ? 'Ativar' : 'Inativar';
+      const percent = Number(aluno.Percentual || 0);
+      const faltas = Number(aluno.TotalFaltas || 0);
+      const run = Number(aluno.FaltasConsecutivas || 0);
 
-    presentBtn.addEventListener('click', () => setStudentPresence(row.alunoId, 'sim'));
-    absentBtn.addEventListener('click', () => setStudentPresence(row.alunoId, 'nao'));
-    delayBtn.addEventListener('click', () => setStudentPresence(row.alunoId, 'atrasado'));
-    editBtn.addEventListener('click', () => editStudentOnWhatsApp(row.alunoId));
-    toggleBtn.addEventListener('click', () => toggleStudentStatus(row.alunoId));
+      percentEl.textContent = `Presença individual: ${formatPercent(percent)}`;
+      absenceEl.textContent = `Faltas: ${faltas}`;
+      runEl.textContent = `Faltas seguidas: ${run}`;
+      runEl.style.color = run >= 4 ? '#c46a6a' : '';
+      runEl.style.fontWeight = run >= 4 ? '700' : '';
 
-    noteInput.value = row.observacao || '';
-    noteInput.addEventListener('input', (event) => {
-      row.observacao = event.target.value;
-      markDirty();
-    });
+      presentBtn.classList.toggle('is-selected-present', presence === 'sim');
+      absentBtn.classList.toggle('is-selected-absent', presence === 'nao');
+      delayBtn.classList.toggle('is-selected-delay', presence === 'atrasado');
+      toggleBtn.textContent = isInactive ? 'Ativar' : 'Inativar';
 
-    els.studentsList.appendChild(clone);
+      presentBtn.addEventListener('click', () => setStudentPresence(row.alunoId, 'sim'));
+      absentBtn.addEventListener('click', () => setStudentPresence(row.alunoId, 'nao'));
+      delayBtn.addEventListener('click', () => setStudentPresence(row.alunoId, 'atrasado'));
+      editBtn.addEventListener('click', () => editStudentOnWhatsApp(row.alunoId));
+      toggleBtn.addEventListener('click', () => toggleStudentStatus(row.alunoId));
+
+      noteInput.value = row.observacao || '';
+      noteInput.addEventListener('input', (event) => {
+        row.observacao = event.target.value;
+        markDirty();
+      });
+
+      container.appendChild(fragment);
+    } catch (err) {
+      console.error('Falha ao renderizar aluno:', row, err);
+    }
   });
 }
+
+
 function markDirty() {
   const call = getCurrentCall();
   if (!call) return;
