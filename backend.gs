@@ -761,7 +761,7 @@ function buildCallsByTurmaForDate_(dateKey, all) {
       oferta: callMeta?.Oferta ?? '',
       visitantes: Number(callMeta?.Visitantes ?? 0) || 0,
       biblias: Number(callMeta?.Biblias ?? 0) || 0,
-      visitantes: Number(callMeta?.Revistas ?? 0) || 0,
+      revistas: Number(callMeta?.Revistas ?? 0) || 0,
       totalAlunos: rows.length,
       presentes,
       atrasos,
