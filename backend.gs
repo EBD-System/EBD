@@ -585,6 +585,8 @@ function buildTurmaReportText_(dateKey, turma, turmaCall, all) {
   const ausentes = matriculados - presentes;
   const visitantes = Number(turmaCall?.visitantes ?? 0) || 0;
   const totalAssistencia = presentes + visitantes;
+  const biblias = Number(turmaCall?.biblias ?? 0) || 0;
+  const revistas = Number(turmaCall?.revistas ?? 0) || 0;
   const ofertas = (turmaCall?.oferta === '' || turmaCall?.oferta === null || turmaCall?.oferta === undefined)
     ? null
     : turmaCall?.oferta;
@@ -601,8 +603,8 @@ function buildTurmaReportText_(dateKey, turma, turmaCall, all) {
     presentes,
     visitantes,
     totalAssistencia,
-    biblias: null,
-    revistas: null,
+    biblias,
+    revistas,
     ofertas,
   }).forEach(line => lines.push(line));
   lines.push('');
