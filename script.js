@@ -908,7 +908,7 @@ function buildGeneralReportText() {
   ];
 
   (geral.turmaSummaries || []).forEach((item) => {
-    lines.push(`- ${item.nome}: ${item.presentes}/${item.totalAlunos} (${formatPercent(item.percentual)}) | Oferta ${item.oferta || '-'} | Visitantes ${item.visitantes || 0}`);
+    lines.push(`- ${item.nome}: ${item.presentes}/${item.totalAlunos} (${formatPercent(item.percentual)}) | Oferta ${item.oferta || '-'} | Visitantes ${item.visitantes || 0} | Bíblias ${item.biblias || 0} | Revistas ${item.revistas || 0}`);
   });
 
   lines.push('');
