@@ -5,7 +5,7 @@ const APPS_SCRIPT_URL =
 const STORAGE_KEY = 'prb_presenca_turmas_v2';
 const ROSTER_CACHE_KEY = 'prb_roster_cache_v1';
 const ROSTER_CACHE_VERSION = 1;
-const showDebugBox = true;
+const showDebugBox = false;
 
 // Se false, o carregamento inicial usa somente o que vem do backend.
 // Se true, o rascunho local pode voltar a ser aplicado quando existir.
