@@ -872,7 +872,9 @@ function buildTurmaReportText() {
     `Presença: ${formatPercent(stats.percentual)}`,
     `Oferta da classe: ${call.oferta || '-'}`,
     `Visitantes: ${Number(call.visitantes || 0) > 0 ? call.visitantes : 'não informado'}`,
-    call.visitantesTexto ? `Detalhe visitantes: ${call.visitantesTexto}` : '',
+    `Bíblias: ${Number(call.biblias || 0) > 0 ? call.biblias : 'não informado'}`,
+    `Revistas: ${Number(call.revistas || 0) > 0 ? call.revistas : 'não informado'}`,
+    //call.visitantesTexto ? `Detalhe visitantes: ${call.visitantesTexto}` : '',
     '',
     `Melhor aluno: ${best ? `${best.Nome} (${formatPercent(best.Percentual)})` : '—'}`,
     `Inativos: ${inactiveNames}`,
@@ -899,6 +901,8 @@ function buildGeneralReportText() {
     `Presença geral: ${formatPercent(geral.percentual)}`,
     `Oferta total: ${formatMoney(geral.ofertaTotal)}`,
     `Visitantes: ${geral.visitantesTotal}`,
+    `Bíblias: ${geral.bibliasTotal}`,
+    `Revistas: ${geral.revistasTotal}`,
     '',
     'Resumo por turma:',
   ];
@@ -946,6 +950,8 @@ function renderSummary() {
     els.summary.percentual.textContent = '0%';
     els.summary.oferta.textContent = 'R$ 0,00';
     els.summary.visitantes.textContent = '0';
+    els.summary.biblias.textContent = '0';
+    els.summary.revistas.textContent = '0';
     els.turmaMeta.textContent = isRestrictedMode() ? 'Chamada não salva.' : 'Selecione uma turma para carregar a chamada.';
     if (isRestrictedMode()) els.turmaMeta.classList.add('turma-meta--warn');
     return;
@@ -958,6 +964,8 @@ function renderSummary() {
   els.summary.percentual.textContent = formatPercent(stats.percentual);
   els.summary.oferta.textContent = formatMoney(call.oferta);
   els.summary.visitantes.textContent = String(Number(call.visitantes || 0));
+  els.summary.biblias.textContent = String(Number(call.biblias || 0));
+  els.summary.revistas.textContent = String(Number(call.revistas || 0));
 
   if (isRestrictedMode()) {
     els.turmaMeta.textContent = call.isSaved ? 'Chamada salva.' : 'Chamada não salva.';
