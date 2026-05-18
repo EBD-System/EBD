@@ -1862,6 +1862,8 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
             rows: testCall?.rows?.length,
             oferta: testCall?.oferta,
             visitantes: testCall?.visitantes,
+            biblias: testCall?.biblias,
+            revistas: testCall?.revistas,
           }, null, 2);
         }
       }
