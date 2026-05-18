@@ -743,15 +743,46 @@ function getCurrentTurma() {
   return getTurmasSorted().find((t) => String(t.TurmaID || '') === String(state.selectedTurmaId || '')) || null;
 }
 
+function hydrateCallForTurma(turma) {
+  const serverCall =
+    state.chamadasByTurma?.[turma.TurmaID] || null;
+
+  const drafts =
+    storageState().drafts || {};
+
+  const draft =
+    drafts[
+      callKey(state.dateKey, turma.TurmaID)
+    ] || null;
+
+  const call =
+    buildSyncedCall(
+      turma,
+      serverCall,
+      draft
+    );
+
+  state.chamadasByTurma[turma.TurmaID] = call;
+
+  return call;
+}
+
 function getCurrentCall() {
   const turma = getCurrentTurma();
+
   if (!turma) return null;
-  let call = state.chamadasByTurma[turma.TurmaID];
-  if (!call) {
-    call = blankCallForTurma(turma);
-    call = restoreDraft(call);
-    state.chamadasByTurma[turma.TurmaID] = call;
+
+  let call =
+    state.chamadasByTurma[turma.TurmaID];
+
+  const invalidRows =
+    !Array.isArray(call?.rows) ||
+    call.rows.length === 0;
+
+  if (!call || invalidRows) {
+    call = hydrateCallForTurma(turma);
   }
+
   return call;
 }
 
