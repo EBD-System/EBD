@@ -768,6 +768,11 @@ function recalculateAndPersistStudentStats_() {
 
 
 
+
+function recalculateAndPersistStudents_() {
+  return recalculateAndPersistStudentStats_();
+}
+
 function replaceBaseRowsForCall_(dateKey, turmaId, turmaNome, normalizedRows, extra) {
   Logger.log('INICIANDO SALVAMENTO');
   Logger.log('SPREADSHEET_ID: ' + SPREADSHEET_ID);
