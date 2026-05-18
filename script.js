@@ -693,7 +693,9 @@ function restoreDraft(call) {
     ...call,
     oferta: draft.oferta ?? call.oferta,
     visitantes: draft.visitantes ?? call.visitantes,
-    visitantesTexto: draft.visitantesTexto ?? call.visitantesTexto,
+    biblias: draft.biblias ?? call.biblias,
+    revistas: draft.revistas ?? call.revistas,
+    //visitantesTexto: draft.visitantesTexto ?? call.visitantesTexto,
     rows: Array.isArray(draft.rows)
       ? draft.rows.map((row) => syncRowPresenceFields({ ...row }))
       : call.rows,
@@ -707,7 +709,9 @@ function persistDraft(call) {
   data.drafts[call.chamadaId] = {
     oferta: call.oferta,
     visitantes: call.visitantes,
-    visitantesTexto: call.visitantesTexto || '',
+    biblias: call.biblias,
+    revistas: call.revistas,
+    //visitantesTexto: call.visitantesTexto || '',
     rows: call.rows.map((row) => syncRowPresenceFields({
       alunoId: row.alunoId,
       nome: row.nome,
