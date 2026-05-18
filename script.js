@@ -1764,7 +1764,9 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
           turmaNome: firstCall?.turmaNome,
           oferta: firstCall?.oferta,
           visitantes: firstCall?.visitantes,
-          visitantesTexto: firstCall?.visitantesTexto,
+          biblias: firstCall?.biblias,
+          revistas: firstCall?.revistas
+          //visitantesTexto: firstCall?.visitantesTexto,
           totalRows: firstCall?.rows?.length,
           firstRow: firstCall?.rows?.[0],
         }, null, 2);
