@@ -1484,13 +1484,13 @@ function getCallMetaForTurmaAndDate_(turmaId, dateKey, cache) {
 
 
 
-function upsertCallMeta_(chamadaId, dateKey, turmaId, oferta, visitantes, visitantesTexto, totalAlunos, presentes, ausentes, percentual, enviadoTelegram) {
+function upsertCallMeta_(chamadaId, dateKey, turmaId, oferta, visitantes, biblias, revistas, totalAlunos, presentes, ausentes, percentual, enviadoTelegram) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = getOrCreateSheet_(ss, REPORTS_SHEET, REPORTS_HEADERS, true);
   const reportId = `CALL_${turmaId}_${dateKey}`;
-  const hash = textHash_([dateKey, turmaId, oferta, visitantes, visitantesTexto, totalAlunos, presentes, ausentes, percentual].join('|'));
+  const hash = textHash_([dateKey, turmaId, oferta, visitantes, biblias, revistas, totalAlunos, presentes, ausentes, percentual].join('|'));
   const now = new Date().toISOString();
-  const text = JSON.stringify({ chamadaId, dateKey, turmaId, oferta, visitantes, visitantesTexto, totalAlunos, presentes, ausentes, percentual });
+  const text = JSON.stringify({ chamadaId, dateKey, turmaId, oferta, visitantes, biblias, revistas, totalAlunos, presentes, ausentes, percentual });
 
   let rowIndex = -1;
   const values = sheet.getDataRange().getValues();
