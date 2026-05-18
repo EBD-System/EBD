@@ -1383,12 +1383,24 @@ function buildCallMetaFromBaseRows_(dateKey, turmaId) {
     return 0;
   })();
 
-  const visitantesTexto = getFirstNonEmpty_(
-    ...rows.map(r => r.visitantesTexto)
-  );
+  const biblias = (() => {
+    for (const r of rows) {
+      const n = Number(r.biblias || 0) || 0;
+      if (n > 0) return n;
+    }
+    return 0;
+  })();
+
+  const revistas = (() => {
+    for (const r of rows) {
+      const n = Number(r.revistas || 0) || 0;
+      if (n > 0) return n;
+    }
+    return 0;
+  })();
 
   Logger.log('META VIA BASE:');
-  Logger.log(JSON.stringify({ oferta, visitantes, visitantesTexto }, null, 2));
+  Logger.log(JSON.stringify({ oferta, visitantes, biblias, revistas }, null, 2));
 
   return {
     ChamadaID: `CALL_${turmaId}_${dateKey}`,
@@ -1396,7 +1408,8 @@ function buildCallMetaFromBaseRows_(dateKey, turmaId) {
     TurmaID: turmaId,
     Oferta: String(oferta || '').trim(),
     Visitantes: Number(visitantes || 0) || 0,
-    VisitantesTexto: String(visitantesTexto || '').trim(),
+    Biblias: Number(biblias || 0) || 0,
+    Revistas: Number(revistas || 0) || 0,
     EnviadoTelegram: 'nao',
     TelegramEnviadoEm: '',
   };
@@ -1418,7 +1431,9 @@ function findCallMeta_(turmaId, dateKey) {
 
       const parsedOferta = getFirstNonEmpty_(parsed.oferta, parsed.Oferta, log.Oferta, log.OFERTA);
       const parsedVisitantes = getFirstNonEmpty_(parsed.visitantes, parsed.Visitantes, log.Visitantes, log.VISITANTES);
-      const parsedVisitantesTexto = getFirstNonEmpty_(parsed.visitantesTexto, parsed.VisitantesTexto, log.VisitantesTexto, log.VISITANTESTEXTO);
+      const parsedBiblias = getFirstNonEmpty_(parsed.biblias, parsed.Biblias, log.Biblias, log.BIBLIAS);
+      const parsedRevistas = getFirstNonEmpty_(parsed.revistas, parsed.Revistas, log.Revistas, log.REVISTAS);
+      //const parsedVisitantesTexto = getFirstNonEmpty_(parsed.visitantesTexto, parsed.VisitantesTexto, log.VisitantesTexto, log.VISITANTESTEXTO);
 
       return {
         ChamadaID: reportId,
@@ -1426,7 +1441,8 @@ function findCallMeta_(turmaId, dateKey) {
         TurmaID: turmaId,
         Oferta: parsedOferta ?? '',
         Visitantes: Number(parsedVisitantes ?? 0) || 0,
-        VisitantesTexto: parsedVisitantesTexto ?? '',
+        Biblias: Number(parsedBiblias ?? 0) || 0,
+        Revistas: Number(parsedRevistas ?? 0) || 0,
         EnviadoTelegram: String(getFirstNonEmpty_(log.Enviado, parsed.enviadoTelegram, parsed.EnviadoTelegram) || 'nao'),
         TelegramEnviadoEm: String(getFirstNonEmpty_(log.EnviadoEm, parsed.telegramEnviadoEm, parsed.TelegramEnviadoEm) || ''),
       };
@@ -1438,7 +1454,8 @@ function findCallMeta_(turmaId, dateKey) {
       TurmaID: turmaId,
       Oferta: getFirstNonEmpty_(log.Oferta, log.oferta, log.OFERTA) ?? '',
       Visitantes: Number(getFirstNonEmpty_(log.Visitantes, log.visitantes, log.VISITANTES) ?? 0) || 0,
-      VisitantesTexto: getFirstNonEmpty_(log.VisitantesTexto, log.visitantesTexto, log.VISITANTESTEXTO) ?? '',
+      Biblias: Number(getFirstNonEmpty_(log.Biblias, log.biblias, log.BIBLIAS) ?? 0) || 0,
+      Revistas: Number(getFirstNonEmpty_(log.Revistas, log.revistas, log.REVISTAS) ?? 0) || 0,
       EnviadoTelegram: String(getFirstNonEmpty_(log.Enviado, 'nao') || 'nao'),
       TelegramEnviadoEm: String(getFirstNonEmpty_(log.EnviadoEm, '') || ''),
     };
