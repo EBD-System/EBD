@@ -1551,6 +1551,33 @@ if (ofertaInput && !ofertaInput.dataset.bound) {
     });
   }
 
+  if (bibliasInput && !bibliasInput.dataset.bound) {
+    bibliasInput.dataset.bound = '1';
+    bibliasInput.addEventListener('input', (event) => {
+      const current = getCurrentCall();
+      if (!current) return;
+      current.visitantes = Number(event.target.value || 0) || 0;
+      persistDraft(current);
+      markDirty();
+      renderSummary();
+      renderReports();
+    });
+  }
+
+  if (revistasInput && !revistasInput.dataset.bound) {
+    revistasInput.dataset.bound = '1';
+    revistasInput.addEventListener('input', (event) => {
+      const current = getCurrentCall();
+      if (!current) return;
+      current.revistas = Number(event.target.value || 0) || 0;
+      persistDraft(current);
+      markDirty();
+      renderSummary();
+      renderReports();
+    });
+  }
+
+  /*
   if (visitantesTextoInput && !visitantesTextoInput.dataset.bound) {
     visitantesTextoInput.dataset.bound = '1';
     visitantesTextoInput.addEventListener('input', (event) => {
@@ -1562,6 +1589,8 @@ if (ofertaInput && !ofertaInput.dataset.bound) {
       renderReports();
     });
   }
+  */
+  
 }
 
 
