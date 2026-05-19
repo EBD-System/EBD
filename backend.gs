@@ -116,6 +116,7 @@ function doGet(e) {
 
      // debugRoundTripChamada_();
      // debugLerChamadaSalva_('2026-05-14', 'T_cordei_de_cristo');
+        debugSelfPresenceCpf_('75608');
 
   const action = String(e?.parameter?.action || 'init').toLowerCase();
 
@@ -310,8 +311,63 @@ function saveCall_(p) {
   };
 }
 
-
 function selfPresence_(p) {
+  ensureSheets_();
+
+  const dateKey = normalizeDateKey_(p.date || todayKey_());
+  const cpfPrefix = String(p.cpfPrefix || p.cpf || '').replace(/\D/g, '').slice(0, 5);
+
+  Logger.log('=== selfPresence_ ===');
+  Logger.log('dateKey: %s', dateKey);
+  Logger.log('cpfPrefix bruto: %s', String(p.cpfPrefix || p.cpf || ''));
+  Logger.log('cpfPrefix normalizado: %s', cpfPrefix);
+
+  if (cpfPrefix.length !== 5) {
+    throw new Error('Digite os 5 primeiros números do CPF.');
+  }
+
+  const all = loadAllData_();
+  Logger.log('all.alunos carregado: %s', (all.alunos || []).length);
+
+  const student = findReadBaseStudentByCpfPrefix_(cpfPrefix, all, true);
+
+  if (!student) {
+    Logger.log('Aluno não encontrado para o prefixo %s', cpfPrefix);
+    throw new Error('CPF não encontrado na ReadBase.');
+  }
+
+  Logger.log('Aluno encontrado em selfPresence_: %s', JSON.stringify({
+    Nome: student.Nome,
+    CPF: student.CPF,
+    TurmaID: student.TurmaID,
+    TurmaNome: student.TurmaNome
+  }));
+
+  const alreadyRegistered = hasSelfPresenceOnDate_(dateKey, student);
+  Logger.log('Já registrado hoje? %s', alreadyRegistered);
+
+  if (!alreadyRegistered) {
+    appendSelfPresenceRow_(dateKey, student);
+    Logger.log('Linha de presença adicionada com sucesso.');
+  }
+
+  invalidateRuntimeCache_();
+
+  return {
+    ok: true,
+    message: 'Presença confirmada com sucesso.',
+    alreadyRegistered,
+    dateKey,
+    aluno: {
+      nome: student.Nome,
+      turmaId: student.TurmaID,
+      turmaNome: student.TurmaNome,
+      cpfPrefix,
+    },
+  };
+}
+
+function selfPresence_2(p) {
   ensureSheets_();
 
   const dateKey = normalizeDateKey_(p.date || todayKey_());
