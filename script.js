@@ -400,6 +400,7 @@ function setSelfAccessMessage(type, message) {
 
 async function handleSelfCpfSubmit() {
   const input = document.getElementById('selfCpfInput');
+  const btn = document.getElementById('selfCpfSubmitBtn');
   const prefix = normalizeSelfCpfPrefix(input?.value || '');
 
   if (prefix.length !== 5) {
@@ -409,15 +410,26 @@ async function handleSelfCpfSubmit() {
 
   state.selfCpfPrefix = prefix;
   localStorage.setItem('prb_self_cpf_prefix_v1', prefix);
-  window.dispatchEvent(new CustomEvent('selfCpfPrefixReady', { detail: { cpfPrefix: prefix } }));
+  window.dispatchEvent(
+    new CustomEvent('selfCpfPrefixReady', { detail: { cpfPrefix: prefix } })
+  );
 
   if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('COLE_AQUI')) {
     setSelfAccessMessage('error', 'Configure a URL do backend antes de enviar a presença.');
     return null;
   }
 
+  const originalBtnText = btn?.textContent || 'Confirmar presença';
+
   try {
-    setSelfAccessMessage('success', 'Enviando presença...');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Enviando...';
+    }
+
+    showLoading('Registrando presença...', 30000);
+    setSelfAccessMessage('info', 'Registrando presença...');
+
     const result = await apiPost({
       action: 'selfPresence',
       cpfPrefix: prefix,
@@ -429,6 +441,13 @@ async function handleSelfCpfSubmit() {
   } catch (err) {
     setSelfAccessMessage('error', err.message || 'Não foi possível registrar a presença.');
     return null;
+  } finally {
+    hideLoading();
+
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = originalBtnText;
+    }
   }
 }
 
