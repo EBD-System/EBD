@@ -206,7 +206,7 @@ body.access-restricted #actionsPanel .panel__actions button:not(#saveBtn),
 body.access-restricted #actionsPanel .panel__head p,
 body.access-restricted .student__stats,
 body.access-restricted .student__note,
-body.access-restricted .student [data-action]:not([data-action="edit"]):not([data-action="save"]){
+body.access-restricted .student [data-action="toggle"]{
   display:none !important;
 }
 
