@@ -116,7 +116,7 @@ function doGet(e) {
 
      // debugRoundTripChamada_();
      // debugLerChamadaSalva_('2026-05-14', 'T_cordei_de_cristo');
-        debugSelfPresenceCpf_('75608');
+     // debugSelfPresenceCpf_('07560');
 
   const action = String(e?.parameter?.action || 'init').toLowerCase();
 
