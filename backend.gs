@@ -231,9 +231,9 @@ function saveCall_(p) {
 
   const normalizedRows = roster.map(aluno => {
     const payload = byNome[normalizeKey_(aluno.Nome)] || {};
-    const presencaRaw = normalizePresence_(payload.presenca ?? payload.PRESENCA ?? payload.presencaStatus);
-    const atraso = normalizeBool_(payload.atraso ?? payload.Atraso) || String(payload.presenca || '').toLowerCase().trim() === 'atrasado';
-    const presenca = atraso ? 'nao' : presencaRaw;
+    const presencaInput = String(payload.presenca ?? payload.PRESENCA ?? payload.presencaStatus ?? '').toLowerCase().trim();
+    const atraso = normalizeBool_(payload.atraso ?? payload.Atraso) || ['atrasado', 'atrasada', 'late', 'delay'].includes(presencaInput);
+    const presenca = atraso ? 'atrasado' : normalizePresence_(presencaInput);
     return {
       alunoId: aluno.Nome,
       nome: aluno.Nome,
@@ -1310,20 +1310,26 @@ function replaceBaseRowsForCall_(dateKey, turmaId, turmaNome, normalizedRows, ex
   const dataBr = formatDateBR_(dateKey);
   const mesTxt = monthToAbbrev_(month);
 
-  const rowsToAppend = normalizedRows.map((r) => ([
-    dataBr,
-    Number(year),
-    mesTxt,
-    r.nome,
-    turmaNomeFinal,
-    r.presenca === 'sim' ? 1 : 0,
-    r.atraso ? 1 : 0,
-    r.presenca === 'nao' ? 1 : 0,
-    Number(extra?.oferta || 0),
-    Number(extra?.visitantes || 0),
-    Number(extra?.biblias || 0),
-    Number(extra?.revistas || 0),
-  ]));
+  const rowsToAppend = normalizedRows.map((r) => {
+    const presente = isPresenceLikeRow_(r) ? 1 : 0;
+    const atraso = isDelayedRow_(r) ? 1 : 0;
+    const ausencia = presente || atraso ? 0 : 1;
+
+    return [
+      dataBr,
+      Number(year),
+      mesTxt,
+      r.nome,
+      turmaNomeFinal,
+      presente,
+      atraso,
+      ausencia,
+      Number(extra?.oferta || 0),
+      Number(extra?.visitantes || 0),
+      Number(extra?.biblias || 0),
+      Number(extra?.revistas || 0),
+    ];
+  });
 
   Logger.log('LINHAS PARA INSERIR:');
   Logger.log(JSON.stringify(rowsToAppend, null, 2));
