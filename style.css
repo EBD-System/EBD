@@ -207,7 +207,7 @@ body.access-restricted #actionsPanel .panel__head p,
 body.access-restricted .student-badges,
 body.access-restricted .student__stats,
 body.access-restricted .student__note,
-body.access-restricted .student [data-action="edit"],
+/*body.access-restricted .student [data-action="edit"],*/
 body.access-restricted .student [data-action="toggle"]{
   display:none !important;
 }
