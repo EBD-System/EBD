@@ -1040,6 +1040,9 @@ function mergeRosterWithMeta_(roster, studentsMeta, turmas) {
   const metaById = new Map((studentsMeta || []).map(s => [String(s.AlunoID || ''), s]));
   const turmaById = new Map((turmas || []).map(t => [String(t.TurmaID || ''), t]));
 
+  // A visualização do front deve refletir apenas os alunos que estão na ReadBase.
+  // O complemento com meta é usado somente para enriquecer cada aluno existente
+  // com status, porcentagens e contagens, sem criar registros extras.
   const merged = (roster || []).map(st => {
     const meta = metaById.get(String(st.AlunoID || '')) || {};
     const turmaId = String(meta.TurmaID || st.TurmaID || '').trim();
@@ -1064,31 +1067,6 @@ function mergeRosterWithMeta_(roster, studentsMeta, turmas) {
       CriadoEm: String(meta.CriadoEm || st.CriadoEm || '').trim(),
       AtualizadoEm: String(meta.AtualizadoEm || st.AtualizadoEm || '').trim(),
     };
-  });
-
-  const existingIds = new Set(merged.map(a => String(a.AlunoID || '')));
-  (studentsMeta || []).forEach(meta => {
-    const id = String(meta.AlunoID || '');
-    if (!id || existingIds.has(id)) return;
-    merged.push({
-      AlunoID: id,
-      Nome: String(meta.Nome || '').trim(),
-      CPF: String(meta.CPF || '').trim(),
-      TurmaID: String(meta.TurmaID || '').trim(),
-      TurmaNome: String(meta.TurmaNome || '').trim(),
-      Ativo: String(meta.Ativo || 'sim'),
-      FaltasConsecutivas: Number(meta.FaltasConsecutivas || 0) || 0,
-      TotalPresencas: Number(meta.TotalPresencas || 0) || 0,
-      TotalFaltas: Number(meta.TotalFaltas || 0) || 0,
-      Percentual: Number(meta.Percentual || 0) || 0,
-      Status: String(meta.Status || 'ativo').trim(),
-      StatusManual: String(meta.StatusManual || '').trim(),
-      UltimaPresenca: String(meta.UltimaPresenca || '').trim(),
-      UltimaAusencia: String(meta.UltimaAusencia || '').trim(),
-      RealocadoDe: String(meta.RealocadoDe || '').trim(),
-      CriadoEm: String(meta.CriadoEm || '').trim(),
-      AtualizadoEm: String(meta.AtualizadoEm || '').trim(),
-    });
   });
 
   return sortAlunos_(merged);
