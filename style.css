@@ -202,12 +202,12 @@ body.access-restricted #reportsPanel,
 body.access-restricted #registrationPanel,
 body.access-restricted #markAllPresentBtn,
 body.access-restricted #markAllAbsentBtn,
-body.access-restricted #actionsPanel .panel__actions button:not(#saveBtn):not(#sendGeralBtn),
+body.access-restricted #actionsPanel .panel__actions button:not(#saveBtn),
 body.access-restricted #actionsPanel .panel__head p,
 body.access-restricted .student-badges,
 body.access-restricted .student__stats,
 body.access-restricted .student__note,
-/*body.access-restricted .student [data-action="edit"],*/
+body.access-restricted .student [data-action="edit"],
 body.access-restricted .student [data-action="toggle"]{
   display:none !important;
 }
@@ -614,4 +614,54 @@ body.access-restricted .student__actions{
   .mini-form{
     border-radius:20px;
   }
+}
+
+
+body.access-self .app {
+  display: none !important;
+}
+
+#selfAccessPanel {
+  position: fixed;
+  inset: 0;
+  z-index: 99998;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(12, 18, 38, 0.96), rgba(25, 33, 63, 0.96));
+}
+
+body.access-self #selfAccessPanel {
+  display: flex;
+}
+
+.self-access-card {
+  width: min(100%, 520px);
+  padding: 28px;
+  border-radius: 28px;
+  text-align: left;
+}
+
+.self-access-card h1 {
+  margin: 14px 0 10px;
+  font-size: clamp(1.7rem, 4vw, 2.4rem);
+  line-height: 1.05;
+}
+
+.self-access-card p {
+  margin: 0 0 18px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.self-access-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.feedback--inline {
+  margin-top: 14px;
 }

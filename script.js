@@ -26,7 +26,8 @@ const state = {
   initialized: false,
   autosaveTimer: null,
   accessCode: '',
-  accessMode: 'restricted',
+  accessMode: 'self',
+  selfCpfPrefix: '',
   baseRowsCount: 0,
 };
 
@@ -310,20 +311,118 @@ function getAccessCodeFromUrl() {
 
 function resolveAccessMode(code) {
   const normalized = String(code || '').trim().toLowerCase();
+
+  if (!normalized) return 'self';
   if (ACCESS_CODES.full.has(normalized)) return 'full';
   if (ACCESS_CODES.restricted.has(normalized)) return 'restricted';
+
   return 'restricted';
 }
 
 function isRestrictedMode() {
-  return state.accessMode !== 'full';
+  return state.accessMode === 'restricted';
+}
+
+function isSelfAccessMode() {
+  return state.accessMode === 'self';
 }
 
 function applyAccessMode() {
   document.body.classList.toggle('access-restricted', isRestrictedMode());
-  document.body.classList.toggle('access-full', !isRestrictedMode());
+  document.body.classList.toggle('access-full', state.accessMode === 'full');
+  document.body.classList.toggle('access-self', isSelfAccessMode());
 }
 
+function normalizeSelfCpfPrefix(value) {
+  return onlyDigits(value).slice(0, 5);
+}
+
+function ensureSelfAccessGate() {
+  let panel = document.getElementById('selfAccessPanel');
+  if (panel) return panel;
+
+  panel = document.createElement('section');
+  panel.id = 'selfAccessPanel';
+  panel.className = 'self-access-panel';
+  panel.innerHTML = `
+    <div class="self-access-card card">
+      <span class="badge">Acesso do aluno</span>
+      <h1>Digite os 5 primeiros do CPF</h1>
+      <p>Use apenas os 5 primeiros números do CPF para registrar sua presença.</p>
+      <label class="self-access-field">
+        <span>CPF</span>
+        <input
+          id="selfCpfInput"
+          type="text"
+          inputmode="numeric"
+          autocomplete="off"
+          maxlength="5"
+          placeholder="Digite os 5 primeiros do CPF"
+        />
+      </label>
+      <button id="selfCpfSubmitBtn" class="btn btn--primary" type="button">Confirmar presença</button>
+      <div id="selfCpfMessage" class="feedback feedback--inline" aria-live="polite"></div>
+    </div>
+  `;
+
+  document.body.prepend(panel);
+
+  const input = panel.querySelector('#selfCpfInput');
+  const btn = panel.querySelector('#selfCpfSubmitBtn');
+
+  if (input && !input.dataset.bound) {
+    input.dataset.bound = '1';
+    input.addEventListener('input', (event) => {
+      event.target.value = normalizeSelfCpfPrefix(event.target.value);
+    });
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        handleSelfCpfSubmit();
+      }
+    });
+  }
+
+  if (btn && !btn.dataset.bound) {
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', handleSelfCpfSubmit);
+  }
+
+  return panel;
+}
+
+function setSelfAccessMessage(type, message) {
+  const messageBox = document.getElementById('selfCpfMessage');
+  if (!messageBox) return;
+  messageBox.className = `feedback feedback--inline show ${type}`;
+  messageBox.textContent = message;
+}
+
+function handleSelfCpfSubmit() {
+  const input = document.getElementById('selfCpfInput');
+  const prefix = normalizeSelfCpfPrefix(input?.value || '');
+
+  if (prefix.length !== 5) {
+    setSelfAccessMessage('error', 'Digite os 5 primeiros números do CPF.');
+    return null;
+  }
+
+  state.selfCpfPrefix = prefix;
+  localStorage.setItem('prb_self_cpf_prefix_v1', prefix);
+  window.dispatchEvent(new CustomEvent('selfCpfPrefixReady', { detail: { cpfPrefix: prefix } }));
+
+  setSelfAccessMessage('success', 'CPF preparado. O envio ao backend será conectado depois.');
+  return prefix;
+}
+
+function renderSelfAccessGate() {
+  ensureSelfAccessGate();
+  document.body.classList.add('access-self');
+  document.body.classList.remove('access-full');
+  document.body.classList.remove('access-restricted');
+  hideLoading(true);
+  clearFeedback();
+}
 
 function normalizePresenceValue(value) {
   const v = String(value || '').trim().toLowerCase();
@@ -1986,7 +2085,6 @@ function normalizeCpfInput(event) {
 
 async function bootstrap() {
   ensureLoadingOverlay();
-  showLoading('Carregando dados...');
 
   try {
     state.accessCode = getAccessCodeFromUrl();
@@ -2001,6 +2099,14 @@ async function bootstrap() {
     state.selectedTurmaId = storage.selectedTurmaId || '';
     state.dateKey = storage.selectedDateKey || state.dateKey;
     els.dateInput.value = state.dateKey;
+
+    if (isSelfAccessMode()) {
+      renderSelfAccessGate();
+      state.initialized = true;
+      return;
+    }
+
+    showLoading('Carregando dados...');
 
     if (!validateApiUrl()) return;
 
