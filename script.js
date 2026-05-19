@@ -1208,6 +1208,7 @@ function renderStudents() {
         isDelayed ? '<span class="badge-pill badge-pill--warn">Atrasado(a)</span>' : '',
         isFaltandoMuito ? '<span class="badge-pill badge-pill--warn">Faltando muito</span>' : '',
         isReativado ? '<span class="badge-pill badge-pill--info">Reativado</span>' : '',
+        row.selfPresence || row.presencaOrigem === 'selfbase' ? '<span class="badge-pill badge-pill--info">Auto-presença</span>' : '',
         aluno.RealocadoDe ? `<span class="badge-pill badge-pill--info">Veio de ${escapeHtml(aluno.RealocadoDe)}</span>` : '',
       ].filter(Boolean).join('');
 

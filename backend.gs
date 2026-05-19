@@ -21,6 +21,7 @@ const TELEGRAM_CHAT_ID = '-5138652770';
 
 const READ_SHEET_NAME = 'ReadBase';
 const BASE_SHEET_NAME = 'Base';
+const SELF_BASE_SHEET_NAME = 'SelfBase';
 const META_STUDENTS_SHEET = '__ALUNOS_META';
 const META_CLASSES_SHEET = '__TURMAS_META';
 const REPORTS_SHEET = '__RELATORIOS';
@@ -39,6 +40,8 @@ var __BACKEND_RUNTIME_CACHE__ = {
   allData: null,
   baseRowsAll: null,
   baseRowsByDate: {},
+  selfBaseRowsAll: null,
+  selfBaseRowsByDate: {},
   metaStudents: null,
   metaClasses: null,
   reportLogsById: null,
@@ -50,6 +53,8 @@ function invalidateRuntimeCache_() {
   __BACKEND_RUNTIME_CACHE__.allData = null;
   __BACKEND_RUNTIME_CACHE__.baseRowsAll = null;
   __BACKEND_RUNTIME_CACHE__.baseRowsByDate = {};
+  __BACKEND_RUNTIME_CACHE__.selfBaseRowsAll = null;
+  __BACKEND_RUNTIME_CACHE__.selfBaseRowsByDate = {};
   __BACKEND_RUNTIME_CACHE__.metaStudents = null;
   __BACKEND_RUNTIME_CACHE__.metaClasses = null;
   __BACKEND_RUNTIME_CACHE__.reportLogsById = null;
@@ -181,6 +186,7 @@ function init_(params) {
     callsByTurma,
     resumoGeral: geral,
     baseRowsCount: (all.baseRowsAll || []).length,
+    selfBaseRowsCount: getSelfBaseRowsCount_(),
     timestamps: { now: new Date().toISOString() },
   };
 }
@@ -312,7 +318,7 @@ function saveCall_(p) {
 }
 
 function hasSelfPresenceOnDate_(dateKey, student) {
-  const rows = getBaseRowsAll_(true);
+  const rows = getSelfBaseRowsAll_(true);
   const targetNome = normalizeKey_(student?.Nome || '');
   const targetTurma = normalizeKey_(student?.TurmaNome || '');
   const targetDate = normalizeDateKey_(dateKey);
@@ -785,7 +791,7 @@ function getTopStudentsOverall_(all) {
 function buildCallsByTurmaForDate_(dateKey, all) {
   const roster = all.alunos || [];
   const groupedRoster = groupBy_(roster, 'TurmaID');
-  const savedRows = getBaseRowsForDate_(dateKey);
+  const savedRows = getMergedPresenceRowsForDate_(dateKey);
   const savedGrouped = groupBy_(savedRows, 'turmaId');
 
   const callsByTurma = {};
@@ -813,6 +819,8 @@ function buildCallsByTurmaForDate_(dateKey, all) {
         atraso,
         observacao: String(found.observacao || found.Observacao || '').trim(),
         statusAluno: String(aluno.Status || 'ativo').trim(),
+        selfPresence: Boolean(found.selfPresence),
+        presencaOrigem: String(found.presenceSource || '').trim(),
       };
     });
 
@@ -891,6 +899,7 @@ function loadAllData_() {
     alunos,
     studentsMeta,
     baseRowsAll: getBaseRowsAll_(),
+    selfBaseRowsAll: getSelfBaseRowsAll_(),
   };
 
   __BACKEND_RUNTIME_CACHE__.allData = data;
@@ -1043,12 +1052,15 @@ function mergeRosterWithMeta_(roster, studentsMeta, turmas) {
   // A visualização do front deve refletir apenas os alunos que estão na ReadBase.
   // O complemento com meta é usado somente para enriquecer cada aluno existente
   // com status, porcentagens e contagens, sem criar registros extras.
-  const merged = (roster || []).map(st => {
+  const merged = [];
+  const seen = new Map();
+
+  (roster || []).forEach(st => {
     const meta = metaById.get(String(st.AlunoID || '')) || {};
     const turmaId = String(meta.TurmaID || st.TurmaID || '').trim();
     const turma = turmaById.get(turmaId) || { Nome: st.TurmaNome || meta.TurmaNome || '', TurmaID: turmaId };
 
-    return {
+    const item = {
       AlunoID: String(st.AlunoID || meta.AlunoID || buildStudentId_(st.Nome, turmaId, st.CPF)),
       Nome: String(st.Nome || meta.Nome || '').trim(),
       CPF: String(st.CPF || meta.CPF || '').trim(),
@@ -1067,8 +1079,28 @@ function mergeRosterWithMeta_(roster, studentsMeta, turmas) {
       CriadoEm: String(meta.CriadoEm || st.CriadoEm || '').trim(),
       AtualizadoEm: String(meta.AtualizadoEm || st.AtualizadoEm || '').trim(),
     };
+
+    const key = String(item.AlunoID || '').trim();
+    if (!key) return;
+    if (seen.has(key)) {
+      const prev = seen.get(key);
+      seen.set(key, {
+        ...prev,
+        ...item,
+        Nome: prev.Nome || item.Nome,
+        CPF: prev.CPF || item.CPF,
+        TurmaID: prev.TurmaID || item.TurmaID,
+        TurmaNome: prev.TurmaNome || item.TurmaNome,
+        Ativo: prev.Ativo || item.Ativo,
+        Status: prev.Status || item.Status,
+      });
+      return;
+    }
+
+    seen.set(key, item);
   });
 
+  seen.forEach((value) => merged.push(value));
   return sortAlunos_(merged);
 }
 
@@ -1328,6 +1360,123 @@ function getBaseRowsCount_() {
   return sheet.getLastRow() - 1;
 }
 
+
+function getSelfBaseRowsCount_() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(SELF_BASE_SHEET_NAME);
+  if (!sheet || sheet.getLastRow() < 2) return 0;
+  return sheet.getLastRow() - 1;
+}
+
+function getSelfBaseRowsAll_(forceReload) {
+  if (!forceReload && __BACKEND_RUNTIME_CACHE__.selfBaseRowsAll) return __BACKEND_RUNTIME_CACHE__.selfBaseRowsAll;
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(SELF_BASE_SHEET_NAME);
+  if (!sheet || sheet.getLastRow() < 2) {
+    __BACKEND_RUNTIME_CACHE__.selfBaseRowsAll = [];
+    return [];
+  }
+
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0].map(normalizeHeader_);
+  const idx = indexByHeader_(headers);
+  const result = [];
+
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    const aluno = String(row[idx.ALUNO] || '').trim();
+    const classe = String(row[idx.CLASSE] || '').trim();
+    if (!aluno || !classe) continue;
+
+    const turmaId = buildTurmaId_(classe);
+    const atraso = normalizeBool_(row[idx.ATRASO]);
+    const presenca = atraso ? 'atrasado' : normalizePresence_(row[idx.PRESENCA]);
+
+    result.push({
+      dateKey: normalizeDateFromBaseCell_(row[idx.DATA]),
+      ano: row[idx.ANO],
+      mes: row[idx.MES],
+      nome: aluno,
+      turmaId,
+      turmaNome: classe,
+      presenca,
+      atraso,
+      ausencia: normalizeBool_(row[idx.AUSENCIA]),
+      oferta: row[idx.OFERTA] ?? '',
+      visitantes: Number(row[idx.Visitantes] ?? row[idx.VISITANTES] ?? 0) || 0,
+      biblias: Number(row[idx.Biblias] ?? row[idx.BIBLIAS] ?? 0) || 0,
+      revistas: Number(row[idx.Revistas] ?? row[idx.REVISTAS] ?? 0) || 0,
+      alunoId: buildStudentId_(aluno, turmaId, ''),
+      selfPresence: true,
+      presenceSource: 'selfbase',
+    });
+  }
+
+  __BACKEND_RUNTIME_CACHE__.selfBaseRowsAll = result;
+  return result;
+}
+
+function getSelfBaseRowsForDate_(dateKey) {
+  const key = String(dateKey || '');
+  if (!__BACKEND_RUNTIME_CACHE__.selfBaseRowsByDate) {
+    __BACKEND_RUNTIME_CACHE__.selfBaseRowsByDate = {};
+  }
+  if (!__BACKEND_RUNTIME_CACHE__.selfBaseRowsByDate[key]) {
+    __BACKEND_RUNTIME_CACHE__.selfBaseRowsByDate[key] = getSelfBaseRowsAll_().filter(row => row.dateKey === dateKey);
+  }
+  return __BACKEND_RUNTIME_CACHE__.selfBaseRowsByDate[key];
+}
+
+function getMergedPresenceRowsForDate_(dateKey) {
+  const baseRows = getBaseRowsForDate_(dateKey).map(row => ({
+    ...row,
+    selfPresence: false,
+    presenceSource: 'base',
+  }));
+  const selfRows = getSelfBaseRowsForDate_(dateKey).map(row => ({
+    ...row,
+    selfPresence: true,
+    presenceSource: 'selfbase',
+  }));
+
+  const merged = new Map();
+  const addRow = (row) => {
+    const key = [
+      String(row.turmaId || ''),
+      String(row.alunoId || ''),
+      normalizeKey_(row.nome || ''),
+      String(row.dateKey || ''),
+    ].join('|');
+    const existing = merged.get(key);
+    if (!existing) {
+      merged.set(key, row);
+      return;
+    }
+
+    if (row.selfPresence && !existing.selfPresence) {
+      merged.set(key, {
+        ...existing,
+        ...row,
+        selfPresence: true,
+        presenceSource: 'selfbase',
+      });
+      return;
+    }
+
+    merged.set(key, {
+      ...existing,
+      ...row,
+      selfPresence: Boolean(existing.selfPresence || row.selfPresence),
+      presenceSource: existing.selfPresence || row.selfPresence ? 'selfbase' : (row.presenceSource || existing.presenceSource || 'base'),
+    });
+  };
+
+  baseRows.forEach(addRow);
+  selfRows.forEach(addRow);
+
+  return [...merged.values()];
+}
 
 function getBaseRowsAll_(forceReload) {
   if (!forceReload && __BACKEND_RUNTIME_CACHE__.baseRowsAll) return __BACKEND_RUNTIME_CACHE__.baseRowsAll;
@@ -1755,12 +1904,32 @@ function findReadBaseStudentByCpfPrefix_(cpfPrefix, allData, debug) {
 
 function appendSelfPresenceRow_(dateKey, student) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = getOrCreateSheet_(ss, BASE_SHEET_NAME, BASE_HEADERS, false);
+  const sheet = getOrCreateSheet_(ss, SELF_BASE_SHEET_NAME, BASE_HEADERS, false);
   ensureBaseHeaders_(sheet, BASE_HEADERS);
 
-  const [year, month] = String(dateKey || todayKey_()).split('-');
-  const dataBr = formatDateBR_(dateKey);
+  const normalizedDate = normalizeDateKey_(dateKey);
+  const [year, month] = String(normalizedDate || todayKey_()).split('-');
+  const dataBr = formatDateBR_(normalizedDate);
   const mesTxt = monthToAbbrev_(month);
+
+  const values = sheet.getDataRange().getValues();
+  const rowsToDelete = [];
+  if (values.length > 1) {
+    const headers = values[0].map(normalizeHeader_);
+    const idx = indexByHeader_(headers);
+    const targetNome = normalizeKey_(student?.Nome || '');
+    const targetTurma = normalizeKey_(student?.TurmaNome || '');
+    for (let i = 1; i < values.length; i++) {
+      const row = values[i];
+      const rowDateKey = normalizeDateFromBaseCell_(row[idx.DATA]);
+      const rowNome = normalizeKey_(row[idx.ALUNO] || '');
+      const rowTurma = normalizeKey_(row[idx.CLASSE] || '');
+      if (rowDateKey === normalizedDate && rowNome === targetNome && rowTurma === targetTurma) {
+        rowsToDelete.push(i + 1);
+      }
+    }
+  }
+  deleteRowsByNumberDesc_(sheet, rowsToDelete);
 
   const row = [
     dataBr,
@@ -1923,8 +2092,10 @@ function ensureSheets_() {
   getOrCreateSheet_(ss, READ_SHEET_NAME, getReadBaseHeaders_(), false);
 
   const baseSheet = getOrCreateSheet_(ss, BASE_SHEET_NAME, BASE_HEADERS, false);
+  const selfBaseSheet = getOrCreateSheet_(ss, SELF_BASE_SHEET_NAME, BASE_HEADERS, false);
 
   ensureBaseHeaders_(baseSheet, BASE_HEADERS);
+  ensureBaseHeaders_(selfBaseSheet, BASE_HEADERS);
 
   getOrCreateSheet_(ss, META_STUDENTS_SHEET, META_STUDENTS_HEADERS, true);
   getOrCreateSheet_(ss, META_CLASSES_SHEET, META_CLASSES_HEADERS, true);
