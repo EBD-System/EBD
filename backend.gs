@@ -311,6 +311,19 @@ function saveCall_(p) {
   };
 }
 
+function hasSelfPresenceOnDate_(dateKey, student) {
+  const rows = getBaseRowsAll_(true);
+  const targetNome = normalizeKey_(student?.Nome || '');
+  const targetTurma = normalizeKey_(student?.TurmaNome || '');
+  const targetDate = normalizeDateKey_(dateKey);
+
+  return rows.some(row => (
+    String(row.dateKey || '') === targetDate &&
+    normalizeKey_(row.nome || '') === targetNome &&
+    normalizeKey_(row.turmaNome || '') === targetTurma
+  ));
+}
+
 function selfPresence_(p) {
   ensureSheets_();
 
