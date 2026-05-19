@@ -28,7 +28,7 @@ const REPORTS_SHEET = '__RELATORIOS';
 
 const BASE_HEADERS = ['DATA', 'ANO', 'MÊS', 'ALUNO', 'CLASSE', 'PRESENÇA', 'ATRASO', 'AUSÊNCIA', 'OFERTA', 'VISITANTES', 'BÍBLIAS', 'REVISTAS'];
 const META_STUDENTS_HEADERS = [
-  'AlunoID', 'Nome', 'TurmaID', 'TurmaNome', 'Ativo',
+  'Nome', 'TurmaID', 'TurmaNome', 'Ativo',
   'FaltasConsecutivas', 'TotalPresencas', 'TotalFaltas', 'Percentual',
   'Status', 'StatusManual', 'UltimaPresenca', 'UltimaAusencia',
   'RealocadoDe', 'CriadoEm', 'AtualizadoEm'
@@ -82,8 +82,8 @@ function writeStudentMetaRows_(students) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = getOrCreateSheet_(ss, META_STUDENTS_SHEET, META_STUDENTS_HEADERS, true);
   const rows = (students || []).map(student => ([
-    String(student.AlunoID || '').trim(),
-    student.Nome || '',
+    String(student.Nome || '').trim(),
+    student.TurmaID || '',
     student.TurmaID || '',
     student.TurmaNome || '',
     student.Ativo || 'sim',
@@ -223,19 +223,19 @@ function saveCall_(p) {
   if (!turma) throw new Error('Turma não encontrada.');
 
   const roster = getRosterForTurma_(turma.TurmaID, allBefore);
-  const byAlunoId = {};
+  const byNome = {};
   rows.forEach(item => {
-    const alunoId = String(item.alunoId || item.AlunoID || '').trim();
-    if (alunoId) byAlunoId[alunoId] = item;
+    const nome = String(item.nome || item.alunoId || '').trim();
+    if (nome) byNome[normalizeKey_(nome)] = item;
   });
 
   const normalizedRows = roster.map(aluno => {
-    const payload = byAlunoId[aluno.AlunoID] || {};
+    const payload = byNome[normalizeKey_(aluno.Nome)] || {};
     const presencaRaw = normalizePresence_(payload.presenca ?? payload.PRESENCA ?? payload.presencaStatus);
     const atraso = normalizeBool_(payload.atraso ?? payload.Atraso) || String(payload.presenca || '').toLowerCase().trim() === 'atrasado';
     const presenca = atraso ? 'nao' : presencaRaw;
     return {
-      alunoId: aluno.AlunoID,
+      alunoId: aluno.Nome,
       nome: aluno.Nome,
       turmaId: aluno.TurmaID,
       turmaNome: aluno.TurmaNome,
@@ -473,11 +473,10 @@ function addAluno_(p) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const readSheet = getOrCreateSheet_(ss, READ_SHEET_NAME, getReadBaseHeaders_(), false);
   const now = new Date().toISOString();
-  const alunoId = buildStudentId_(nome, turma.TurmaID, cpf);
+  const alunoId = nome;
 
-  appendReadBaseStudent_(readSheet, nome, turma.Nome, cpf, alunoId, now);
+  appendReadBaseStudent_(readSheet, nome, turma.Nome, cpf, now);
   upsertStudentMeta_({
-    AlunoID: alunoId,
     Nome: nome,
     TurmaID: turma.TurmaID,
     TurmaNome: turma.Nome,
@@ -498,8 +497,6 @@ function addAluno_(p) {
   invalidateRuntimeCache_();
   return { ok: true, message: 'Aluno cadastrado com sucesso.', alunoId };
 }
-
-
 
 
 function moveAluno_(p) {
@@ -530,8 +527,6 @@ function moveAluno_(p) {
 }
 
 
-
-
 function toggleAluno_(p) {
   ensureSheets_();
   const alunoId = String(p.alunoId || '').trim();
@@ -554,9 +549,6 @@ function toggleAluno_(p) {
   invalidateRuntimeCache_();
   return { ok: true, message: `Aluno marcado como ${ativo ? 'ativo' : 'inativo'}.`, alunoId, ativo };
 }
-
-
-
 function getReportText_(p) {
   const dateKey = normalizeDateKey_(p.date || todayKey_());
   const scope = String(p.scope || 'turma').toLowerCase();
@@ -803,19 +795,19 @@ function buildCallsByTurmaForDate_(dateKey, all) {
     const saved = savedGrouped[turma.TurmaID] || [];
     const savedMap = {};
     saved.forEach(row => {
-      const key = String(row.alunoId || row.AlunoID || row.nome || '').trim();
+      const key = normalizeKey_(String(row.nome || row.alunoId || ''));
       if (key) savedMap[key] = row;
     });
 
     const rows = turmaRoster.map(aluno => {
-      const key = String(aluno.AlunoID || aluno.Nome || '').trim();
-      const found = savedMap[key] || savedMap[normalizeKey_(aluno.Nome)] || {};
+      const key = normalizeKey_(String(aluno.Nome || ''));
+      const found = savedMap[key] || {};
       const atraso = normalizeBool_(found.atraso || found.Atraso);
       const presencaSource = found.presenca || found.Presenca || found.PRESENCA || (found.ausencia ? 'nao' : 'nao');
       const presenca = atraso ? 'atrasado' : normalizePresence_(presencaSource);
       return {
-        alunoId: aluno.AlunoID,
-        nome: aluno.Nome,
+        alunoId: aluno.Nome,
+      nome: aluno.Nome,
         presenca,
         atraso,
         observacao: String(found.observacao || found.Observacao || '').trim(),
@@ -987,13 +979,11 @@ function loadRosterFromReadBase_() {
 
     const cpf = idxCpf !== -1 ? normalizeCpf_(values[i][idxCpf]) : '';
     const turmaId = buildTurmaId_(classe);
-    const alunoId = buildStudentId_(nome, turmaId, cpf, i + 1);
-    const key = `${alunoId}`;
+    const key = normalizeKey_(nome);
 
     if (!seen.has(key)) {
       const item = {
-        AlunoID: alunoId,
-        Nome: nome,
+          Nome: nome,
         CPF: cpf,
         TurmaID: turmaId,
         TurmaNome: classe,
@@ -1047,7 +1037,7 @@ function mergeTurmas_(metaTurmas, readTurmas) {
 
 
 function mergeRosterWithMeta_(roster, studentsMeta, turmas) {
-  const metaById = new Map((studentsMeta || []).map(s => [String(s.AlunoID || ''), s]));
+  const metaByName = new Map((studentsMeta || []).map(s => [normalizeKey_(String(s.Nome || '')), s]));
   const turmaById = new Map((turmas || []).map(t => [String(t.TurmaID || ''), t]));
 
   // A visualização do front deve refletir apenas os alunos que estão na ReadBase.
@@ -1057,13 +1047,15 @@ function mergeRosterWithMeta_(roster, studentsMeta, turmas) {
   const seen = new Map();
 
   (roster || []).forEach(st => {
-    const meta = metaById.get(String(st.AlunoID || '')) || {};
+    const nome = String(st.Nome || '').trim();
+    if (!nome) return;
+
+    const meta = metaByName.get(normalizeKey_(nome)) || {};
     const turmaId = String(meta.TurmaID || st.TurmaID || '').trim();
     const turma = turmaById.get(turmaId) || { Nome: st.TurmaNome || meta.TurmaNome || '', TurmaID: turmaId };
 
     const item = {
-      AlunoID: String(st.AlunoID || meta.AlunoID || buildStudentId_(st.Nome, turmaId, st.CPF)),
-      Nome: String(st.Nome || meta.Nome || '').trim(),
+      Nome: nome,
       CPF: String(st.CPF || meta.CPF || '').trim(),
       TurmaID: turmaId,
       TurmaNome: String(turma.Nome || st.TurmaNome || meta.TurmaNome || '').trim(),
@@ -1081,7 +1073,7 @@ function mergeRosterWithMeta_(roster, studentsMeta, turmas) {
       AtualizadoEm: String(meta.AtualizadoEm || st.AtualizadoEm || '').trim(),
     };
 
-    const key = String(item.AlunoID || '').trim();
+    const key = normalizeKey_(item.Nome);
     if (!key) return;
     if (seen.has(key)) {
       const prev = seen.get(key);
@@ -1164,20 +1156,20 @@ function upsertStudentMeta_(student) {
   const values = sheet.getDataRange().getValues();
   const headers = values[0].map(String);
   const idx = indexByHeader_(headers);
-  const id = String(student.AlunoID || '').trim();
+  const nome = String(student.Nome || '').trim();
   const now = new Date().toISOString();
 
   let rowIndex = -1;
   for (let i = 1; i < values.length; i++) {
-    if (String(values[i][idx.AlunoID] || '') === id) {
+    const existingName = String(values[i][idx.Nome] || values[i][idx.ALUNO] || '').trim();
+    if (normalizeKey_(existingName) === normalizeKey_(nome)) {
       rowIndex = i + 1;
       break;
     }
   }
 
   const row = [
-    id,
-    student.Nome || '',
+    nome,
     student.TurmaID || '',
     student.TurmaNome || '',
     student.Ativo || 'sim',
@@ -1210,14 +1202,15 @@ function recalculateAndPersistStudentStats_() {
   const baseRows = getBaseRowsAll_();
   const roster = loadRosterFromReadBase_();
   const studentsMeta = loadMetaStudents_();
-  const metaById = new Map(studentsMeta.map(s => [String(s.AlunoID || ''), s]));
+  const metaByName = new Map(studentsMeta.map(s => [normalizeKey_(String(s.Nome || '')), s]));
 
   const grouped = new Map();
   baseRows.forEach(row => {
-    const alunoId = String(row.alunoId || '').trim();
-    if (!alunoId) return;
-    if (!grouped.has(alunoId)) grouped.set(alunoId, []);
-    grouped.get(alunoId).push(row);
+    const alunoNome = String(row.alunoId || row.nome || '').trim();
+    if (!alunoNome) return;
+    const key = normalizeKey_(alunoNome);
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(row);
   });
 
   const mergedRoster = mergeRosterWithMeta_(roster, studentsMeta, loadTurmasFromReadBase_().concat(loadMetaClasses_()));
@@ -1225,8 +1218,9 @@ function recalculateAndPersistStudentStats_() {
   const rowsToPersist = [];
 
   mergedRoster.forEach(st => {
-    const meta = metaById.get(String(st.AlunoID || '')) || {};
-    const studentRows = grouped.get(String(st.AlunoID || '')) || [];
+    const key = normalizeKey_(String(st.Nome || ''));
+    const meta = metaByName.get(key) || {};
+    const studentRows = grouped.get(key) || [];
     studentRows.sort((a, b) => compareDateKey_(a.dateKey, b.dateKey));
 
     let totalPresencas = 0;
@@ -1253,7 +1247,6 @@ function recalculateAndPersistStudentStats_() {
     const finalStatus = String(meta.StatusManual || '').trim() || autoStatus;
 
     rowsToPersist.push({
-      AlunoID: st.AlunoID,
       Nome: st.Nome,
       TurmaID: st.TurmaID,
       TurmaNome: st.TurmaNome,
@@ -1417,7 +1410,7 @@ function getSelfBaseRowsAll_(forceReload) {
       visitantes: Number(row[idx.Visitantes] ?? row[idx.VISITANTES] ?? 0) || 0,
       biblias: Number(row[idx.Biblias] ?? row[idx.BIBLIAS] ?? 0) || 0,
       revistas: Number(row[idx.Revistas] ?? row[idx.REVISTAS] ?? 0) || 0,
-      alunoId: matchedStudent?.AlunoID || buildStudentId_(aluno, turmaId, ''),
+      alunoId: matchedStudent?.Nome || aluno,
       selfPresence: true,
       presenceSource: 'selfbase',
     });
@@ -1456,8 +1449,7 @@ function getMergedPresenceRowsForDate_(dateKey) {
   const addRow = (row) => {
     const key = [
       String(row.turmaId || ''),
-      String(row.alunoId || ''),
-      normalizeKey_(row.nome || ''),
+      normalizeKey_(row.nome || row.alunoId || ''),
       String(row.dateKey || ''),
     ].join('|');
     const existing = merged.get(key);
@@ -1534,7 +1526,7 @@ function getBaseRowsAll_(forceReload) {
       visitantes: Number(row[idx.Visitantes] ?? row[idx.VISITANTES] ?? 0) || 0,
       biblias: Number(row[idx.Biblias] ?? row[idx.BIBLIAS] ?? 0) || 0,
       revistas: Number(row[idx.Revistas] ?? row[idx.REVISTAS] ?? 0) || 0,
-      alunoId: buildStudentId_(aluno, turmaId, ''),
+      alunoId: aluno,
     });
   }
 
@@ -1995,7 +1987,7 @@ function appendSelfPresenceRow_(dateKey, student) {
   return row;
 }
 
-function appendReadBaseStudent_(sheet, nome, turmaNome, cpf, alunoId, now) {
+function appendReadBaseStudent_(sheet, nome, turmaNome, cpf, now) {
   const headers = getReadBaseHeaders_();
   const values = sheet.getDataRange().getValues();
   if (values.length === 0) {
@@ -2009,33 +2001,30 @@ function appendReadBaseStudent_(sheet, nome, turmaNome, cpf, alunoId, now) {
   if (cols.CLASSE !== -1) row[cols.CLASSE] = turmaNome;
   if (cols.TURMA !== -1 && cols.CLASSE === -1) row[cols.TURMA] = turmaNome;
   if (cols.CPF !== -1) row[cols.CPF] = cpf;
-  if (cols.ALUNOID !== -1) row[cols.ALUNOID] = alunoId;
-  if (cols.CRiadoEm !== -1) row[cols.CRiadoEm] = now;
+  if (cols.CRIADOEM !== -1) row[cols.CRIADOEM] = now;
 
   sheet.appendRow(row.slice(0, Math.max(headers.length, cols.maxLen)));
 }
 
 function getReadBaseHeaders_() {
-  return ['ALUNO', 'CLASSE', 'CPF', 'ALUNOID', 'CRIADOEM'];
+  return ['ALUNO', 'CLASSE', 'CPF', 'CRIADOEM'];
 }
 
 function getReadBaseHeaderIndexes_(sheet) {
   const values = sheet.getDataRange().getValues();
   const headerRow = values.length ? values[0].map(normalizeHeader_) : [];
   const find = (aliases) => findHeaderIndex_(headerRow, aliases);
-  const maxLen = Math.max(headerRow.length, 5);
+  const maxLen = Math.max(headerRow.length, 4);
   return {
     ALUNO: find(['ALUNO', 'NOME']),
     NOME: find(['NOME']),
     CLASSE: find(['CLASSE']),
     TURMA: find(['TURMA']),
     CPF: find(['CPF']),
-    ALUNOID: find(['ALUNOID', 'ALUNO_ID', 'ID']),
-    CRiadoEm: find(['CRIADOEM', 'CRIADO_EM', 'DATACRIACAO']),
+    CRIADOEM: find(['CRIADOEM', 'CRIADO_EM', 'DATACRIACAO']),
     maxLen,
   };
 }
-
 function getTurmaNameById_(turmaId) {
   const all = loadAllData_();
   const turma = (all.turmas || []).find(t => String(t.TurmaID || '') === String(turmaId || ''));
@@ -2050,9 +2039,9 @@ function getTurmaByIdOrName_(turmaIdOrName, turmas) {
 }
 
 function findStudentMetaById_(alunoId) {
-  return loadMetaStudents_().find(s => String(s.AlunoID || '') === String(alunoId || '')) || null;
+  const target = normalizeKey_(String(alunoId || ''));
+  return loadMetaStudents_().find(s => normalizeKey_(String(s.Nome || '')) === target) || null;
 }
-
 function findMetaClassById_(turmaId) {
   return loadMetaClasses_().find(t => String(t.TurmaID || '') === String(turmaId || '')) || null;
 }
@@ -2131,7 +2120,7 @@ function upsertReportLog_(log) {
 function ensureSheets_() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
 
-  getOrCreateSheet_(ss, READ_SHEET_NAME, getReadBaseHeaders_(), false);
+  const readSheet = getOrCreateSheet_(ss, READ_SHEET_NAME, getReadBaseHeaders_(), false);
 
   const baseSheet = getOrCreateSheet_(ss, BASE_SHEET_NAME, BASE_HEADERS, false);
   const selfBaseSheet = getOrCreateSheet_(ss, SELF_BASE_SHEET_NAME, BASE_HEADERS, false);
@@ -2142,6 +2131,10 @@ function ensureSheets_() {
   getOrCreateSheet_(ss, META_STUDENTS_SHEET, META_STUDENTS_HEADERS, true);
   getOrCreateSheet_(ss, META_CLASSES_SHEET, META_CLASSES_HEADERS, true);
   getOrCreateSheet_(ss, REPORTS_SHEET, REPORTS_HEADERS, true);
+
+  pruneColumnsByHeader_(readSheet, ['ALUNOID', 'ALUNO_ID', 'ID']);
+  const metaSheet = ss.getSheetByName(META_STUDENTS_SHEET);
+  pruneColumnsByHeader_(metaSheet, ['ALUNOID', 'ALUNO_ID', 'ID']);
 }
 
 function ensureBaseHeaders_(sheet, headers) {
@@ -2167,6 +2160,22 @@ function ensureBaseHeaders_(sheet, headers) {
   if (sheet.getFrozenRows() < 1) {
     sheet.setFrozenRows(1);
   }
+}
+
+function pruneColumnsByHeader_(sheet, aliases) {
+  if (!sheet || !aliases || !aliases.length) return;
+  const values = sheet.getDataRange().getValues();
+  if (!values.length) return;
+  const headers = values[0].map(normalizeHeader_);
+  const targets = new Set((aliases || []).map(normalizeHeader_));
+  const cols = [];
+  headers.forEach((h, idx) => {
+    if (targets.has(h)) cols.push(idx + 1);
+  });
+  if (!cols.length) return;
+  cols.sort((a, b) => b - a).forEach(col => {
+    try { sheet.deleteColumn(col); } catch (e) {}
+  });
 }
 
 function getOrCreateSheet_(ss, name, headers, hidden) {
@@ -2251,7 +2260,6 @@ function indexByHeader_(headers) {
   idx.AUSENCIA = lookup(['AUSENCIA', 'AUSÊNCIA', 'FALTA']);
   idx.OFERTA = lookup(['OFERTA', 'VALOR', 'R', 'R$']);
 
-  idx.AlunoID = lookup(['ALUNOID', 'ALUNO_ID', 'ID']);
   idx.Nome = lookup(['NOME', 'ALUNO']);
   idx.TurmaID = lookup(['TURMAID', 'TURMA_ID', 'CLASSE']);
   idx.TurmaNome = lookup(['TURMANOME', 'TURMA_NOME', 'CLASSE']);
@@ -2612,7 +2620,7 @@ function debugRoundTripChamada_() {
     }
 
     const sampleRows = roster.slice(0, Math.min(4, roster.length)).map((aluno, index) => ({
-      alunoId: aluno.AlunoID,
+      alunoId: aluno.Nome,
       nome: aluno.Nome,
       presenca: index === 0 ? 'sim' : (index === 1 ? 'atrasado' : 'nao'),
       atraso: index === 1,
