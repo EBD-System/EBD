@@ -367,48 +367,6 @@ function selfPresence_(p) {
   };
 }
 
-function selfPresence_2(p) {
-  ensureSheets_();
-
-  const dateKey = normalizeDateKey_(p.date || todayKey_());
-  const cpfPrefix = String(p.cpfPrefix || p.cpf || '').replace(/\D/g, '').slice(0, 5);
-
-  if (cpfPrefix.length !== 5) {
-    throw new Error('Digite os 5 primeiros números do CPF.');
-  }
-
-  const all = loadAllData_();
-  const student = findReadBaseStudentByCpfPrefix_(cpfPrefix, all);
-  if (!student) {
-    throw new Error('CPF não encontrado na ReadBase.');
-  }
-
-  const alreadyRegistered = hasSelfPresenceOnDate_(dateKey, student);
-  if (!alreadyRegistered) {
-    appendSelfPresenceRow_(dateKey, student);
-  }
-
-  invalidateRuntimeCache_();
-
-  return {
-    ok: true,
-    message: 'Presença confirmada com sucesso.',
-    alreadyRegistered,
-    dateKey,
-    aluno: {
-      nome: student.Nome,
-      turmaId: student.TurmaID,
-      turmaNome: student.TurmaNome,
-      cpfPrefix,
-    },
-  };
-}
-
-
-
-
-
-
 function sendReport_(p) {
   ensureSheets_();
 
@@ -1802,33 +1760,6 @@ function findReadBaseStudentByCpfPrefix_(cpfPrefix, allData, debug) {
   }
 
   return null;
-}
-
-function findReadBaseStudentByCpfPrefix_2(cpfPrefix, allData) {
-  const prefix = String(cpfPrefix || '').replace(/\D/g, '').slice(0, 5);
-  if (prefix.length !== 5) return null;
-
-  const roster = (allData && Array.isArray(allData.alunos))
-    ? allData.alunos
-    : loadRosterFromReadBase_();
-
-  return roster.find(student => {
-    const cpf = normalizeCpf_(student.CPF || '');
-    return cpf.slice(0, 5) === prefix;
-  }) || null;
-}
-
-function hasSelfPresenceOnDate_(dateKey, student) {
-  const rows = getBaseRowsAll_(true);
-  const targetNome = normalizeKey_(student?.Nome || '');
-  const targetTurma = normalizeKey_(student?.TurmaNome || '');
-  const targetDate = normalizeDateKey_(dateKey);
-
-  return rows.some(row => (
-    String(row.dateKey || '') === targetDate &&
-    normalizeKey_(row.nome || '') === targetNome &&
-    normalizeKey_(row.turmaNome || '') === targetTurma
-  ));
 }
 
 function appendSelfPresenceRow_(dateKey, student) {
