@@ -811,7 +811,8 @@ function buildCallsByTurmaForDate_(dateKey, all) {
       const key = String(aluno.AlunoID || aluno.Nome || '').trim();
       const found = savedMap[key] || savedMap[normalizeKey_(aluno.Nome)] || {};
       const atraso = normalizeBool_(found.atraso || found.Atraso);
-      const presenca = atraso ? 'atrasado' : normalizePresence_(found.presenca || found.Presenca || found.PRESENCA || (found.ausencia ? 'nao' : 'nao'));
+      const presencaSource = found.presenca || found.Presenca || found.PRESENCA || (found.ausencia ? 'nao' : 'nao');
+      const presenca = atraso ? 'atrasado' : normalizePresence_(presencaSource);
       return {
         alunoId: aluno.AlunoID,
         nome: aluno.Nome,
@@ -819,7 +820,7 @@ function buildCallsByTurmaForDate_(dateKey, all) {
         atraso,
         observacao: String(found.observacao || found.Observacao || '').trim(),
         statusAluno: String(aluno.Status || 'ativo').trim(),
-        selfPresence: Boolean(found.selfPresence),
+        selfPresence: Boolean(found.selfPresence || String(found.presenceSource || '').trim().toLowerCase() === 'selfbase'),
         presencaOrigem: String(found.presenceSource || '').trim(),
       };
     });
@@ -1368,6 +1369,7 @@ function getSelfBaseRowsCount_() {
   return sheet.getLastRow() - 1;
 }
 
+
 function getSelfBaseRowsAll_(forceReload) {
   if (!forceReload && __BACKEND_RUNTIME_CACHE__.selfBaseRowsAll) return __BACKEND_RUNTIME_CACHE__.selfBaseRowsAll;
 
@@ -1382,6 +1384,13 @@ function getSelfBaseRowsAll_(forceReload) {
   const headers = values[0].map(normalizeHeader_);
   const idx = indexByHeader_(headers);
   const result = [];
+  const roster = loadRosterFromReadBase_();
+  const rosterByKey = new Map(
+    (roster || []).map(student => [
+      `${normalizeKey_(student.Nome || '')}|${String(student.TurmaID || '').trim()}`,
+      student
+    ])
+  );
 
   for (let i = 1; i < values.length; i++) {
     const row = values[i];
@@ -1392,6 +1401,7 @@ function getSelfBaseRowsAll_(forceReload) {
     const turmaId = buildTurmaId_(classe);
     const atraso = normalizeBool_(row[idx.ATRASO]);
     const presenca = atraso ? 'atrasado' : normalizePresence_(row[idx.PRESENCA]);
+    const matchedStudent = rosterByKey.get(`${normalizeKey_(aluno)}|${turmaId}`) || null;
 
     result.push({
       dateKey: normalizeDateFromBaseCell_(row[idx.DATA]),
@@ -1407,7 +1417,7 @@ function getSelfBaseRowsAll_(forceReload) {
       visitantes: Number(row[idx.Visitantes] ?? row[idx.VISITANTES] ?? 0) || 0,
       biblias: Number(row[idx.Biblias] ?? row[idx.BIBLIAS] ?? 0) || 0,
       revistas: Number(row[idx.Revistas] ?? row[idx.REVISTAS] ?? 0) || 0,
-      alunoId: buildStudentId_(aluno, turmaId, ''),
+      alunoId: matchedStudent?.AlunoID || buildStudentId_(aluno, turmaId, ''),
       selfPresence: true,
       presenceSource: 'selfbase',
     });
@@ -1416,6 +1426,7 @@ function getSelfBaseRowsAll_(forceReload) {
   __BACKEND_RUNTIME_CACHE__.selfBaseRowsAll = result;
   return result;
 }
+
 
 function getSelfBaseRowsForDate_(dateKey) {
   const key = String(dateKey || '');
@@ -1427,6 +1438,7 @@ function getSelfBaseRowsForDate_(dateKey) {
   }
   return __BACKEND_RUNTIME_CACHE__.selfBaseRowsByDate[key];
 }
+
 
 function getMergedPresenceRowsForDate_(dateKey) {
   const baseRows = getBaseRowsForDate_(dateKey).map(row => ({
@@ -1454,21 +1466,25 @@ function getMergedPresenceRowsForDate_(dateKey) {
       return;
     }
 
-    if (row.selfPresence && !existing.selfPresence) {
-      merged.set(key, {
-        ...existing,
-        ...row,
-        selfPresence: true,
-        presenceSource: 'selfbase',
-      });
-      return;
-    }
+    // A Base continua sendo a fonte principal dos metadados da chamada.
+    // Quando houver presença em SelfBase, apenas o status de presença é sobrescrito.
+    const selfWins = Boolean(row.selfPresence && !existing.selfPresence);
 
     merged.set(key, {
       ...existing,
-      ...row,
-      selfPresence: Boolean(existing.selfPresence || row.selfPresence),
-      presenceSource: existing.selfPresence || row.selfPresence ? 'selfbase' : (row.presenceSource || existing.presenceSource || 'base'),
+      ...(selfWins ? {
+        presenca: row.presenca,
+        atraso: row.atraso,
+        ausencia: row.ausencia,
+        selfPresence: true,
+        presenceSource: 'selfbase',
+      } : {}),
+      // mantemos o que já veio de Base para oferta, visitantes e demais campos
+      alunoId: existing.alunoId || row.alunoId,
+      nome: existing.nome || row.nome,
+      turmaId: existing.turmaId || row.turmaId,
+      turmaNome: existing.turmaNome || row.turmaNome,
+      dateKey: existing.dateKey || row.dateKey,
     });
   };
 
@@ -1477,6 +1493,7 @@ function getMergedPresenceRowsForDate_(dateKey) {
 
   return [...merged.values()];
 }
+
 
 function getBaseRowsAll_(forceReload) {
   if (!forceReload && __BACKEND_RUNTIME_CACHE__.baseRowsAll) return __BACKEND_RUNTIME_CACHE__.baseRowsAll;
@@ -1841,6 +1858,31 @@ function debugSelfPresenceCpf_(cpfRaw) {
   Logger.log('=================================================');
 
   return found;
+}
+
+
+function findReadBaseStudentByNameAndTurma_(studentName, turmaId, allData, debug) {
+  const targetName = normalizeKey_(studentName || '');
+  const targetTurmaId = String(turmaId || '').trim();
+
+  if (!targetName || !targetTurmaId) return null;
+
+  const roster = (allData && Array.isArray(allData.alunos))
+    ? allData.alunos
+    : loadRosterFromReadBase_();
+
+  for (let i = 0; i < roster.length; i++) {
+    const student = roster[i];
+    if (String(student.TurmaID || '') !== targetTurmaId) continue;
+    if (normalizeKey_(student.Nome || '') !== targetName) continue;
+    return student;
+  }
+
+  if (debug) {
+    Logger.log('Nenhum aluno encontrado em ReadBase para Nome=%s TurmaID=%s', studentName, turmaId);
+  }
+
+  return null;
 }
 
 function findReadBaseStudentByCpfPrefix_(cpfPrefix, allData, debug) {
