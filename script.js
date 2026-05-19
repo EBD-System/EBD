@@ -398,7 +398,7 @@ function setSelfAccessMessage(type, message) {
   messageBox.textContent = message;
 }
 
-function handleSelfCpfSubmit() {
+async function handleSelfCpfSubmit() {
   const input = document.getElementById('selfCpfInput');
   const prefix = normalizeSelfCpfPrefix(input?.value || '');
 
@@ -411,8 +411,25 @@ function handleSelfCpfSubmit() {
   localStorage.setItem('prb_self_cpf_prefix_v1', prefix);
   window.dispatchEvent(new CustomEvent('selfCpfPrefixReady', { detail: { cpfPrefix: prefix } }));
 
-  setSelfAccessMessage('success', 'CPF preparado. O envio ao backend será conectado depois.');
-  return prefix;
+  if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('COLE_AQUI')) {
+    setSelfAccessMessage('error', 'Configure a URL do backend antes de enviar a presença.');
+    return null;
+  }
+
+  try {
+    setSelfAccessMessage('success', 'Enviando presença...');
+    const result = await apiPost({
+      action: 'selfPresence',
+      cpfPrefix: prefix,
+      date: state.dateKey,
+    });
+
+    setSelfAccessMessage('success', result.message || 'Presença confirmada com sucesso.');
+    return prefix;
+  } catch (err) {
+    setSelfAccessMessage('error', err.message || 'Não foi possível registrar a presença.');
+    return null;
+  }
 }
 
 function renderSelfAccessGate() {
