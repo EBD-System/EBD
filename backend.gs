@@ -1642,8 +1642,113 @@ function extractCallMetaField_(text, field) {
   }
 }
 
+function debugSelfPresenceCpf_(cpfRaw) {
+  ensureSheets_();
 
-function findReadBaseStudentByCpfPrefix_(cpfPrefix, allData) {
+  const cpfPrefix = String(cpfRaw || '').replace(/\D/g, '').slice(0, 5);
+
+  Logger.log('================ DEBUG SELF CPF ================');
+  Logger.log('CPF bruto recebido: %s', String(cpfRaw || ''));
+  Logger.log('CPF normalizado (5 primeiros): %s', cpfPrefix);
+  Logger.log('Tamanho do prefixo: %s', cpfPrefix.length);
+
+  if (cpfPrefix.length !== 5) {
+    Logger.log('ERRO: prefixo inválido. São necessários exatamente 5 dígitos.');
+    return { ok: false, message: 'Digite os 5 primeiros números do CPF.' };
+  }
+
+  const all = loadAllData_();
+  Logger.log('Total de alunos carregados em all.alunos: %s', (all.alunos || []).length);
+
+  (all.alunos || []).slice(0, 15).forEach((student, index) => {
+    const cpf = normalizeCpf_(student.CPF || '');
+    Logger.log(
+      '[%s] Nome=%s | Turma=%s | CPF=%s | CPF5=%s',
+      index + 1,
+      String(student.Nome || ''),
+      String(student.TurmaNome || ''),
+      cpf,
+      cpf.slice(0, 5)
+    );
+  });
+
+  const found = findReadBaseStudentByCpfPrefix_(cpfPrefix, all, true);
+
+  Logger.log('Resultado final: %s', found ? 'ENCONTRADO' : 'NÃO ENCONTRADO');
+  if (found) {
+    Logger.log('Aluno encontrado: %s', JSON.stringify({
+      nome: found.Nome,
+      turmaId: found.TurmaID,
+      turmaNome: found.TurmaNome,
+      cpf: found.CPF
+    }));
+  }
+
+  Logger.log('=================================================');
+
+  return found;
+}
+
+function findReadBaseStudentByCpfPrefix_(cpfPrefix, allData, debug) {
+  const prefix = String(cpfPrefix || '').replace(/\D/g, '').slice(0, 5);
+
+  if (debug) {
+    Logger.log('--- findReadBaseStudentByCpfPrefix_ ---');
+    Logger.log('Prefixo recebido: %s', String(cpfPrefix || ''));
+    Logger.log('Prefixo normalizado: %s', prefix);
+    Logger.log('Tamanho do prefixo: %s', prefix.length);
+  }
+
+  if (prefix.length !== 5) {
+    if (debug) Logger.log('Prefixo inválido dentro da função de busca.');
+    return null;
+  }
+
+  const roster = (allData && Array.isArray(allData.alunos))
+    ? allData.alunos
+    : loadRosterFromReadBase_();
+
+  if (debug) {
+    Logger.log('Total de registros no roster: %s', roster.length);
+  }
+
+  for (let i = 0; i < roster.length; i++) {
+    const student = roster[i];
+    const cpf = normalizeCpf_(student.CPF || '');
+    const cpf5 = cpf.slice(0, 5);
+
+    if (debug) {
+      Logger.log(
+        'Comparando [%s] Nome=%s | CPF=%s | CPF5=%s com Prefixo=%s',
+        i + 1,
+        String(student.Nome || ''),
+        cpf,
+        cpf5,
+        prefix
+      );
+    }
+
+    if (cpf5 === prefix) {
+      if (debug) {
+        Logger.log('MATCH encontrado no índice %s: %s', i + 1, JSON.stringify({
+          Nome: student.Nome,
+          CPF: student.CPF,
+          TurmaID: student.TurmaID,
+          TurmaNome: student.TurmaNome
+        }));
+      }
+      return student;
+    }
+  }
+
+  if (debug) {
+    Logger.log('Nenhum aluno encontrado para o prefixo %s', prefix);
+  }
+
+  return null;
+}
+
+function findReadBaseStudentByCpfPrefix_2(cpfPrefix, allData) {
   const prefix = String(cpfPrefix || '').replace(/\D/g, '').slice(0, 5);
   if (prefix.length !== 5) return null;
 
