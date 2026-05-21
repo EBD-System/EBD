@@ -37,6 +37,8 @@ const META_STUDENTS_HEADERS = [
 const META_CLASSES_HEADERS = ['TurmaID', 'Nome', 'Ordem', 'Ativa', 'CriadoEm', 'AtualizadoEm'];
 const REPORTS_HEADERS = ['RelatorioID', 'Tipo', 'Data', 'TurmaID', 'Hash', 'Enviado', 'EnviadoEm', 'Texto', 'CriadoEm'];
 const LAST_CALL_CACHE_HEADERS = ['ChamadaID', 'Data', 'TurmaID', 'TurmaNome', 'Oferta', 'Visitantes', 'Biblias', 'Revistas', 'Presentes', 'Atrasos', 'Ausentes', 'RowsJson', 'AtualizadoEm'];
+const CALL_CACHE_SHEET = '__CHAMADAS_CACHE';
+const CALL_CACHE_HEADERS = LAST_CALL_CACHE_HEADERS;
 
 var __BACKEND_RUNTIME_CACHE__ = {
   allData: null,
@@ -48,6 +50,7 @@ var __BACKEND_RUNTIME_CACHE__ = {
   metaClasses: null,
   reportLogsById: null,
   lastCallCache: null,
+  callCacheAll: null,
   loadTurmasFromReadBase: null,
   loadRosterFromReadBase: null,
 };
@@ -62,6 +65,7 @@ function invalidateRuntimeCache_() {
   __BACKEND_RUNTIME_CACHE__.metaClasses = null;
   __BACKEND_RUNTIME_CACHE__.reportLogsById = null;
   __BACKEND_RUNTIME_CACHE__.lastCallCache = null;
+  __BACKEND_RUNTIME_CACHE__.callCacheAll = null;
   __BACKEND_RUNTIME_CACHE__.loadTurmasFromReadBase = null;
   __BACKEND_RUNTIME_CACHE__.loadRosterFromReadBase = null;
 }
@@ -189,7 +193,7 @@ function init_(params) {
     alunos: sortAlunos_(all.alunos),
     callsByTurma,
     resumoGeral: geral,
-    baseRowsCount: getBaseRowsCount_(),
+    baseRowsCount: 0,
     selfBaseRowsCount: getSelfBaseRowsCount_(),
     timestamps: { now: new Date().toISOString() },
   };
@@ -283,6 +287,21 @@ function saveCall_(p) {
   );
 
   writeLastCallCache_({
+    chamadaId,
+    dateKey,
+    turmaId: turma.TurmaID,
+    turmaNome: turma.Nome,
+    oferta,
+    visitantes,
+    biblias,
+    revistas,
+    presentes,
+    atrasos: normalizedRows.filter(r => isDelayedRow_(r)).length,
+    ausentes,
+    rows: normalizedRows,
+  });
+
+  upsertCallCache_({
     chamadaId,
     dateKey,
     turmaId: turma.TurmaID,
@@ -823,6 +842,112 @@ function loadLastCallCache_(forceReload) {
   return cache;
 }
 
+function loadCallCacheAll_(forceReload) {
+  if (!forceReload && __BACKEND_RUNTIME_CACHE__.callCacheAll) return __BACKEND_RUNTIME_CACHE__.callCacheAll;
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(CALL_CACHE_SHEET);
+  if (!sheet || sheet.getLastRow() < 2) {
+    __BACKEND_RUNTIME_CACHE__.callCacheAll = [];
+    return [];
+  }
+
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) {
+    __BACKEND_RUNTIME_CACHE__.callCacheAll = [];
+    return [];
+  }
+
+  const headers = values[0].map(String);
+  const idx = indexByHeader_(headers);
+  const result = [];
+
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    const rowsJson = String(row[idx.RowsJson] || '');
+    let rows = [];
+    try {
+      const parsed = rowsJson ? JSON.parse(rowsJson) : [];
+      rows = Array.isArray(parsed)
+        ? parsed
+        : (parsed && typeof parsed === 'object' ? Object.values(parsed).filter(v => v && typeof v === 'object') : []);
+    } catch (err) {
+      rows = [];
+    }
+
+    result.push({
+      chamadaId: String(row[idx.ChamadaID] || '').trim(),
+      dateKey: normalizeDateKey_(row[idx.Data] || ''),
+      turmaId: String(row[idx.TurmaID] || '').trim(),
+      turmaNome: String(row[idx.TurmaNome] || '').trim(),
+      oferta: row[idx.Oferta] ?? '',
+      visitantes: Number(row[idx.Visitantes] || 0) || 0,
+      biblias: Number(row[idx.Biblias] || 0) || 0,
+      revistas: Number(row[idx.Revistas] || 0) || 0,
+      presentes: Number(row[idx.Presentes] || 0) || 0,
+      atrasos: Number(row[idx.Atrasos] || 0) || 0,
+      ausentes: Number(row[idx.Ausentes] || 0) || 0,
+      rows,
+      updatedAt: String(row[idx.AtualizadoEm] || ''),
+    });
+  }
+
+  __BACKEND_RUNTIME_CACHE__.callCacheAll = result;
+  return result;
+}
+
+function getCallCacheEntryByTurmaAndDate_(turmaId, dateKey) {
+  const targetTurmaId = String(turmaId || '').trim();
+  const targetDate = String(dateKey || '').trim();
+  if (!targetTurmaId || !targetDate) return null;
+  const rows = loadCallCacheAll_();
+  return rows.find(row => String(row.turmaId || '') === targetTurmaId && String(row.dateKey || '') === targetDate) || null;
+}
+
+function upsertCallCache_(payload) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = getOrCreateSheet_(ss, CALL_CACHE_SHEET, CALL_CACHE_HEADERS, true);
+  const now = new Date().toISOString();
+  const rowsJson = JSON.stringify(Array.isArray(payload.rows) ? payload.rows : []);
+
+  const row = [
+    String(payload.chamadaId || '').trim(),
+    String(payload.dateKey || '').trim(),
+    String(payload.turmaId || '').trim(),
+    String(payload.turmaNome || '').trim(),
+    payload.oferta ?? '',
+    Number(payload.visitantes || 0) || 0,
+    Number(payload.biblias || 0) || 0,
+    Number(payload.revistas || 0) || 0,
+    Number(payload.presentes || 0) || 0,
+    Number(payload.atrasos || 0) || 0,
+    Number(payload.ausentes || 0) || 0,
+    rowsJson,
+    now,
+  ];
+
+  const values = sheet.getDataRange().getValues();
+  let rowIndex = -1;
+  if (values.length >= 2) {
+    const headers = values[0].map(String);
+    const idx = indexByHeader_(headers);
+    for (let i = 1; i < values.length; i++) {
+      if (String(values[i][idx.ChamadaID] || '') === String(payload.chamadaId || '')) {
+        rowIndex = i + 1;
+        break;
+      }
+    }
+  }
+
+  if (rowIndex === -1) {
+    sheet.appendRow(row);
+  } else {
+    sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
+  }
+
+  invalidateRuntimeCache_();
+}
+
 function writeLastCallCache_(payload) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = getOrCreateSheet_(ss, LAST_CALL_CACHE_SHEET, LAST_CALL_CACHE_HEADERS, true);
@@ -912,23 +1037,24 @@ function mergePresenceRows_(rowsA, rowsB) {
 }
 
 function getSavedRowsForDate_(dateKey) {
-  const cache = loadLastCallCache_();
-  const cacheRows = cache && String(cache.dateKey || '') === String(dateKey || '') ? (cache.rows || []) : [];
-  const baseRows = getBaseRowsForDate_(dateKey).map(row => ({
-    ...row,
-    selfPresence: false,
-    presenceSource: 'base',
-  }));
+  const cacheRows = loadCallCacheAll_()
+    .filter(entry => String(entry.dateKey || '') === String(dateKey || ''))
+    .flatMap(entry => (entry.rows || []).map(row => ({
+      ...row,
+      dateKey: entry.dateKey,
+      turmaId: entry.turmaId,
+      turmaNome: entry.turmaNome,
+      selfPresence: false,
+      presenceSource: 'cache',
+    })));
+
   const selfRows = getSelfBaseRowsForDate_(dateKey).map(row => ({
     ...row,
     selfPresence: true,
     presenceSource: 'selfbase',
   }));
 
-  return mergePresenceRows_(
-    mergePresenceRows_(baseRows, cacheRows),
-    selfRows
-  );
+  return mergePresenceRows_(cacheRows, selfRows);
 }
 
 function getTopStatsForTurma_(turmaId, all) {
@@ -1066,8 +1192,6 @@ function loadAllData_() {
     turmas,
     alunos,
     studentsMeta,
-    baseRowsAll: getBaseRowsAll_(),
-    selfBaseRowsAll: getSelfBaseRowsAll_(),
   };
 
   __BACKEND_RUNTIME_CACHE__.allData = data;
@@ -1685,11 +1809,7 @@ function getBaseRowsAll_(forceReload) {
 
 
 function getBaseRowsForDate_(dateKey) {
-  const key = String(dateKey || '');
-  if (!__BACKEND_RUNTIME_CACHE__.baseRowsByDate[key]) {
-    __BACKEND_RUNTIME_CACHE__.baseRowsByDate[key] = getBaseRowsAll_().filter(row => row.dateKey === dateKey);
-  }
-  return __BACKEND_RUNTIME_CACHE__.baseRowsByDate[key];
+  return [];
 }
 
 
@@ -1714,60 +1834,25 @@ function parseCallMetaText_(text) {
 }
 
 function buildCallMetaFromBaseRows_(dateKey, turmaId) {
-  const rows = getBaseRowsForDate_(dateKey)
-    .filter(r => String(r.turmaId || '') === String(turmaId || ''));
-
-  Logger.log('FALLBACK VIA BASE');
-  Logger.log('ROWS BASE ENCONTRADAS:');
-  Logger.log(JSON.stringify(rows, null, 2));
-
-  if (!rows.length) return null;
-
-  const oferta = getFirstNonEmpty_(
-    ...rows.map(r => r.oferta)
-  );
-
-  const visitantes = (() => {
-    for (const r of rows) {
-      const n = Number(r.visitantes || 0) || 0;
-      if (n > 0) return n;
-    }
-    return 0;
-  })();
-
-  const biblias = (() => {
-    for (const r of rows) {
-      const n = Number(r.biblias || 0) || 0;
-      if (n > 0) return n;
-    }
-    return 0;
-  })();
-
-  const revistas = (() => {
-    for (const r of rows) {
-      const n = Number(r.revistas || 0) || 0;
-      if (n > 0) return n;
-    }
-    return 0;
-  })();
-
-  Logger.log('META VIA BASE:');
-  Logger.log(JSON.stringify({ oferta, visitantes, biblias, revistas }, null, 2));
-
-  return {
-    ChamadaID: `CALL_${turmaId}_${dateKey}`,
-    Data: formatDateBR_(dateKey),
-    TurmaID: turmaId,
-    Oferta: String(oferta || '').trim(),
-    Visitantes: Number(visitantes || 0) || 0,
-    Biblias: Number(biblias || 0) || 0,
-    Revistas: Number(revistas || 0) || 0,
-    EnviadoTelegram: 'nao',
-    TelegramEnviadoEm: '',
-  };
+  return null;
 }
 
 function findCallMeta_(turmaId, dateKey) {
+  const cached = getCallCacheEntryByTurmaAndDate_(turmaId, dateKey);
+  if (cached) {
+    return {
+      ChamadaID: cached.chamadaId || `CALL_${turmaId}_${dateKey}`,
+      Data: formatDateBR_(dateKey),
+      TurmaID: turmaId,
+      Oferta: cached.oferta ?? '',
+      Visitantes: Number(cached.visitantes || 0) || 0,
+      Biblias: Number(cached.biblias || 0) || 0,
+      Revistas: Number(cached.revistas || 0) || 0,
+      EnviadoTelegram: 'nao',
+      TelegramEnviadoEm: '',
+    };
+  }
+
   const reportId = `CALL_${turmaId}_${dateKey}`;
   const log = getReportLogById_(reportId);
 
@@ -1818,9 +1903,8 @@ function findCallMeta_(turmaId, dateKey) {
     return directFallback;
   }
 
-  return buildCallMetaFromBaseRows_(dateKey, turmaId);
+  return null;
 }
-
 
 function getCallMetaForTurmaAndDate_(turmaId, dateKey, cache) {
   const key = `${turmaId}_${dateKey}`;
@@ -2293,6 +2377,7 @@ function ensureSheets_() {
   getOrCreateSheet_(ss, META_CLASSES_SHEET, META_CLASSES_HEADERS, true);
   getOrCreateSheet_(ss, REPORTS_SHEET, REPORTS_HEADERS, true);
   getOrCreateSheet_(ss, LAST_CALL_CACHE_SHEET, LAST_CALL_CACHE_HEADERS, true);
+  getOrCreateSheet_(ss, CALL_CACHE_SHEET, CALL_CACHE_HEADERS, true);
 
   pruneColumnsByHeader_(readSheet, ['ALUNOID', 'ALUNO_ID', 'ID']);
   const metaSheet = ss.getSheetByName(META_STUDENTS_SHEET);

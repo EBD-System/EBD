@@ -1955,12 +1955,10 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
     state.resumoGeral =
       data.resumoGeral || null;
 
-    state.baseRowsCount =
-      Number(
-        data.baseRowsCount ||
-        state.baseRowsCount ||
-        0
-      );
+    const backendBaseRowsCount = Number(data.baseRowsCount || 0);
+    if (backendBaseRowsCount > 0) {
+      state.baseRowsCount = backendBaseRowsCount;
+    }
 
     if (showDebugBox) {
       const debugBox = document.getElementById('debugBackendJson');
