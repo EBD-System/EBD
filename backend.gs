@@ -123,6 +123,8 @@ function writeStudentMetaRows_(students) {
 
 function doGet(e) {
 
+    // testLastCallCache_()
+
   const action = String(e?.parameter?.action || 'init').toLowerCase();
 
   try {
@@ -2802,6 +2804,105 @@ function json_(obj) {
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }
+
+
+
+
+
+function testLastCallCache_() {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+
+    const sh = ss.getSheetByName('__ULTIMA_CHAMADA');
+
+    if (!sh) {
+      Logger.log('ABA __ULTIMA_CHAMADA NÃO EXISTE');
+
+      return {
+        ok: false,
+        message: 'Cache não encontrado'
+      };
+    }
+
+    const values = sh.getDataRange().getValues();
+
+    Logger.log('==============================');
+    Logger.log('CACHE BRUTO DA PLANILHA');
+    Logger.log('==============================');
+
+    Logger.log(JSON.stringify(values, null, 2));
+
+    const headers = values[0] || [];
+    const row = values[1] || [];
+
+    const obj = {};
+
+    headers.forEach((h, i) => {
+      obj[h] = row[i];
+    });
+
+    Logger.log('==============================');
+    Logger.log('CACHE FORMATADO');
+    Logger.log('==============================');
+
+    Logger.log(JSON.stringify(obj, null, 2));
+
+    let rows = [];
+
+    try {
+      rows = JSON.parse(obj.RowsJson || '[]');
+    } catch (err) {
+      Logger.log('ERRO AO PARSEAR RowsJson');
+      Logger.log(err);
+    }
+
+    Logger.log('==============================');
+    Logger.log('ALUNOS DO CACHE');
+    Logger.log('==============================');
+
+    rows.forEach((r, i) => {
+      Logger.log(JSON.stringify({
+        index: i,
+        aluno: r.nome || r.aluno,
+        presenca: r.presenca,
+        atraso: r.atraso,
+        ausSeguidas: r.ausSeguidas,
+        ausSeguidasCache: r.ausSeguidasCache
+      }, null, 2));
+    });
+
+    return {
+      ok: true,
+      rows: rows.length
+    };
+
+  } catch (err) {
+
+    Logger.log('ERRO GERAL');
+    Logger.log(err);
+
+    return {
+      ok: false,
+      message: err.message || String(err)
+    };
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
