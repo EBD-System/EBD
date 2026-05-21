@@ -278,6 +278,7 @@ function saveCall_(p) {
     false
   );
 
+  invalidateRuntimeCache_();
   recalculateAndPersistStudentStats_();
 
   invalidateRuntimeCache_();
@@ -1199,7 +1200,7 @@ function upsertStudentMeta_(student) {
 
 
 function recalculateAndPersistStudentStats_() {
-  const baseRows = getBaseRowsAll_();
+  const baseRows = getBaseRowsAll_(true);
   const roster = loadRosterFromReadBase_();
   const studentsMeta = loadMetaStudents_();
   const metaByName = new Map(studentsMeta.map(s => [normalizeKey_(String(s.Nome || '')), s]));
