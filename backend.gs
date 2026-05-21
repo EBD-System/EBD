@@ -793,7 +793,10 @@ function loadLastCallCache_(forceReload) {
   const rowsJson = String(row[11] || '');
   let rows = [];
   try {
-    rows = rowsJson ? JSON.parse(rowsJson) : [];
+    const parsed = rowsJson ? JSON.parse(rowsJson) : [];
+    rows = Array.isArray(parsed)
+      ? parsed
+      : (parsed && typeof parsed === 'object' ? Object.values(parsed).filter(v => v && typeof v === 'object') : []);
   } catch (err) {
     rows = [];
   }
@@ -853,8 +856,16 @@ function writeLastCallCache_(payload) {
   invalidateRuntimeCache_();
 }
 
+function coerceRowsArray_(value) {
+  if (Array.isArray(value)) return value;
+  if (!value || typeof value !== 'object') return [];
+  return Object.values(value).filter(v => v && typeof v === 'object');
+}
+
 function mergePresenceRows_(rowsA, rowsB) {
   const merged = new Map();
+  const listA = coerceRowsArray_(rowsA);
+  const listB = coerceRowsArray_(rowsB);
 
   const pushRow = (row, sourcePriority) => {
     if (!row) return;
@@ -892,8 +903,8 @@ function mergePresenceRows_(rowsA, rowsB) {
     merged.set(key, next);
   };
 
-  (rowsA || []).forEach(row => pushRow(row, 1));
-  (rowsB || []).forEach(row => pushRow(row, 2));
+  listA.forEach(row => pushRow(row, 1));
+  listB.forEach(row => pushRow(row, 2));
 
   return [...merged.values()].map(({ _priority, ...row }) => row);
 }
