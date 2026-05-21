@@ -679,14 +679,43 @@ function mergeById(prevList = [], nextList = [], idField, fingerprintFn = null) 
 }
 
 function buildStudentRowFromAluno(aluno) {
-  return syncRowPresenceFields({
+  const fallbackStreak = Number(aluno.FaltasConsecutivas || 0) || 0;
+  return syncAttendanceStreakFields(syncRowPresenceFields({
     alunoId: aluno.AlunoID,
     nome: aluno.Nome,
     presenca: 'nao',
     atraso: false,
     observacao: '',
     statusAluno: aluno.Status || 'ativo',
-  });
+    ausSeguidasCache: fallbackStreak,
+    ausSeguidas: fallbackStreak + 1,
+  }));
+}
+
+function syncAttendanceStreakFields(row = {}) {
+  const cacheBase = Number(
+    row.ausSeguidasCache ??
+    row.ausSeguidasAnterior ??
+    row.faltasConsecutivas ??
+    0
+  ) || 0;
+
+  const current = Number(
+    row.ausSeguidas ??
+    row.AUS_SEGUIDAS ??
+    row.ausSeguidasBase ??
+    0
+  ) || 0;
+
+  if (isPresentLikeValue(row.presenca)) {
+    row.ausSeguidasCache = cacheBase;
+    row.ausSeguidas = 0;
+  } else {
+    row.ausSeguidasCache = cacheBase;
+    row.ausSeguidas = current > 0 ? current : cacheBase + 1;
+  }
+
+  return row;
 }
 
 function buildSyncedCall(turma, serverCall = null, draft = null) {
@@ -706,11 +735,11 @@ function buildSyncedCall(turma, serverCall = null, draft = null) {
     const serverRow = serverRowsMap.get(String(aluno.AlunoID || '')) || null;
     const draftRow = draftRowsMap.get(String(aluno.AlunoID || '')) || null;
 
-    const merged = syncRowPresenceFields({
+    const merged = syncAttendanceStreakFields(syncRowPresenceFields({
       ...base,
       ...(serverRow || {}),
       ...(draftRow || {}),
-    });
+    }));
 
     merged.alunoId = base.alunoId;
     merged.nome = draftRow?.nome ?? serverRow?.nome ?? base.nome;
@@ -1261,6 +1290,7 @@ function setStudentPresence(alunoId, presence) {
   if (!row) return;
   row.presenca = normalizePresenceValue(presence);
   row.atraso = row.presenca === 'atrasado';
+  syncAttendanceStreakFields(row);
   state.dirty = true;
   persistDraft(call);
   renderAll();
@@ -1272,6 +1302,7 @@ function setAllPresence(presence) {
     if (isInactiveStudent(row)) return;
     row.presenca = normalizePresenceValue(presence);
     row.atraso = row.presenca === 'atrasado';
+    syncAttendanceStreakFields(row);
   });
   state.dirty = true;
   persistDraft(call);
@@ -1287,6 +1318,8 @@ async function saveCurrentCall({ silent = false } = {}) {
   if (!turma || !call) {
     throw new Error('Selecione uma turma antes de salvar.');
   }
+
+  call.rows.forEach((row) => syncAttendanceStreakFields(row));
 
   const beforeRows = Number(state.baseRowsCount || 0);
 
