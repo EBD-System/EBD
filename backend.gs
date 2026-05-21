@@ -25,6 +25,7 @@ const SELF_BASE_SHEET_NAME = 'SelfBase';
 const META_STUDENTS_SHEET = '__ALUNOS_META';
 const META_CLASSES_SHEET = '__TURMAS_META';
 const REPORTS_SHEET = '__RELATORIOS';
+const LAST_CALL_CACHE_SHEET = '__ULTIMA_CHAMADA';
 
 const BASE_HEADERS = ['DATA', 'ANO', 'MÊS', 'ALUNO', 'CLASSE', 'PRESENÇA', 'ATRASO', 'AUSÊNCIA', 'OFERTA', 'VISITANTES', 'BÍBLIAS', 'REVISTAS'];
 const META_STUDENTS_HEADERS = [
@@ -35,6 +36,7 @@ const META_STUDENTS_HEADERS = [
 ];
 const META_CLASSES_HEADERS = ['TurmaID', 'Nome', 'Ordem', 'Ativa', 'CriadoEm', 'AtualizadoEm'];
 const REPORTS_HEADERS = ['RelatorioID', 'Tipo', 'Data', 'TurmaID', 'Hash', 'Enviado', 'EnviadoEm', 'Texto', 'CriadoEm'];
+const LAST_CALL_CACHE_HEADERS = ['ChamadaID', 'Data', 'TurmaID', 'TurmaNome', 'Oferta', 'Visitantes', 'Biblias', 'Revistas', 'Presentes', 'Atrasos', 'Ausentes', 'RowsJson', 'AtualizadoEm'];
 
 var __BACKEND_RUNTIME_CACHE__ = {
   allData: null,
@@ -45,6 +47,7 @@ var __BACKEND_RUNTIME_CACHE__ = {
   metaStudents: null,
   metaClasses: null,
   reportLogsById: null,
+  lastCallCache: null,
   loadTurmasFromReadBase: null,
   loadRosterFromReadBase: null,
 };
@@ -58,6 +61,7 @@ function invalidateRuntimeCache_() {
   __BACKEND_RUNTIME_CACHE__.metaStudents = null;
   __BACKEND_RUNTIME_CACHE__.metaClasses = null;
   __BACKEND_RUNTIME_CACHE__.reportLogsById = null;
+  __BACKEND_RUNTIME_CACHE__.lastCallCache = null;
   __BACKEND_RUNTIME_CACHE__.loadTurmasFromReadBase = null;
   __BACKEND_RUNTIME_CACHE__.loadRosterFromReadBase = null;
 }
@@ -119,10 +123,6 @@ function writeStudentMetaRows_(students) {
 
 function doGet(e) {
 
-     // debugRoundTripChamada_();
-     // debugLerChamadaSalva_('2026-05-14', 'T_cordei_de_cristo');
-     // debugSelfPresenceCpf_('07560');
-
   const action = String(e?.parameter?.action || 'init').toLowerCase();
 
   try {
@@ -131,6 +131,8 @@ function doGet(e) {
         return json_(init_(e?.parameter || {}));
       case 'health':
         return json_({ ok: true, message: 'ok' });
+      case 'testcache':
+        return json_(testLastCallCache_());
       case 'reporttext':
         return json_(getReportText_(e?.parameter || {}));
       default:
@@ -174,7 +176,7 @@ function init_(params) {
   ensureSheets_();
 
   const dateKey = normalizeDateKey_(params.date || todayKey_());
-  const all = loadAllData_();
+  const all = loadCoreData_();
   const callsByTurma = buildCallsByTurmaForDate_(dateKey, all);
   const geral = buildDailyGeneralSummary_(dateKey, all, callsByTurma);
 
@@ -185,7 +187,7 @@ function init_(params) {
     alunos: sortAlunos_(all.alunos),
     callsByTurma,
     resumoGeral: geral,
-    baseRowsCount: (all.baseRowsAll || []).length,
+    baseRowsCount: getBaseRowsCount_(),
     selfBaseRowsCount: getSelfBaseRowsCount_(),
     timestamps: { now: new Date().toISOString() },
   };
@@ -278,10 +280,25 @@ function saveCall_(p) {
     false
   );
 
+  writeLastCallCache_({
+    chamadaId,
+    dateKey,
+    turmaId: turma.TurmaID,
+    turmaNome: turma.Nome,
+    oferta,
+    visitantes,
+    biblias,
+    revistas,
+    presentes,
+    atrasos: normalizedRows.filter(r => isDelayedRow_(r)).length,
+    ausentes,
+    rows: normalizedRows,
+  });
+
   recalculateAndPersistStudentStats_();
 
   invalidateRuntimeCache_();
-  const allAfter = loadAllData_();
+  const allAfter = loadCoreData_();
   const callsByTurma = buildCallsByTurmaForDate_(dateKey, allAfter);
   const geral = buildDailyGeneralSummary_(dateKey, allAfter, callsByTurma);
   const turmaCall = callsByTurma[turma.TurmaID];
@@ -318,7 +335,7 @@ function saveCall_(p) {
 }
 
 function hasSelfPresenceOnDate_(dateKey, student) {
-  const rows = getSelfBaseRowsAll_(true);
+  const rows = getSelfBaseRowsAll_();
   const targetNome = normalizeKey_(student?.Nome || '');
   const targetTurma = normalizeKey_(student?.TurmaNome || '');
   const targetDate = normalizeDateKey_(dateKey);
@@ -756,6 +773,151 @@ function buildDailyGeneralSummary_(dateKey, all, callsByTurma) {
   };
 }
 
+function loadLastCallCache_(forceReload) {
+  if (!forceReload && __BACKEND_RUNTIME_CACHE__.lastCallCache) return __BACKEND_RUNTIME_CACHE__.lastCallCache;
+
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(LAST_CALL_CACHE_SHEET);
+  if (!sheet || sheet.getLastRow() < 2) {
+    __BACKEND_RUNTIME_CACHE__.lastCallCache = null;
+    return null;
+  }
+
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) {
+    __BACKEND_RUNTIME_CACHE__.lastCallCache = null;
+    return null;
+  }
+
+  const row = values[1] || [];
+  const rowsJson = String(row[11] || '');
+  let rows = [];
+  try {
+    rows = rowsJson ? JSON.parse(rowsJson) : [];
+  } catch (err) {
+    rows = [];
+  }
+
+  const cache = {
+    chamadaId: String(row[0] || '').trim(),
+    dateKey: normalizeDateKey_(row[1] || ''),
+    turmaId: String(row[2] || '').trim(),
+    turmaNome: String(row[3] || '').trim(),
+    oferta: row[4] ?? '',
+    visitantes: Number(row[5] || 0) || 0,
+    biblias: Number(row[6] || 0) || 0,
+    revistas: Number(row[7] || 0) || 0,
+    presentes: Number(row[8] || 0) || 0,
+    atrasos: Number(row[9] || 0) || 0,
+    ausentes: Number(row[10] || 0) || 0,
+    rows,
+    updatedAt: String(row[12] || ''),
+  };
+
+  __BACKEND_RUNTIME_CACHE__.lastCallCache = cache;
+  return cache;
+}
+
+function writeLastCallCache_(payload) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = getOrCreateSheet_(ss, LAST_CALL_CACHE_SHEET, LAST_CALL_CACHE_HEADERS, true);
+  const now = new Date().toISOString();
+  const rowsJson = JSON.stringify(Array.isArray(payload.rows) ? payload.rows : []);
+
+  const row = [
+    String(payload.chamadaId || '').trim(),
+    String(payload.dateKey || '').trim(),
+    String(payload.turmaId || '').trim(),
+    String(payload.turmaNome || '').trim(),
+    payload.oferta ?? '',
+    Number(payload.visitantes || 0) || 0,
+    Number(payload.biblias || 0) || 0,
+    Number(payload.revistas || 0) || 0,
+    Number(payload.presentes || 0) || 0,
+    Number(payload.atrasos || 0) || 0,
+    Number(payload.ausentes || 0) || 0,
+    rowsJson,
+    now,
+  ];
+
+  if (sheet.getLastRow() < 2) {
+    sheet.getRange(1, 1, 1, LAST_CALL_CACHE_HEADERS.length).setValues([LAST_CALL_CACHE_HEADERS]);
+    sheet.getFrozenRows() < 1 && sheet.setFrozenRows(1);
+  }
+
+  if (sheet.getLastRow() >= 2) {
+    sheet.getRange(2, 1, 1, LAST_CALL_CACHE_HEADERS.length).clearContent();
+  }
+
+  sheet.getRange(2, 1, 1, row.length).setValues([row]);
+  invalidateRuntimeCache_();
+}
+
+function mergePresenceRows_(rowsA, rowsB) {
+  const merged = new Map();
+
+  const pushRow = (row, sourcePriority) => {
+    if (!row) return;
+    const nome = normalizeKey_(String(row.nome || row.alunoId || row.Nome || row.ALUNO || ''));
+    const turmaId = String(row.turmaId || row.TurmaID || '').trim();
+    const dateKey = String(row.dateKey || row.Data || '').trim();
+    const key = [turmaId, nome, dateKey].join('|');
+    if (!nome || !turmaId || !dateKey) return;
+
+    const existing = merged.get(key);
+    if (!existing) {
+      merged.set(key, {
+        ...row,
+        _priority: sourcePriority,
+      });
+      return;
+    }
+
+    const next = {
+      ...existing,
+      ...row,
+      _priority: Math.max(Number(existing._priority || 0), Number(sourcePriority || 0)),
+    };
+
+    if (sourcePriority >= (existing._priority || 0)) {
+      next.presenca = row.presenca ?? existing.presenca;
+      next.atraso = row.atraso ?? existing.atraso;
+      next.ausencia = row.ausencia ?? existing.ausencia;
+      next.selfPresence = row.selfPresence ?? existing.selfPresence;
+      next.presencaOrigem = row.presencaOrigem ?? existing.presencaOrigem;
+      next.observacao = row.observacao ?? existing.observacao;
+      next.statusAluno = row.statusAluno ?? existing.statusAluno;
+    }
+
+    merged.set(key, next);
+  };
+
+  (rowsA || []).forEach(row => pushRow(row, 1));
+  (rowsB || []).forEach(row => pushRow(row, 2));
+
+  return [...merged.values()].map(({ _priority, ...row }) => row);
+}
+
+function getSavedRowsForDate_(dateKey) {
+  const cache = loadLastCallCache_();
+  const cacheRows = cache && String(cache.dateKey || '') === String(dateKey || '') ? (cache.rows || []) : [];
+  const baseRows = getBaseRowsForDate_(dateKey).map(row => ({
+    ...row,
+    selfPresence: false,
+    presenceSource: 'base',
+  }));
+  const selfRows = getSelfBaseRowsForDate_(dateKey).map(row => ({
+    ...row,
+    selfPresence: true,
+    presenceSource: 'selfbase',
+  }));
+
+  return mergePresenceRows_(
+    mergePresenceRows_(baseRows, cacheRows),
+    selfRows
+  );
+}
+
 function getTopStatsForTurma_(turmaId, all) {
   const turmaAlunos = (all.alunos || []).filter(a => String(a.TurmaID || '') === String(turmaId || ''));
   if (!turmaAlunos.length) {
@@ -783,7 +945,7 @@ function getTopStudentsOverall_(all) {
 function buildCallsByTurmaForDate_(dateKey, all) {
   const roster = all.alunos || [];
   const groupedRoster = groupBy_(roster, 'TurmaID');
-  const savedRows = getMergedPresenceRowsForDate_(dateKey);
+  const savedRows = getSavedRowsForDate_(dateKey);
   const savedGrouped = groupBy_(savedRows, 'turmaId');
 
   const callsByTurma = {};
@@ -897,6 +1059,21 @@ function loadAllData_() {
 
   __BACKEND_RUNTIME_CACHE__.allData = data;
   return data;
+}
+
+
+
+function loadCoreData_() {
+  const turmas = mergeTurmas_(loadMetaClasses_(), loadTurmasFromReadBase_());
+  const studentsMeta = loadMetaStudents_();
+  const roster = loadRosterFromReadBase_();
+  const alunos = mergeRosterWithMeta_(roster, studentsMeta, turmas);
+
+  return {
+    turmas,
+    alunos,
+    studentsMeta,
+  };
 }
 
 
@@ -1440,56 +1617,7 @@ function getSelfBaseRowsForDate_(dateKey) {
 
 
 function getMergedPresenceRowsForDate_(dateKey) {
-  const baseRows = getBaseRowsForDate_(dateKey).map(row => ({
-    ...row,
-    selfPresence: false,
-    presenceSource: 'base',
-  }));
-  const selfRows = getSelfBaseRowsForDate_(dateKey).map(row => ({
-    ...row,
-    selfPresence: true,
-    presenceSource: 'selfbase',
-  }));
-
-  const merged = new Map();
-  const addRow = (row) => {
-    const key = [
-      String(row.turmaId || ''),
-      normalizeKey_(row.nome || row.alunoId || ''),
-      String(row.dateKey || ''),
-    ].join('|');
-    const existing = merged.get(key);
-    if (!existing) {
-      merged.set(key, row);
-      return;
-    }
-
-    // A Base continua sendo a fonte principal dos metadados da chamada.
-    // Quando houver presença em SelfBase, apenas o status de presença é sobrescrito.
-    const selfWins = Boolean(row.selfPresence && !existing.selfPresence);
-
-    merged.set(key, {
-      ...existing,
-      ...(selfWins ? {
-        presenca: row.presenca,
-        atraso: row.atraso,
-        ausencia: row.ausencia,
-        selfPresence: true,
-        presenceSource: 'selfbase',
-      } : {}),
-      // mantemos o que já veio de Base para oferta, visitantes e demais campos
-      alunoId: existing.alunoId || row.alunoId,
-      nome: existing.nome || row.nome,
-      turmaId: existing.turmaId || row.turmaId,
-      turmaNome: existing.turmaNome || row.turmaNome,
-      dateKey: existing.dateKey || row.dateKey,
-    });
-  };
-
-  baseRows.forEach(addRow);
-  selfRows.forEach(addRow);
-
-  return [...merged.values()];
+  return getSavedRowsForDate_(dateKey);
 }
 
 
@@ -1811,53 +1939,6 @@ function extractCallMetaField_(text, field) {
   }
 }
 
-function debugSelfPresenceCpf_(cpfRaw) {
-  ensureSheets_();
-
-  const cpfPrefix = String(cpfRaw || '').replace(/\D/g, '').slice(0, 5);
-
-  Logger.log('================ DEBUG SELF CPF ================');
-  Logger.log('CPF bruto recebido: %s', String(cpfRaw || ''));
-  Logger.log('CPF normalizado (5 primeiros): %s', cpfPrefix);
-  Logger.log('Tamanho do prefixo: %s', cpfPrefix.length);
-
-  if (cpfPrefix.length !== 5) {
-    Logger.log('ERRO: prefixo inválido. São necessários exatamente 5 dígitos.');
-    return { ok: false, message: 'Digite os 5 primeiros números do CPF.' };
-  }
-
-  const all = loadAllData_();
-  Logger.log('Total de alunos carregados em all.alunos: %s', (all.alunos || []).length);
-
-  (all.alunos || []).slice(0, 15).forEach((student, index) => {
-    const cpf = normalizeCpf_(student.CPF || '');
-    Logger.log(
-      '[%s] Nome=%s | Turma=%s | CPF=%s | CPF5=%s',
-      index + 1,
-      String(student.Nome || ''),
-      String(student.TurmaNome || ''),
-      cpf,
-      cpf.slice(0, 5)
-    );
-  });
-
-  const found = findReadBaseStudentByCpfPrefix_(cpfPrefix, all, true);
-
-  Logger.log('Resultado final: %s', found ? 'ENCONTRADO' : 'NÃO ENCONTRADO');
-  if (found) {
-    Logger.log('Aluno encontrado: %s', JSON.stringify({
-      nome: found.Nome,
-      turmaId: found.TurmaID,
-      turmaNome: found.TurmaNome,
-      cpf: found.CPF
-    }));
-  }
-
-  Logger.log('=================================================');
-
-  return found;
-}
-
 
 function findReadBaseStudentByNameAndTurma_(studentName, turmaId, allData, debug) {
   const targetName = normalizeKey_(studentName || '');
@@ -1897,6 +1978,9 @@ function findReadBaseStudentByCpfPrefix_(cpfPrefix, allData, debug) {
     if (debug) Logger.log('Prefixo inválido dentro da função de busca.');
     return null;
   }
+
+  const direct = findReadBaseStudentByCpfPrefixInSheet_(prefix, debug);
+  if (direct) return direct;
 
   const roster = (allData && Array.isArray(allData.alunos))
     ? allData.alunos
@@ -1991,6 +2075,64 @@ function appendSelfPresenceRow_(dateKey, student) {
   invalidateRuntimeCache_();
 
   return row;
+}
+
+
+function findReadBaseStudentByCpfPrefixInSheet_(cpfPrefix, debug) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(READ_SHEET_NAME);
+  if (!sheet || sheet.getLastRow() < 2) return null;
+
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0].map(normalizeHeader_);
+  const idxAluno = findHeaderIndex_(headers, ['ALUNO', 'NOME']);
+  const idxClasse = findHeaderIndex_(headers, ['CLASSE', 'TURMA']);
+  const idxCpf = findHeaderIndex_(headers, ['CPF', 'DOCUMENTO']);
+
+  if (idxAluno === -1 || idxClasse === -1 || idxCpf === -1) {
+    if (debug) Logger.log('ReadBase sem colunas suficientes para busca direta de CPF.');
+    return null;
+  }
+
+  for (let i = 1; i < values.length; i++) {
+    const nome = String(values[i][idxAluno] || '').trim();
+    const classe = String(values[i][idxClasse] || '').trim();
+    const cpf = normalizeCpf_(values[i][idxCpf] || '');
+    const cpf5 = cpf.slice(0, 5);
+    if (!nome || !classe || cpf5 !== cpfPrefix) continue;
+
+    const student = {
+      Nome: nome,
+      CPF: cpf,
+      TurmaID: buildTurmaId_(classe),
+      TurmaNome: classe,
+      Ativo: 'sim',
+      FaltasConsecutivas: 0,
+      TotalPresencas: 0,
+      TotalFaltas: 0,
+      Percentual: 0,
+      Status: 'ativo',
+      StatusManual: '',
+      UltimaPresenca: '',
+      UltimaAusencia: '',
+      RealocadoDe: '',
+      CriadoEm: '',
+      AtualizadoEm: '',
+    };
+
+    if (debug) {
+      Logger.log('MATCH direto na ReadBase na linha %s: %s', i + 1, JSON.stringify({
+        Nome: student.Nome,
+        CPF: student.CPF,
+        TurmaID: student.TurmaID,
+        TurmaNome: student.TurmaNome
+      }));
+    }
+
+    return student;
+  }
+
+  return null;
 }
 
 function appendReadBaseStudent_(sheet, nome, turmaNome, cpf, now) {
@@ -2137,6 +2279,7 @@ function ensureSheets_() {
   getOrCreateSheet_(ss, META_STUDENTS_SHEET, META_STUDENTS_HEADERS, true);
   getOrCreateSheet_(ss, META_CLASSES_SHEET, META_CLASSES_HEADERS, true);
   getOrCreateSheet_(ss, REPORTS_SHEET, REPORTS_HEADERS, true);
+  getOrCreateSheet_(ss, LAST_CALL_CACHE_SHEET, LAST_CALL_CACHE_HEADERS, true);
 
   pruneColumnsByHeader_(readSheet, ['ALUNOID', 'ALUNO_ID', 'ID']);
   const metaSheet = ss.getSheetByName(META_STUDENTS_SHEET);
@@ -2593,14 +2736,7 @@ function sendTelegram_(text) {
   return { ok: true, sent: true, sentCount: chunks.length, lastResponse };
 }
 
-function json_(obj) {
-  return ContentService
-    .createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-// debugRoundTripChamada_();
-function debugRoundTripChamada_() {
+function testLastCallCache_() {
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(30000)) {
     throw new Error('Não foi possível obter lock para o teste.');
@@ -2609,146 +2745,53 @@ function debugRoundTripChamada_() {
   try {
     ensureSheets_();
 
-    const dateKey = todayKey_();
-    const all = loadAllData_();
-
-    const turma =
-      getTurmaByIdOrName_('T_cordei_de_cristo', all.turmas) ||
-      all.turmas[0] ||
-      null;
-
-    if (!turma) {
-      throw new Error('Nenhuma turma encontrada para o teste.');
+    const cache = loadLastCallCache_(true);
+    if (!cache) {
+      return {
+        ok: false,
+        message: 'Nenhum cache de última chamada encontrado.',
+      };
     }
 
-    const roster = getRosterForTurma_(turma.TurmaID, all);
-    if (!roster.length) {
-      throw new Error(`A turma ${turma.Nome} não tem alunos para testar.`);
-    }
-
-    const sampleRows = roster.slice(0, Math.min(4, roster.length)).map((aluno, index) => ({
-      alunoId: aluno.Nome,
-      nome: aluno.Nome,
-      presenca: index === 0 ? 'sim' : (index === 1 ? 'atrasado' : 'nao'),
-      atraso: index === 1,
-      observacao: `teste_${new Date().toISOString()}`,
-      statusAluno: String(aluno.Status || 'ativo'),
-    }));
-
-    const chamadaId = `CALL_${turma.TurmaID}_${dateKey}`;
-    const oferta = 'R$ 4,00';
-    const visitantes = 4;
-    const biblias = 4;
-    const revistas = 4;
-
-    Logger.log('========== TESTE ROUND-TRIP ==========');
-    Logger.log('TURMA: ' + JSON.stringify({
-      turmaId: turma.TurmaID,
-      turmaNome: turma.Nome,
-      dateKey,
-      chamadaId,
-    }, null, 2));
-
-    Logger.log('PAYLOAD DE TESTE: ' + JSON.stringify({
-      action: 'saveCall',
-      date: dateKey,
-      turmaId: turma.TurmaID,
-      chamadaId,
-      oferta,
-      visitantes,
-      biblias,
-      revistas,
-      rowsJson: sampleRows,
-    }, null, 2));
-
-    const saveResult = saveCall_({
-      date: dateKey,
-      turmaId: turma.TurmaID,
-      chamadaId,
-      oferta,
-      visitantes: String(visitantes),
-      biblias: String(biblias),
-      revistas: String(revistas),
-      rowsJson: JSON.stringify(sampleRows),
-      sendTelegram: 'nao',
-      autoSend: 'nao',
-    });
-
-    SpreadsheetApp.flush();
-
-    const reportId = `CALL_${turma.TurmaID}_${dateKey}`;
-    const rawLog = getReportLogById_(reportId);
-    const parsedMeta = findCallMeta_(turma.TurmaID, dateKey);
-    const initResult = init_({ date: dateKey });
-    const frontendCall = initResult?.callsByTurma?.[turma.TurmaID] || null;
-
-    Logger.log('========== SAVE RESULT ==========');
-    Logger.log(JSON.stringify(saveResult, null, 2));
-
-    Logger.log('========== REPORT LOG RAW ==========');
-    Logger.log(JSON.stringify(rawLog, null, 2));
-
-    Logger.log('========== PARSED META ==========');
-    Logger.log(JSON.stringify(parsedMeta, null, 2));
-
-    Logger.log('========== FRONTEND JSON ==========');
-    Logger.log(JSON.stringify(frontendCall, null, 2));
-
-    Logger.log('========== INIT INTEIRO ==========');
-    Logger.log(JSON.stringify({
-      dateKey: initResult.dateKey,
-      baseRowsCount: initResult.baseRowsCount,
-      call: frontendCall,
-    }, null, 2));
+    const all = loadCoreData_();
+    const callsByTurma = buildCallsByTurmaForDate_(cache.dateKey, all);
+    const turmaCall = callsByTurma[String(cache.turmaId || '')] || null;
+    const cacheRows = Array.isArray(cache.rows) ? cache.rows : [];
+    const turmaRows = turmaCall && Array.isArray(turmaCall.rows) ? turmaCall.rows : [];
 
     return {
       ok: true,
-      dateKey,
-      turmaId: turma.TurmaID,
-      chamadaId,
-      saveResult,
-      rawLog,
-      parsedMeta,
-      frontendCall,
+      message: 'Cache lido e reconstruído com sucesso.',
+      cache: {
+        chamadaId: cache.chamadaId || '',
+        dateKey: cache.dateKey || '',
+        turmaId: cache.turmaId || '',
+        turmaNome: cache.turmaNome || '',
+        rows: cacheRows.length,
+        presentes: Number(cache.presentes || 0) || 0,
+        atrasos: Number(cache.atrasos || 0) || 0,
+        ausentes: Number(cache.ausentes || 0) || 0,
+      },
+      reconstruido: {
+        rows: turmaRows.length,
+        presentes: turmaCall ? Number(turmaCall.presentes || 0) || 0 : 0,
+        atrasos: turmaCall ? Number(turmaCall.atrasos || 0) || 0 : 0,
+        ausentes: turmaCall ? Number(turmaCall.ausentes || 0) || 0 : 0,
+      },
+      selfBaseRowsHoje: getSelfBaseRowsForDate_(cache.dateKey).length,
     };
   } finally {
     lock.releaseLock();
   }
 }
 
-// debugLerChamadaSalva_('2026-05-14', 'T_cordei_de_cristo');
-function debugLerChamadaSalva_(dateKey, turmaId) {
-  ensureSheets_();
 
-  const all = loadAllData_();
-  const turma = getTurmaByIdOrName_(turmaId, all.turmas);
-
-  if (!turma) {
-    throw new Error('Turma não encontrada.');
-  }
-
-  const reportId = `CALL_${turma.TurmaID}_${dateKey}`;
-  const rawLog = getReportLogById_(reportId);
-  const parsedMeta = findCallMeta_(turma.TurmaID, dateKey);
-  const initResult = init_({ date: dateKey });
-  const frontendCall = initResult?.callsByTurma?.[turma.TurmaID] || null;
-
-  Logger.log('========== LEITURA SALVA ==========');
-  Logger.log(JSON.stringify({
-    reportId,
-    rawLog,
-    parsedMeta,
-    frontendCall,
-  }, null, 2));
-
-  return {
-    ok: true,
-    reportId,
-    rawLog,
-    parsedMeta,
-    frontendCall,
-  };
+function json_(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
 }
+
 
 
 
