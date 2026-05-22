@@ -229,7 +229,7 @@ function saveCall_(p) {
   const baseRows = prepared.map(x => x.baseRow);
 
   replaceRowsForDateClass_(SHEETS.CHAMADA, CHAMADA_HEADERS, currentChamada, dateKey, turma.Nome, chamadaRows);
-  replaceRowsForDateClass_(SHEETS.BASE, BASE_HEADERS, currentBase, dateKey, turma.Nome, baseRows);
+  upsertBaseRows_(SHEETS.BASE, BASE_HEADERS, currentBase, baseRows);
 
   const refreshedChamada = loadSheetObjects_(SHEETS.CHAMADA, CHAMADA_HEADERS);
   const refreshedBase = loadSheetObjects_(SHEETS.BASE, BASE_HEADERS);
@@ -953,6 +953,7 @@ function loadSheetObjects_(sheetName, headers) {
       const idx = headerMap.get(normalizeKey_(header));
       obj[header] = idx === undefined ? '' : raw[idx];
     }
+    obj._rowNumber = i + 1;
     rows.push(obj);
   }
 
@@ -990,6 +991,54 @@ function appendObjects_(sheet, headers, rows) {
   sheet.getRange(startRow, 1, data.length, headers.length).setValues(data);
 }
 
+function buildBaseRowKey_(row) {
+  return [
+    normalizeDateKey_(row?.DATA || ''),
+    normalizeKey_(row?.CLASSE || ''),
+    normalizeKey_(row?.ALUNO || ''),
+  ].join('__');
+}
+
+function upsertRowsInPlace_(sheetName, headers, existingRows, newRows, keyFn) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
+  ensureHeaders_(sheet, headers);
+
+  const currentRows = Array.isArray(existingRows) && existingRows.length
+    ? existingRows
+    : loadSheetObjects_(sheetName, headers);
+
+  const rowByKey = new Map();
+  for (const row of currentRows) {
+    const key = keyFn(row);
+    if (key) rowByKey.set(key, row);
+  }
+
+  for (const newRow of newRows || []) {
+    const key = keyFn(newRow);
+    if (!key) continue;
+
+    const values = headers.map(header => newRow[header] ?? '');
+    const existing = rowByKey.get(key);
+
+    if (existing && existing._rowNumber) {
+      sheet.getRange(existing._rowNumber, 1, 1, headers.length).setValues([values]);
+    } else {
+      const nextRow = Math.max(sheet.getLastRow() + 1, 2);
+      sheet.getRange(nextRow, 1, 1, headers.length).setValues([values]);
+      rowByKey.set(key, { _rowNumber: nextRow });
+    }
+  }
+}
+
+function upsertBaseRows_(sheetName, headers, existingRows, newRows) {
+  upsertRowsInPlace_(sheetName, headers, existingRows, newRows, buildBaseRowKey_);
+}
+
+function upsertBaseRow_(sheetName, headers, existingRows, dateKey, className, alunoNome, newRow) {
+  upsertRowsInPlace_(sheetName, headers, existingRows, [newRow], buildBaseRowKey_);
+}
+
 function upsertChamadaRow_(sheetName, headers, existingRows, dateKey, className, alunoNome, newRow) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
@@ -1009,20 +1058,7 @@ function upsertChamadaRow_(sheetName, headers, existingRows, dateKey, className,
   writeAllRows_(sheet, headers, remaining);
 }
 
-function upsertBaseRow_(sheetName, headers, existingRows, dateKey, className, alunoNome, newRow) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
-  ensureHeaders_(sheet, headers);
 
-  const remaining = (existingRows || []).filter(r =>
-    !(normalizeDateKey_(r.DATA) === normalizeDateKey_(dateKey) &&
-      normalizeKey_(r.CLASSE) === normalizeKey_(className) &&
-      normalizeKey_(r.ALUNO) === normalizeKey_(alunoNome))
-  );
-
-  remaining.push(newRow);
-  writeAllRows_(sheet, headers, remaining);
-}
 
 function replaceRowsForDateClass_(sheetName, headers, existingRows, dateKey, className, newRows) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
