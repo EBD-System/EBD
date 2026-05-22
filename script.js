@@ -1214,9 +1214,9 @@ const isAutoPresenca =
   String(row.AUTO_PRESENÇA || '').toLowerCase() === 'sim';
 
 const autoBadge = isAutoAtraso
-  ? '<span class="badge-pill badge-pill--warn">Auto atraso</span>'
+  ? '<span class="badge-pill badge-pill--warn">Auto-Atraso</span>'
   : isAutoPresenca
-    ? '<span class="badge-pill badge-pill--info">Auto-presença</span>'
+    ? '<span class="badge-pill badge-pill--info">Auto-Presença</span>'
     : '';
 
 badgesEl.innerHTML = [
