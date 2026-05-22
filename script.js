@@ -1205,18 +1205,25 @@ function renderStudents() {
       const statusLabel = isInactive ? 'Inativo' : 'Ativo';
       nameEl.innerHTML = `<span class="student-status ${isInactive ? 'student-status--inactive' : 'student-status--active'}">${statusLabel}</span> - ${escapeHtml(row.nome || '')}`;
 
-      const isAutoAtraso =
-  row.AUTO_ATRASO === true ||
-  String(row.AUTO_ATRASO || '').toLowerCase() === 'sim';
+const isAuto = (v) => {
+  if (v === true || v === 1) return true;
+  const s = String(v ?? '').trim().toLowerCase();
+  return s === 'sim' || s === 'true' || s === '1';
+};
+
+const isAutoAtraso =
+  isAuto(row.autoAtraso) ||
+  isAuto(row.AUTO_ATRASO);
 
 const isAutoPresenca =
-  row.AUTO_PRESENÇA === true ||
-  String(row.AUTO_PRESENÇA || '').toLowerCase() === 'sim';
+  isAuto(row.autoPresenca) ||
+  isAuto(row.AUTO_PRESENÇA) ||
+  isAuto(row.AUTO_PRESENCA);
 
 const autoBadge = isAutoAtraso
-  ? '<span class="badge-pill badge-pill--warn">Auto-Atraso</span>'
+  ? '<span class="badge-pill badge-pill--warn">Auto atraso</span>'
   : isAutoPresenca
-    ? '<span class="badge-pill badge-pill--info">Auto-Presença</span>'
+    ? '<span class="badge-pill badge-pill--info">Auto-presença</span>'
     : '';
 
 badgesEl.innerHTML = [
