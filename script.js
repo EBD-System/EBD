@@ -1206,14 +1206,12 @@ function renderStudents() {
       nameEl.innerHTML = `<span class="student-status ${isInactive ? 'student-status--inactive' : 'student-status--active'}">${statusLabel}</span> - ${escapeHtml(row.nome || '')}`;
 
       const isAutoAtraso =
-  row.auto_atraso === true ||
-  row.autoAtraso === true ||
-  String(row.auto_atraso || '').toLowerCase() === 'sim' ||
-  String(row.autoAtraso || '').toLowerCase() === 'sim';
+  row.AUTO_ATRASO === true ||
+  String(row.AUTO_ATRASO || '').toLowerCase() === 'sim';
 
 const isAutoPresenca =
-  row.selfPresence ||
-  row.presencaOrigem === 'selfbase';
+  row.AUTO_PRESENÇA === true ||
+  String(row.AUTO_PRESENÇA || '').toLowerCase() === 'sim';
 
 const autoBadge = isAutoAtraso
   ? '<span class="badge-pill badge-pill--warn">Auto atraso</span>'
