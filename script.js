@@ -957,6 +957,7 @@ function bestStudentForCurrentTurma() {
   const turmaId = state.selectedTurmaId;
   const turmaStudents = state.alunos
     .filter((a) => String(a.TurmaID || '') === String(turmaId || ''))
+    .filter((a) => String(a.Status || 'ativo').trim().toLowerCase() !== 'inativo')
     .filter((a) => Number(a.Percentual || 0) > 0)
     .sort((a, b) => Number(b.Percentual || 0) - Number(a.Percentual || 0) || String(a.Nome || '').localeCompare(String(b.Nome || '')));
   return turmaStudents[0] || null;

@@ -564,6 +564,9 @@ function buildAlunosFromCadastro_(cadastroRows, baseRows = []) {
     ...st,
     ...(statsMap.get(normalizeKey_(`${st.TurmaID}__${st.Nome}`)) || {}),
   })).sort((a, b) => {
+    const ia = String(a.Status || 'ativo').trim().toLowerCase() === 'inativo' ? 1 : 0;
+    const ib = String(b.Status || 'ativo').trim().toLowerCase() === 'inativo' ? 1 : 0;
+    if (ia !== ib) return ia - ib;
     const turmaCmp = String(a.TurmaNome || '').localeCompare(String(b.TurmaNome || ''));
     if (turmaCmp !== 0) return turmaCmp;
     return String(a.Nome || '').localeCompare(String(b.Nome || ''));
@@ -591,7 +594,9 @@ function buildCallForTurma_(dateKey, turma, alunos, chamadaRows, baseRows) {
     return effective;
   });
 
-  const activeRows = effectiveRows;
+  const activeRows = effectiveRows.filter(r =>
+    String(r.statusAluno || 'ativo').trim().toLowerCase() !== 'inativo'
+  );
   const presentes = activeRows.filter(r => isPresentLikeValue_(r.presenca)).length;
   const atrasos = activeRows.filter(r => isDelayedValue_(r.presenca)).length;
   const ausentes = activeRows.length - presentes;
@@ -622,7 +627,9 @@ function buildResumoGeral_(dateKey, turmas, alunos, callsByTurma, chamadaRows) {
   const values = Object.values(callsByTurma || {});
   const totalTurmas = turmas.length;
   const turmasSalvas = values.filter(c => c && c.isSaved).length;
-  const totalAlunos = alunos.length;
+  const totalAlunos = alunos.filter(a =>
+    String(a.Status || 'ativo').trim().toLowerCase() !== 'inativo'
+  ).length;
 
   const presentes = values.reduce((acc, c) => acc + Number(c?.presentes || 0), 0);
   const atrasos = values.reduce((acc, c) => acc + Number(c?.atrasos || 0), 0);
@@ -749,9 +756,12 @@ function buildBaseRow_(opts) {
 function buildTurmasReportText_(dateKey, turma, turmaCall, alunos) {
   if (!turma || !turmaCall) return 'Nenhuma turma selecionada.';
   const stats = turmaCall || {};
-  const presentNames = (turmaCall.rows || []).filter(r => isPresentLikeValue_(r.presenca)).map(r => r.nome).join(', ') || 'nenhum';
-  const delayedNames = (turmaCall.rows || []).filter(r => isDelayedValue_(r.presenca)).map(r => r.nome).join(', ') || 'nenhum';
-  const absentNames = (turmaCall.rows || []).filter(r => !isPresentLikeValue_(r.presenca)).map(r => r.nome).join(', ') || 'nenhum';
+  const activeRows = (turmaCall.rows || []).filter(r =>
+    String(r.statusAluno || 'ativo').trim().toLowerCase() !== 'inativo'
+  );
+  const presentNames = activeRows.filter(r => isPresentLikeValue_(r.presenca)).map(r => r.nome).join(', ') || 'nenhum';
+  const delayedNames = activeRows.filter(r => isDelayedValue_(r.presenca)).map(r => r.nome).join(', ') || 'nenhum';
+  const absentNames = activeRows.filter(r => !isPresentLikeValue_(r.presenca)).map(r => r.nome).join(', ') || 'nenhum';
 
   return [
     'RELATÓRIO DA CLASSE',
@@ -778,7 +788,9 @@ function buildGeneralReportText_(dateKey, turmas, alunos, callsByTurma) {
   const values = Object.values(callsByTurma || {});
   const totalTurmas = turmas.length;
   const turmasSalvas = values.filter(c => c && c.isSaved).length;
-  const totalAlunos = alunos.length;
+  const totalAlunos = alunos.filter(a =>
+    String(a.Status || 'ativo').trim().toLowerCase() !== 'inativo'
+  ).length;
   const presentes = values.reduce((acc, c) => acc + Number(c?.presentes || 0), 0);
   const atrasos = values.reduce((acc, c) => acc + Number(c?.atrasos || 0), 0);
   const ausentes = values.reduce((acc, c) => acc + Number(c?.ausentes || 0), 0);
@@ -873,16 +885,18 @@ function computeStudentStatsFromBase_(students, baseRows) {
     const lastPresence = [...history].reverse().find(r => toInt_(r.PRESENÇA) === 1 || toInt_(r.ATRASO) === 1);
     const lastAbsence = [...history].reverse().find(r => toInt_(r.AUSÊNCIA) === 1);
 
+    const isInactive = streak >= 4;
+
     map.set(key, {
       FaltasConsecutivas: streak,
       TotalPresencas: totalPresencas,
       TotalFaltas: totalFaltas,
       Percentual: percentual,
-      FaltandoMuito: streak >= 4 ? 'sim' : '',
+      FaltandoMuito: isInactive ? 'sim' : '',
       UltimaPresenca: lastPresence ? normalizeDateKey_(lastPresence.DATA) : '',
       UltimaAusencia: lastAbsence ? normalizeDateKey_(lastAbsence.DATA) : '',
-      Ativo: 'sim',
-      Status: 'ativo',
+      Ativo: isInactive ? 'nao' : 'sim',
+      Status: isInactive ? 'inativo' : 'ativo',
     });
   }
 
