@@ -1205,13 +1205,29 @@ function renderStudents() {
       const statusLabel = isInactive ? 'Inativo' : 'Ativo';
       nameEl.innerHTML = `<span class="student-status ${isInactive ? 'student-status--inactive' : 'student-status--active'}">${statusLabel}</span> - ${escapeHtml(row.nome || '')}`;
 
-      badgesEl.innerHTML = [
-        isDelayed ? '<span class="badge-pill badge-pill--warn">Atrasado(a)</span>' : '',
-        isFaltandoMuito ? '<span class="badge-pill badge-pill--warn">Faltando muito</span>' : '',
-        isReativado ? '<span class="badge-pill badge-pill--info">Reativado</span>' : '',
-        row.selfPresence || row.presencaOrigem === 'selfbase' ? '<span class="badge-pill badge-pill--info">Auto-presença</span>' : '',
-        aluno.RealocadoDe ? `<span class="badge-pill badge-pill--info">Veio de ${escapeHtml(aluno.RealocadoDe)}</span>` : '',
-      ].filter(Boolean).join('');
+      const isAutoAtraso =
+  row.auto_atraso === true ||
+  row.autoAtraso === true ||
+  String(row.auto_atraso || '').toLowerCase() === 'sim' ||
+  String(row.autoAtraso || '').toLowerCase() === 'sim';
+
+const isAutoPresenca =
+  row.selfPresence ||
+  row.presencaOrigem === 'selfbase';
+
+const autoBadge = isAutoAtraso
+  ? '<span class="badge-pill badge-pill--warn">Auto atraso</span>'
+  : isAutoPresenca
+    ? '<span class="badge-pill badge-pill--info">Auto-presença</span>'
+    : '';
+
+badgesEl.innerHTML = [
+  isDelayed ? '<span class="badge-pill badge-pill--warn">Atrasado(a)</span>' : '',
+  isFaltandoMuito ? '<span class="badge-pill badge-pill--warn">Faltando muito</span>' : '',
+  isReativado ? '<span class="badge-pill badge-pill--info">Reativado</span>' : '',
+  autoBadge,
+  aluno.RealocadoDe ? `<span class="badge-pill badge-pill--info">Veio de ${escapeHtml(aluno.RealocadoDe)}</span>` : '',
+].filter(Boolean).join('');
 
       const percent = Number(aluno.Percentual || 0);
       const faltas = Number(aluno.TotalFaltas || 0);
