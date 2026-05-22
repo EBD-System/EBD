@@ -995,10 +995,14 @@ function upsertChamadaRow_(sheetName, headers, existingRows, dateKey, className,
   const sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
   ensureHeaders_(sheet, headers);
 
+  const targetDateKey = normalizeDateKey_(dateKey);
+  const targetClassKey = normalizeKey_(className);
+
+  // Mantém somente o que pertence ao dia atual.
+  // Tudo de datas anteriores é descartado para evitar acúmulo na aba Chamada.
   const remaining = (existingRows || []).filter(r =>
-    !(normalizeDateKey_(r.DATA_CHAMADA) === normalizeDateKey_(dateKey) &&
-      normalizeKey_(r.CLASSE) === normalizeKey_(className) &&
-      normalizeKey_(r.ALUNO) === normalizeKey_(alunoNome))
+    normalizeDateKey_(r.DATA_CHAMADA) === targetDateKey &&
+    normalizeKey_(r.CLASSE) !== targetClassKey
   );
 
   remaining.push(newRow);
@@ -1025,11 +1029,16 @@ function replaceRowsForDateClass_(sheetName, headers, existingRows, dateKey, cla
   const sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
   ensureHeaders_(sheet, headers);
 
+  const targetDateKey = normalizeDateKey_(dateKey);
+  const targetClassKey = normalizeKey_(className);
   const dateHeader = headers[0];
   const classHeader = headers[2];
+
+  // A Chamada funciona como cache do estado corrente do dia.
+  // Por isso, tudo que for de datas anteriores é removido antes da gravação atual.
   const remaining = (existingRows || []).filter(r =>
-    !(normalizeDateKey_(r[dateHeader]) === normalizeDateKey_(dateKey) &&
-      normalizeKey_(r[classHeader]) === normalizeKey_(className))
+    normalizeDateKey_(r[dateHeader]) === targetDateKey &&
+    normalizeKey_(r[classHeader]) !== targetClassKey
   );
 
   const prepared = remaining.concat(newRows || []);
