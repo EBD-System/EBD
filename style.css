@@ -249,31 +249,32 @@ body.access-restricted .student__actions{
   display:inline-flex;
   align-items:baseline;
   gap:0;
+  color:#000;
 }
 
 #statTotalAlunos span{
+  display:inline;
+  margin:0;
   font-size:1.15em;
-}
-
-.stat-total__value{
   color:inherit;
 }
 
-.stat-total__separator{
-  color:inherit;
-  margin:0 2px;
+#statTotalAlunos .stat-total__value,
+#statTotalAlunos .stat-total__separator{
+  color:#000;
 }
 
-.stat-total__saved{
+#statTotalAlunos .stat-total__saved{
   font-weight:800;
+  color:#000;
 }
 
-.stat-total__saved--warn{
-  color:var(--danger);
+#statTotalAlunos .stat-total__saved--warn{
+  color:var(--danger) !important;
 }
 
-.stat-total__saved--ok{
-  color:var(--success);
+#statTotalAlunos .stat-total__saved--ok{
+  color:var(--success) !important;
 }
 
 .loading-overlay {
