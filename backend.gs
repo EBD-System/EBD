@@ -1013,6 +1013,14 @@ function buildBaseRowKey_(row) {
   ].join('__');
 }
 
+function buildChamadaRowKey_(row) {
+  return [
+    normalizeDateKey_(row?.DATA_CHAMADA || ''),
+    normalizeKey_(row?.CLASSE || ''),
+    normalizeKey_(row?.ALUNO || ''),
+  ].join('__');
+}
+
 function upsertRowsInPlace_(sheetName, headers, existingRows, newRows, keyFn) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
@@ -1054,45 +1062,13 @@ function upsertBaseRow_(sheetName, headers, existingRows, dateKey, className, al
 }
 
 function upsertChamadaRow_(sheetName, headers, existingRows, dateKey, className, alunoNome, newRow) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
-  ensureHeaders_(sheet, headers);
-
-  const targetDateKey = normalizeDateKey_(dateKey);
-  const targetClassKey = normalizeKey_(className);
-
-  // Mantém somente o que pertence ao dia atual.
-  // Tudo de datas anteriores é descartado para evitar acúmulo na aba Chamada.
-  const remaining = (existingRows || []).filter(r =>
-    normalizeDateKey_(r.DATA_CHAMADA) === targetDateKey &&
-    normalizeKey_(r.CLASSE) !== targetClassKey
-  );
-
-  remaining.push(newRow);
-  writeAllRows_(sheet, headers, remaining);
+  upsertRowsInPlace_(sheetName, headers, existingRows, [newRow], buildChamadaRowKey_);
 }
 
 
 
 function replaceRowsForDateClass_(sheetName, headers, existingRows, dateKey, className, newRows) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
-  ensureHeaders_(sheet, headers);
-
-  const targetDateKey = normalizeDateKey_(dateKey);
-  const targetClassKey = normalizeKey_(className);
-  const dateHeader = headers[0];
-  const classHeader = headers[2];
-
-  // A Chamada funciona como cache do estado corrente do dia.
-  // Por isso, tudo que for de datas anteriores é removido antes da gravação atual.
-  const remaining = (existingRows || []).filter(r =>
-    normalizeDateKey_(r[dateHeader]) === targetDateKey &&
-    normalizeKey_(r[classHeader]) !== targetClassKey
-  );
-
-  const prepared = remaining.concat(newRows || []);
-  writeAllRows_(sheet, headers, prepared);
+  upsertRowsInPlace_(sheetName, headers, existingRows, newRows || [], buildChamadaRowKey_);
 }
 
 function countDataRows_(sheetName) {
