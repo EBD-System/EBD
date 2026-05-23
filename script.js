@@ -467,6 +467,15 @@ function normalizePresenceValue(value) {
   return 'nao';
 }
 
+function normalizeSalvoValue(value) {
+  const v = String(value ?? '').trim().toLowerCase();
+  return v === '1' || v === 'sim' || v === 'true' ? 1 : 0;
+}
+
+function isSavedRow(row = {}) {
+  return normalizeSalvoValue(row.salvo ?? row.SALVO) === 1;
+}
+
 function isPresentLikeValue(value) {
   return normalizePresenceValue(value) !== 'nao';
 }
@@ -478,8 +487,12 @@ function isDelayedValue(value) {
 function syncRowPresenceFields(row = {}) {
   const delay = isDelayedValue(row.presenca) || normalizeBoolValue(row.atraso);
   const presence = delay ? 'atrasado' : normalizePresenceValue(row.presenca);
+  const salvo = normalizeSalvoValue(row.salvo ?? row.SALVO);
+
   row.presenca = presence;
   row.atraso = delay;
+  row.salvo = salvo;
+  row.SALVO = salvo;
   return row;
 }
 
@@ -684,6 +697,7 @@ function buildStudentRowFromAluno(aluno) {
     nome: aluno.Nome,
     presenca: 'nao',
     atraso: false,
+    salvo: 0,
     observacao: '',
     statusAluno: aluno.Status || 'ativo',
   });
@@ -939,14 +953,17 @@ function isInactiveStudent(row, rosterMap = null) {
 
 function getActiveRows(call) {
   const rosterMap = currentStudentsMap();
-  return (call?.rows || []).filter((row) => !isInactiveStudent(row, rosterMap));
+  return (call?.rows || []).filter((row) => !isInactiveStudent(row, rosterMap) && isSavedRow(row));
 }
 
 function computeLocalStats(call) {
-  const activeRows = getActiveRows(call);
-  const total = activeRows.length;
-  const presentes = activeRows.filter((r) => isPresentLikeValue(r.presenca)).length;
-  const atrasos = activeRows.filter((r) => isDelayedValue(r.presenca)).length;
+  const rosterMap = currentStudentsMap();
+  const allActiveRows = (call?.rows || []).filter((row) => !isInactiveStudent(row, rosterMap));
+  const markedRows = allActiveRows.filter((row) => isSavedRow(row));
+
+  const total = markedRows.length;
+  const presentes = markedRows.filter((r) => isPresentLikeValue(r.presenca)).length;
+  const atrasos = markedRows.filter((r) => isDelayedValue(r.presenca)).length;
   const ausentes = total - presentes;
   const percentual = total ? (presentes / total) * 100 : 0;
 
@@ -1111,11 +1128,15 @@ function renderSummary() {
 
   const turma = getCurrentTurma();
   const best = bestStudentForCurrentTurma();
-  const activeCount = stats.total;
-  const inactiveCount = (call.rows || []).length - activeCount;
+  const activeCount = getAlunosForTurma(call.turmaId).filter(
+    (a) => String(a.Status || 'ativo').trim().toLowerCase() !== 'inativo'
+  ).length;
+  const inactiveCount = getAlunosForTurma(call.turmaId).length - activeCount;
   const missingMuchCount = getAlunosForTurma(call.turmaId).filter(
     (a) => String(a.FaltandoMuito || '') === 'sim'
   ).length;
+  const hasSavedMarks = (call.rows || []).some((row) => isSavedRow(row));
+  const isCallSaved = !!call.isSaved && hasSavedMarks;
 
   els.turmaMeta.textContent = [
     turma ? `Turma: ${turma.Nome}` : '',
@@ -1124,7 +1145,7 @@ function renderSummary() {
     `Atrasos: ${stats.atrasos}`,
     `Faltando muito: ${missingMuchCount}`,
     best ? `Melhor aluno: ${best.Nome} (${formatPercent(best.Percentual)})` : 'Melhor aluno: —',
-    call.isSaved ? 'Chamada salva no dia.' : 'Chamada ainda não salva.',
+    isCallSaved ? 'Chamada salva no dia.' : 'Chamada ainda não salva.',
   ].filter(Boolean).join(' • ');
 }
 function renderReports() {
@@ -1196,10 +1217,12 @@ function renderStudents() {
       const isInactive = String(aluno.Status || row.statusAluno || '').trim().toLowerCase() === 'inativo';
       const isFaltandoMuito = String(aluno.FaltandoMuito || '').trim().toLowerCase() === 'sim';
       const isReativado = String(aluno.Reativado || '').trim().toLowerCase() === 'sim';
-      const presence = normalizePresenceValue(row.presenca);
-      const isDelayed = presence === 'atrasado';
+      const isSaved = isSavedRow(row);
+      const presence = isSaved ? normalizePresenceValue(row.presenca) : 'nao';
+      const isDelayed = isSaved && presence === 'atrasado';
 
       article.dataset.alunoId = row.alunoId;
+      article.dataset.salvo = String(row.salvo ?? 0);
       article.classList.toggle('is-inactive', isInactive);
 
       const statusLabel = isInactive ? 'Inativo' : 'Ativo';
@@ -1244,9 +1267,9 @@ badgesEl.innerHTML = [
       runEl.style.color = run >= 4 ? '#c46a6a' : '';
       runEl.style.fontWeight = run >= 4 ? '700' : '';
 
-      presentBtn.classList.toggle('is-selected-present', presence === 'sim');
-      absentBtn.classList.toggle('is-selected-absent', presence === 'nao');
-      delayBtn.classList.toggle('is-selected-delay', presence === 'atrasado');
+      presentBtn.classList.toggle('is-selected-present', isSaved && presence === 'sim');
+      absentBtn.classList.toggle('is-selected-absent', isSaved && presence === 'nao');
+      delayBtn.classList.toggle('is-selected-delay', isSaved && presence === 'atrasado');
       toggleBtn.textContent = isInactive ? 'Ativar' : 'Inativar';
 
       presentBtn.addEventListener('click', () => setStudentPresence(row.alunoId, 'sim'));
@@ -1283,6 +1306,8 @@ function setStudentPresence(alunoId, presence) {
   if (!row) return;
   row.presenca = normalizePresenceValue(presence);
   row.atraso = row.presenca === 'atrasado';
+  row.salvo = 1;
+  row.SALVO = 1;
   state.dirty = true;
   persistDraft(call);
   renderAll();
@@ -1294,6 +1319,8 @@ function setAllPresence(presence) {
     if (isInactiveStudent(row)) return;
     row.presenca = normalizePresenceValue(presence);
     row.atraso = row.presenca === 'atrasado';
+    row.salvo = 1;
+    row.SALVO = 1;
   });
   state.dirty = true;
   persistDraft(call);
@@ -1621,6 +1648,8 @@ function clearCurrentCall() {
   call.rows.forEach((row) => {
     row.presenca = 'nao';
     row.atraso = false;
+    row.salvo = 0;
+    row.SALVO = 0;
     row.observacao = '';
   });
   call.oferta = '';
