@@ -190,6 +190,9 @@ function saveCall_(p) {
 
   const prepared = turmaAlunos.map(aluno => {
     const payload = frontByAlunoId.get(normalizeKey_(aluno.AlunoID)) || frontByAlunoId.get(normalizeKey_(aluno.Nome)) || {};
+    const rowSalvo = toInt_(payload.salvo ?? payload.SALVO ?? 0);
+    if (rowSalvo !== 1) return null;
+
     const previous = existingByAluno.get(normalizeKey_(aluno.Nome)) || null;
 
     const isAutoPresence = toBool_(previous?.AUTO_PRESENÇA) || toBool_(payload.autoPresenca) || toBool_(payload.autoPresença);
@@ -197,8 +200,6 @@ function saveCall_(p) {
 
     const effectiveStatus = resolveEffectiveStatus_(payload, previous);
     const ausSeguidas = computeConsecutiveAbsences_(currentBase, aluno, dateKey, turma.Nome, effectiveStatus);
-
-    const rowSalvo = toInt_(payload.salvo ?? payload.SALVO ?? 0);
 
     const chamadaRow = buildChamadaRow_({
       dateKey,
@@ -227,12 +228,14 @@ function saveCall_(p) {
     });
 
     return { chamadaRow, baseRow };
-  });
+  }).filter(Boolean);
 
   const chamadaRows = prepared.map(x => x.chamadaRow);
   const baseRows = prepared.map(x => x.baseRow);
 
-  replaceRowsForDateClass_(SHEETS.CHAMADA, CHAMADA_HEADERS, currentChamada, dateKey, turma.Nome, chamadaRows);
+  for (const row of chamadaRows) {
+    upsertChamadaRow_(SHEETS.CHAMADA, CHAMADA_HEADERS, currentChamada, dateKey, turma.Nome, row.ALUNO, row);
+  }
   upsertBaseRows_(SHEETS.BASE, BASE_HEADERS, currentBase, baseRows);
 
   const refreshedChamada = loadSheetObjects_(SHEETS.CHAMADA, CHAMADA_HEADERS);
