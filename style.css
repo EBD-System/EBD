@@ -248,7 +248,7 @@ body.access-restricted .student__actions{
   display:inline-flex;
   align-items:baseline;
   gap:0;
-  font-size:1.12em;
+  font-size:5.12em;
 }
 
 .stat-total__value{
