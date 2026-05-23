@@ -198,6 +198,8 @@ function saveCall_(p) {
     const effectiveStatus = resolveEffectiveStatus_(payload, previous);
     const ausSeguidas = computeConsecutiveAbsences_(currentBase, aluno, dateKey, turma.Nome, effectiveStatus);
 
+    const rowSalvo = toInt_(payload.salvo ?? payload.SALVO ?? 0);
+
     const chamadaRow = buildChamadaRow_({
       dateKey,
       aluno,
@@ -210,7 +212,7 @@ function saveCall_(p) {
       autoPresence: isAutoPresence,
       autoDelay: isAutoDelay,
       ausSeguidas,
-      salvo: 1,
+      salvo: rowSalvo,
     });
 
     const baseRow = buildBaseRow_({

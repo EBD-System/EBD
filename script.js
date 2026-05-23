@@ -733,9 +733,11 @@ function buildSyncedCall(turma, serverCall = null, draft = null) {
     return merged;
   });
 
-  const presentCount = rows.filter((r) => isPresentLikeValue(r.presenca)).length;
-  const delayCount = rows.filter((r) => isDelayedValue(r.presenca)).length;
-  const absentCount = rows.length - presentCount;
+  const presentCount = rows.filter((r) => isPresentLikeValue(r.presenca) && isSavedRow(r)).length;
+  const delayCount = rows.filter((r) => isDelayedValue(r.presenca) && isSavedRow(r)).length;
+  const absentCount = rows.filter((r) => isSavedRow(r) && normalizePresenceValue(r.presenca) === 'nao').length;
+  const neutralCount = rows.filter((r) => !isSavedRow(r)).length;
+  const total = rows.length;
 
   return {
     chamadaId: serverCall?.chamadaId || callKey(state.dateKey, turma.TurmaID),
@@ -747,11 +749,12 @@ function buildSyncedCall(turma, serverCall = null, draft = null) {
     biblias: Number(draft?.biblias ?? serverCall?.biblias ?? 0) || 0,
     revistas: Number(draft?.revistas ?? serverCall?.revistas ?? 0) || 0,
     //visitantesTexto: draft?.visitantesTexto ?? serverCall?.visitantesTexto ?? '',
-    totalAlunos: rows.length,
+    totalAlunos: total,
     presentes: presentCount,
     atrasos: delayCount,
     ausentes: absentCount,
-    percentual: rows.length ? (presentCount / rows.length) * 100 : 0,
+    neutros: neutralCount,
+    percentual: total ? (presentCount / total) * 100 : 0,
     enviadoTelegram: !!serverCall?.enviadoTelegram,
     telegramEnviadoEm: serverCall?.telegramEnviadoEm || '',
     rows,
@@ -951,23 +954,31 @@ function isInactiveStudent(row, rosterMap = null) {
   return studentStatusFromRow(row, rosterMap) === 'inativo';
 }
 
-function getActiveRows(call) {
+function getAllActiveRows(call) {
   const rosterMap = currentStudentsMap();
-  return (call?.rows || []).filter((row) => !isInactiveStudent(row, rosterMap) && isSavedRow(row));
+  return (call?.rows || []).filter((row) => !isInactiveStudent(row, rosterMap));
+}
+
+function getMarkedRows(call) {
+  return getAllActiveRows(call).filter((row) => isSavedRow(row));
+}
+
+function getActiveRows(call) {
+  return getMarkedRows(call);
 }
 
 function computeLocalStats(call) {
-  const rosterMap = currentStudentsMap();
-  const allActiveRows = (call?.rows || []).filter((row) => !isInactiveStudent(row, rosterMap));
-  const markedRows = allActiveRows.filter((row) => isSavedRow(row));
+  const allActiveRows = getAllActiveRows(call);
+  const markedRows = getMarkedRows(call);
 
-  const total = markedRows.length;
+  const total = allActiveRows.length;
   const presentes = markedRows.filter((r) => isPresentLikeValue(r.presenca)).length;
   const atrasos = markedRows.filter((r) => isDelayedValue(r.presenca)).length;
-  const ausentes = total - presentes;
+  const ausentes = markedRows.filter((r) => normalizePresenceValue(r.presenca) === 'nao').length;
+  const neutros = total - markedRows.length;
   const percentual = total ? (presentes / total) * 100 : 0;
 
-  return { total, presentes, atrasos, ausentes, percentual };
+  return { total, presentes, atrasos, ausentes, neutros, percentual };
 }
 
 function bestStudentForCurrentTurma() {
@@ -1007,9 +1018,11 @@ function buildTurmaReportText() {
   if (!call || !turma) return 'Nenhuma turma selecionada.';
   const stats = computeLocalStats(call);
   const best = bestStudentForCurrentTurma();
-  const presentNames = getActiveRows(call).filter((r) => isPresentLikeValue(r.presenca)).map((r) => r.nome).join(', ') || 'nenhum';
-  const delayedNames = getActiveRows(call).filter((r) => isDelayedValue(r.presenca)).map((r) => r.nome).join(', ') || 'nenhum';
-  const absentNames = getActiveRows(call).filter((r) => !isPresentLikeValue(r.presenca)).map((r) => r.nome).join(', ') || 'nenhum';
+  const markedRows = getMarkedRows(call);
+  const presentNames = markedRows.filter((r) => isPresentLikeValue(r.presenca)).map((r) => r.nome).join(', ') || 'nenhum';
+  const delayedNames = markedRows.filter((r) => isDelayedValue(r.presenca)).map((r) => r.nome).join(', ') || 'nenhum';
+  const absentNames = markedRows.filter((r) => normalizePresenceValue(r.presenca) === 'nao').map((r) => r.nome).join(', ') || 'nenhum';
+  const neutralNames = getAllActiveRows(call).filter((r) => !isSavedRow(r)).map((r) => r.nome).join(', ') || 'nenhum';
   const inactiveNames = getAlunosForTurma(turma.TurmaID).filter((a) => String(a.Status || '') === 'inativo').map((a) => a.Nome).join(', ') || 'nenhum';
   const faltandoMuito = getAlunosForTurma(turma.TurmaID).filter((a) => String(a.FaltandoMuito || '') === 'sim').map((a) => a.Nome).join(', ') || 'nenhum';
 
@@ -1022,6 +1035,7 @@ function buildTurmaReportText() {
     `Presentes: ${stats.presentes}`,
     `Atrasados: ${stats.atrasos}`,
     `Ausentes: ${stats.ausentes}`,
+    `Neutros: ${stats.neutros || 0}`,
     `Presença: ${formatPercent(stats.percentual)}`,
     `Oferta da classe: ${call.oferta || '-'}`,
     `Visitantes: ${Number(call.visitantes || 0) > 0 ? call.visitantes : 'não informado'}`,
@@ -1036,6 +1050,7 @@ function buildTurmaReportText() {
     `Presentes: ${presentNames}`,
     `Atrasados: ${delayedNames}`,
     `Ausentes: ${absentNames}`,
+    `Neutros: ${neutralNames}`,
   ].filter(Boolean).join('\n');
 }
 function buildGeneralReportText() {
@@ -1051,6 +1066,7 @@ function buildGeneralReportText() {
     `Presentes: ${geral.presentes}`,
     `Atrasados: ${geral.atrasos || 0}`,
     `Ausentes: ${geral.ausentes}`,
+    `Neutros: ${geral.neutros || 0}`,
     `Presença geral: ${formatPercent(geral.percentual)}`,
     `Oferta total: ${formatMoney(geral.ofertaTotal)}`,
     `Visitantes: ${geral.visitantesTotal}`,
