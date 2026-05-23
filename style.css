@@ -248,7 +248,10 @@ body.access-restricted .student__actions{
   display:inline-flex;
   align-items:baseline;
   gap:0;
-  font-size:5.12em;
+}
+
+#statTotalAlunos span{
+  font-size:1.15em;
 }
 
 .stat-total__value{
