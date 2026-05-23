@@ -472,6 +472,20 @@ function normalizeSalvoValue(value) {
   return v === '1' || v === 'sim' || v === 'true' ? 1 : 0;
 }
 
+function getSavedCount(call) {
+  return getMarkedRows(call).length;
+}
+
+function getSavedTotalLabelData(call) {
+  const total = getAllActiveRows(call).length;
+  const saved = getSavedCount(call);
+  return {
+    total,
+    saved,
+    complete: total === saved,
+  };
+}
+
 function isSavedRow(row = {}) {
   return normalizeSalvoValue(row.salvo ?? row.SALVO) === 1;
 }
@@ -997,6 +1011,20 @@ function getCurrentStats() {
   return computeLocalStats(call);
 }
 
+function renderTotalAlunosStat(call) {
+  const el = els.summary.total;
+  if (!el) return;
+
+  const { total, saved, complete } = getSavedTotalLabelData(call);
+  const savedClass = complete ? 'stat-total__saved--ok' : 'stat-total__saved--warn';
+  el.innerHTML = `
+    <span class="stat-total__value">${escapeHtml(String(total))}</span>
+    <span class="stat-total__separator">/</span>
+    <span class="stat-total__saved ${savedClass}">${escapeHtml(String(saved))}</span>
+  `;
+  el.setAttribute('aria-label', `Total de alunos: ${total}/${saved}`);
+}
+
 function currentStudentsMap() {
   const map = {};
   getAlunosForTurma(state.selectedTurmaId).forEach((aluno) => {
@@ -1113,7 +1141,14 @@ function renderSummary() {
   els.turmaMeta.className = 'turma-meta';
 
   if (!call) {
-    els.summary.total.textContent = '0';
+    if (els.summary.total) {
+      els.summary.total.innerHTML = `
+        <span class="stat-total__value">0</span>
+        <span class="stat-total__separator">/</span>
+        <span class="stat-total__saved stat-total__saved--ok">0</span>
+      `;
+      els.summary.total.setAttribute('aria-label', 'Total de alunos: 0/0');
+    }
     els.summary.presentes.textContent = '0';
     els.summary.ausentes.textContent = '0';
     els.summary.percentual.textContent = '0%';
@@ -1127,7 +1162,7 @@ function renderSummary() {
   }
 
   const stats = computeLocalStats(call);
-  els.summary.total.textContent = String(stats.total);
+  renderTotalAlunosStat(call);
   els.summary.presentes.textContent = String(stats.presentes);
   els.summary.ausentes.textContent = String(stats.ausentes);
   els.summary.percentual.textContent = formatPercent(stats.percentual);

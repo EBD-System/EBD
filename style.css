@@ -244,6 +244,33 @@ body.access-restricted .student__actions{
   letter-spacing:-.02em;
 }
 
+#statTotalAlunos{
+  display:inline-flex;
+  align-items:baseline;
+  gap:0;
+}
+
+.stat-total__value{
+  color:inherit;
+}
+
+.stat-total__separator{
+  color:inherit;
+  margin:0 2px;
+}
+
+.stat-total__saved{
+  font-weight:800;
+}
+
+.stat-total__saved--warn{
+  color:var(--danger);
+}
+
+.stat-total__saved--ok{
+  color:var(--success);
+}
+
 .loading-overlay {
   position: fixed;
   inset: 0;
