@@ -177,15 +177,13 @@ function saveCall_(p) {
   const currentBase = loadSheetObjects_(SHEETS.BASE, BASE_HEADERS);
 
   const existingCache = currentChamada.filter(r =>
+    normalizeDateKey_(r.DATA_CHAMADA) === dateKey &&
     normalizeKey_(r.CLASSE) === normalizeKey_(turma.Nome)
   );
 
   const existingByAluno = new Map();
   for (const row of existingCache) {
-    const key = normalizeKey_(row.ALUNO);
-    if (key && !existingByAluno.has(key)) {
-      existingByAluno.set(key, row);
-    }
+    existingByAluno.set(normalizeKey_(row.ALUNO), row);
   }
 
   const prepared = turmaAlunos.map(aluno => {
@@ -299,6 +297,7 @@ function selfPresence_(p) {
   const currentBase = loadSheetObjects_(SHEETS.BASE, BASE_HEADERS);
 
   const existingCache = currentChamada.filter(r =>
+    normalizeDateKey_(r.DATA_CHAMADA) === dateKey &&
     normalizeKey_(r.CLASSE) === normalizeKey_(turmaNome)
   );
   const previous = existingCache.find(r => normalizeKey_(r.ALUNO) === normalizeKey_(alunoNome)) || null;
@@ -577,26 +576,23 @@ function buildAlunosFromCadastro_(cadastroRows, baseRows = []) {
 function buildCallForTurma_(dateKey, turma, alunos, chamadaRows, baseRows) {
   const turmaNome = String(turma?.Nome || turma?.TurmaID || '').trim();
   const turmaId = String(turma?.TurmaID || turmaNome).trim();
-  const turmaKey = normalizeKey_(turmaNome);
-  const today = todayKey_();
 
   const turmaAlunos = (alunos || []).filter(a => String(a.TurmaID) === String(turmaId));
-  const classRows = (chamadaRows || []).filter(r =>
-    normalizeKey_(r.CLASSE) === turmaKey &&
-    sheetDateKey_(r.DATA_CHAMADA) === today
+  const today = todayKey_();
+  const dayRows = (chamadaRows || []).filter(r =>
+    sheetDateKey_(r.DATA_CHAMADA) === today &&
+    normalizeKey_(r.CLASSE) === normalizeKey_(turmaNome)
   );
 
   const byAluno = new Map();
-  for (const row of classRows) {
-    const key = normalizeKey_(row.ALUNO);
-    if (key && !byAluno.has(key)) {
-      byAluno.set(key, row);
-    }
+  for (const row of dayRows) {
+    byAluno.set(normalizeKey_(row.ALUNO), row);
   }
 
   const effectiveRows = turmaAlunos.map(aluno => {
     const cached = byAluno.get(normalizeKey_(aluno.Nome)) || null;
-    return buildFrontRowFromChamada_(cached, aluno, turmaNome);
+    const effective = buildFrontRowFromChamada_(cached, aluno, turmaNome);
+    return effective;
   });
 
   const activeRows = effectiveRows.filter(r =>
@@ -612,17 +608,19 @@ function buildCallForTurma_(dateKey, turma, alunos, chamadaRows, baseRows) {
     data: dateKey,
     turmaId,
     turmaNome,
-    oferta: getCallLevelValue_(classRows, 'OFERTA'),
-    visitantes: getCallLevelValue_(classRows, 'VISITANTES', true),
-    biblias: getCallLevelValue_(classRows, 'BÍBLIAS', true),
-    revistas: getCallLevelValue_(classRows, 'REVISTAS', true),
+    oferta: getCallLevelValue_(dayRows, 'OFERTA'),
+    visitantes: getCallLevelValue_(dayRows, 'VISITANTES', true),
+    biblias: getCallLevelValue_(dayRows, 'BÍBLIAS', true),
+    revistas: getCallLevelValue_(dayRows, 'REVISTAS', true),
     totalAlunos: activeRows.length,
     presentes,
     atrasos,
     ausentes,
     percentual,
+    enviadoTelegram: false,
+    telegramEnviadoEm: '',
     rows: effectiveRows,
-    isSaved: true,
+    isSaved: dayRows.length ? dayRows.every(r => toBool_(r.SALVO)) : false,
   };
 }
 
@@ -1017,10 +1015,14 @@ function buildBaseRowKey_(row) {
 }
 
 function buildChamadaRowKey_(row) {
-  return normalizeKey_(row?.ALUNO || '');
+  return [
+    normalizeDateKey_(row?.DATA_CHAMADA || ''),
+    normalizeKey_(row?.CLASSE || ''),
+    normalizeKey_(row?.ALUNO || ''),
+  ].join('__');
 }
 
-function upsertRowsInPlace_(sheetName, headers, existingRows, newRows, keyFn, options = {}) {
+function upsertRowsInPlace_(sheetName, headers, existingRows, newRows, keyFn) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   const sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
   ensureHeaders_(sheet, headers);
@@ -1029,30 +1031,10 @@ function upsertRowsInPlace_(sheetName, headers, existingRows, newRows, keyFn, op
     ? existingRows
     : loadSheetObjects_(sheetName, headers);
 
-  const dedupeDuplicates = !!options.dedupeDuplicates;
   const rowByKey = new Map();
-  const duplicateRowNumbers = [];
-
   for (const row of currentRows) {
     const key = keyFn(row);
-    if (!key) continue;
-
-    if (dedupeDuplicates && rowByKey.has(key) && row._rowNumber) {
-      duplicateRowNumbers.push(row._rowNumber);
-      continue;
-    }
-
-    if (!rowByKey.has(key)) {
-      rowByKey.set(key, row);
-    }
-  }
-
-  if (dedupeDuplicates && duplicateRowNumbers.length) {
-    duplicateRowNumbers
-      .sort((a, b) => b - a)
-      .forEach((rowNumber) => {
-        sheet.deleteRow(rowNumber);
-      });
+    if (key) rowByKey.set(key, row);
   }
 
   for (const newRow of newRows || []) {
@@ -1081,13 +1063,13 @@ function upsertBaseRow_(sheetName, headers, existingRows, dateKey, className, al
 }
 
 function upsertChamadaRow_(sheetName, headers, existingRows, dateKey, className, alunoNome, newRow) {
-  upsertRowsInPlace_(sheetName, headers, existingRows, [newRow], buildChamadaRowKey_, { dedupeDuplicates: true });
+  upsertRowsInPlace_(sheetName, headers, existingRows, [newRow], buildChamadaRowKey_);
 }
 
 
 
 function replaceRowsForDateClass_(sheetName, headers, existingRows, dateKey, className, newRows) {
-  upsertRowsInPlace_(sheetName, headers, existingRows, newRows || [], buildChamadaRowKey_, { dedupeDuplicates: true });
+  upsertRowsInPlace_(sheetName, headers, existingRows, newRows || [], buildChamadaRowKey_);
 }
 
 function countDataRows_(sheetName) {
