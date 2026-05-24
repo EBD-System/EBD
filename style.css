@@ -393,9 +393,22 @@ body.access-restricted.access-share-reports #actionsPanel .panel__actions #sendG
   flex-direction:column;
   gap:8px;
 }
+.student__titleRow{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
 .student-name{
   font-size:1.03rem;
   line-height:1.25;
+  min-width:0;
+}
+.btn--edit{
+  flex:0 0 auto;
+  padding:9px 12px;
+  font-size:.88rem;
+  line-height:1;
 }
 .student-status{
   font-weight:900;

@@ -64,6 +64,29 @@
       </div>
     </section>
 
+
+    
+
+    <section class="panel card">
+      <div class="panel__head">
+        <div>
+          <h2>Chamada da turma</h2>
+          <p id="turmaMeta">Selecione uma turma para carregar a chamada.</p>
+        </div>
+
+        <div class="panel__actions">
+          <button id="markAllPresentBtn" class="btn btn--soft" type="button">Todos presentes</button>
+          <button id="markAllAbsentBtn" class="btn btn--soft" type="button">Todos ausentes</button>
+        </div>
+      </div>
+
+      <div id="emptyState" class="empty-state">
+        Nenhuma turma encontrada. Cadastre uma turma para começar a chamada.
+      </div>
+
+      <div id="studentsList" class="students-list"></div>
+    </section>
+
     <section class="card call-data">
       <div class="call-data__grid">
         <div class="toolbar__group">
@@ -86,28 +109,6 @@
           <input id="revistasInput" type="number" min="0" step="1" placeholder="0" />
         </div>
       </div>
-    </section>
-
-    
-
-    <section class="panel card">
-      <div class="panel__head">
-        <div>
-          <h2>Chamada da turma</h2>
-          <p id="turmaMeta">Selecione uma turma para carregar a chamada.</p>
-        </div>
-
-        <div class="panel__actions">
-          <button id="markAllPresentBtn" class="btn btn--soft" type="button">Todos presentes</button>
-          <button id="markAllAbsentBtn" class="btn btn--soft" type="button">Todos ausentes</button>
-        </div>
-      </div>
-
-      <div id="emptyState" class="empty-state">
-        Nenhuma turma encontrada. Cadastre uma turma para começar a chamada.
-      </div>
-
-      <div id="studentsList" class="students-list"></div>
     </section>
 
 <section class="summary-grid" id="summaryGrid">
@@ -237,7 +238,10 @@
     <article class="student card">
       <div class="student__main">
         <div class="student__identity">
-          <strong class="student-name"></strong>
+          <div class="student__titleRow">
+            <strong class="student-name"></strong>
+            <button class="btn btn--soft btn--edit" data-action="edit" type="button">Editar</button>
+          </div>
           <div class="student-badges"></div>
         </div>
         <div class="student__stats">
@@ -251,7 +255,6 @@
         <button class="btn btn--present" data-action="present" type="button">Presente</button>
         <button class="btn btn--absent" data-action="absent" type="button">Ausente</button>
         <button class="btn btn--delay" data-action="delay" type="button">Atrasado(a)</button>
-        <button class="btn btn--soft" data-action="edit" type="button">Editar</button>
         <button class="btn btn--soft btn--wide" data-action="toggle" type="button">Ativar/Inativar</button>
       </div>
 
