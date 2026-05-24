@@ -219,6 +219,11 @@ body.access-restricted .student__actions{
   grid-template-columns:repeat(3, minmax(0,1fr));
 }
 
+body.access-restricted.access-share-reports #actionsPanel .panel__actions #sendTurmaBtn,
+body.access-restricted.access-share-reports #actionsPanel .panel__actions #sendGeralBtn{
+  display:inline-flex !important;
+}
+
 .turma-meta{
   min-height:1.4em;
 }

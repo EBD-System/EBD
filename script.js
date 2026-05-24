@@ -352,6 +352,10 @@ function isRestrictedMode() {
   return state.accessMode === 'restricted';
 }
 
+function canShareRestrictedReports() {
+  return String(state.accessCode || '').trim().toLowerCase() === 'ninha';
+}
+
 function isSelfAccessMode() {
   return state.accessMode === 'self';
 }
@@ -360,6 +364,7 @@ function applyAccessMode() {
   document.body.classList.toggle('access-restricted', isRestrictedMode());
   document.body.classList.toggle('access-full', state.accessMode === 'full');
   document.body.classList.toggle('access-self', isSelfAccessMode());
+  document.body.classList.toggle('access-share-reports', canShareRestrictedReports());
 }
 
 function normalizeSelfCpfPrefix(value) {
@@ -485,6 +490,7 @@ function renderSelfAccessGate() {
   document.body.classList.add('access-self');
   document.body.classList.remove('access-full');
   document.body.classList.remove('access-restricted');
+  document.body.classList.remove('access-share-reports');
   hideLoading(true);
   clearFeedback();
 }
@@ -1547,7 +1553,7 @@ async function saveCurrentCall({ silent = false } = {}) {
 
 
 async function sendReport(scope) {
-  if (isRestrictedMode()) {
+  if (isRestrictedMode() && !canShareRestrictedReports()) {
     throw new Error('Ação indisponível neste modo.');
   }
 
@@ -1622,6 +1628,7 @@ function buildPdfReportModel(scope) {
       successMessage: 'PDF da turma pronto para compartilhar.',
       pages: [
         buildPdfTurmaPage(turma, call, dateLabel),
+        ...buildPdfTurmaRosterPages(turma, call, dateLabel),
       ],
     };
   }
@@ -1668,6 +1675,259 @@ function buildPdfTurmaPage(turma, call, dateLabel) {
   };
 }
 
+function normalizePdfStatusText(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return 'Sem registro';
+
+  const lower = raw.toLowerCase();
+  if (['sim', 'presente', 'presença', 'presenca'].includes(lower)) return 'Presente';
+  if (['nao', 'não', 'ausente'].includes(lower)) return 'Ausente';
+  if (['atrasado', 'atrasada', 'late', 'delay'].includes(lower)) return 'Atrasado(a)';
+  if (['visitante', 'visitor'].includes(lower)) return 'Visitante';
+  if (['inativo', 'ativo', 'reativado', 'faltando muito', 'auto-presença', 'auto-presenca', 'auto-atraso'].includes(lower)) {
+    return lower
+      .replace(/-/g, ' ')
+      .split(/\s+/)
+      .map((part) => part ? part.charAt(0).toUpperCase() + part.slice(1) : part)
+      .join(' ');
+  }
+
+  return raw
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .map((part) => part ? part.charAt(0).toUpperCase() + part.slice(1) : part)
+    .join(' ');
+}
+
+function getPdfStudentStatusLabel(row, aluno) {
+  const statusAluno = String(aluno?.Status ?? row?.statusAluno ?? '').trim().toLowerCase();
+  if (statusAluno === 'inativo') return 'Inativo';
+
+  const rawPresence = String(row?.presenca ?? row?.PRESENCA ?? '').trim().toLowerCase();
+  if (['visitante', 'visitor'].includes(rawPresence)) return 'Visitante';
+  if (rawPresence === 'atrasado' || rawPresence === 'atrasada' || rawPresence === 'late' || rawPresence === 'delay') return 'Atrasado(a)';
+  if (rawPresence === 'sim' || rawPresence === 'presente' || rawPresence === '1' || rawPresence === 'p' || rawPresence === 'true') return 'Presente';
+  if (rawPresence === 'nao' || rawPresence === 'não' || rawPresence === 'ausente' || rawPresence === '0' || rawPresence === 'f' || rawPresence === 'false') return 'Ausente';
+
+  const custom = String(row?.situacao ?? row?.status ?? row?.statusAluno ?? '').trim();
+  if (custom) return normalizePdfStatusText(custom);
+
+  if (!isSavedRow(row)) return 'Sem registro';
+  return 'Sem registro';
+}
+
+function buildPdfTurmaRosterPages(turma, call, dateLabel) {
+  const roster = getAlunosForTurma(turma.TurmaID);
+  const callRows = Array.isArray(call?.rows) ? call.rows : [];
+  const rowsMap = new Map(callRows.map((row) => [String(row?.alunoId ?? ''), row]));
+
+  const items = roster.map((aluno) => {
+    const row = rowsMap.get(String(aluno.AlunoID || '')) || {
+      alunoId: aluno.AlunoID,
+      nome: aluno.Nome,
+      statusAluno: aluno.Status || 'ativo',
+      presenca: '',
+      salvo: 0,
+    };
+
+    return {
+      name: String(row.nome || aluno.Nome || '').trim() || 'Sem nome',
+      status: getPdfStudentStatusLabel(row, aluno),
+    };
+  });
+
+  const title = `Lista de alunos • ${turma?.Nome || 'Turma'}`;
+  const subtitle = `Data: ${dateLabel}`;
+  const note = `Lista completa dos alunos da turma • ${formatIntegerBR(items.length)} registros`;
+
+  if (!items.length) {
+    return [{
+      type: 'turma-roster',
+      title,
+      subtitle,
+      note,
+      items: [],
+      layout: { columns: 1, fontSize: 9, lineGap: 1.4, mode: 'single' },
+    }];
+  }
+
+  const candidate = pickBestRosterSinglePageLayout(items);
+  if (candidate) {
+    return [{
+      type: 'turma-roster',
+      title,
+      subtitle,
+      note,
+      items,
+      layout: candidate.layout,
+      placements: candidate.placements,
+    }];
+  }
+
+  return paginateRosterItems(items, { title, subtitle, note });
+}
+
+function pickBestRosterSinglePageLayout(items) {
+  const width = 210;
+  const height = 297;
+  const margin = 12;
+  const contentWidth = width - margin * 2;
+  const listTop = margin + 44;
+  const listBottom = height - 18;
+  const fontSizes = [10.5, 10, 9.5, 9, 8.5, 8, 7.5];
+  const columnOptions = [1, 2, 3];
+  let best = null;
+
+  const doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+
+  for (const columns of columnOptions) {
+    const gapX = columns > 1 ? 4 : 0;
+    const colWidth = (contentWidth - gapX * (columns - 1)) / columns;
+
+    for (const fontSize of fontSizes) {
+      const plan = planRosterPlacements(doc, items, {
+        columns,
+        fontSize,
+        gapX,
+        colWidth,
+        listTop,
+        listBottom,
+      });
+
+      if (!plan) continue;
+
+      const score = fontSize * 100 - columns * 3;
+      if (!best || score > best.score) {
+        best = { score, layout: { columns, fontSize, lineGap: 1.4, gapX, colWidth, mode: 'single' }, placements: plan.placements };
+      }
+    }
+  }
+
+  return best;
+}
+
+function planRosterPlacements(doc, items, { columns, fontSize, gapX, colWidth, listTop, listBottom }) {
+  const lineHeight = fontSize * 0.36 + 1.45;
+  const statusWidth = Math.max(
+    ...items.map((item) => doc.getTextWidth(String(item.status || '')))
+  ) + 4;
+  const nameWidth = Math.max(18, colWidth - statusWidth - 4);
+  const placements = [];
+
+  let col = 0;
+  let y = listTop;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(fontSize);
+
+  for (const item of items) {
+    const name = String(item.name || '').trim() || 'Sem nome';
+    const status = String(item.status || 'Sem registro').trim() || 'Sem registro';
+    const nameLines = doc.splitTextToSize(name, nameWidth) || [name];
+    const rowHeight = Math.max(nameLines.length, 1) * lineHeight + 1.7;
+
+    if (y + rowHeight > listBottom) {
+      col += 1;
+      if (col >= columns) return null;
+      y = listTop;
+    }
+
+    placements.push({ col, y, rowHeight, nameLines, name, status });
+    y += rowHeight;
+  }
+
+  return { placements, statusWidth, nameWidth, lineHeight };
+}
+
+function paginateRosterItems(items, basePage) {
+  const width = 210;
+  const height = 297;
+  const margin = 12;
+  const contentWidth = width - margin * 2;
+  const listTop = margin + 44;
+  const listBottom = height - 18;
+  const availableHeight = listBottom - listTop;
+  const fontSizes = [9.5, 9, 8.5, 8];
+  const doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+
+  let chosen = null;
+
+  for (const fontSize of fontSizes) {
+    const lineHeight = fontSize * 0.36 + 1.45;
+    const statusWidth = Math.max(
+      ...items.map((item) => doc.getTextWidth(String(item.status || '')))
+    ) + 4;
+    const nameWidth = Math.max(18, contentWidth - statusWidth - 4);
+    let currentHeight = 0;
+    let pageCount = 1;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(fontSize);
+
+    for (const item of items) {
+      const nameLines = doc.splitTextToSize(String(item.name || '').trim() || 'Sem nome', nameWidth) || [String(item.name || 'Sem nome')];
+      const rowHeight = Math.max(nameLines.length, 1) * lineHeight + 1.7;
+      if (currentHeight + rowHeight > availableHeight) {
+        pageCount += 1;
+        currentHeight = 0;
+      }
+      currentHeight += rowHeight;
+    }
+
+    const score = -pageCount * 1000 + fontSize * 100;
+    if (!chosen || score > chosen.score) {
+      chosen = { score, fontSize, lineHeight, statusWidth, nameWidth, pageCount };
+    }
+  }
+
+  const fontSize = chosen?.fontSize || 9;
+  const lineHeight = chosen?.lineHeight || (fontSize * 0.36 + 1.45);
+  const statusWidth = chosen?.statusWidth || 30;
+  const nameWidth = chosen?.nameWidth || Math.max(18, contentWidth - statusWidth - 4);
+  const pages = [];
+  let current = [];
+  let currentHeight = 0;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(fontSize);
+
+  for (const item of items) {
+    const nameLines = doc.splitTextToSize(String(item.name || '').trim() || 'Sem nome', nameWidth) || [String(item.name || 'Sem nome')];
+    const rowHeight = Math.max(nameLines.length, 1) * lineHeight + 1.7;
+
+    if (current.length && currentHeight + rowHeight > availableHeight) {
+      pages.push({
+        type: 'turma-roster',
+        title: basePage.title,
+        subtitle: basePage.subtitle,
+        note: basePage.note,
+        items: current,
+        layout: { columns: 1, fontSize, lineGap: 1.45, gapX: 0, colWidth: contentWidth, mode: 'multi' },
+      });
+      current = [];
+      currentHeight = 0;
+    }
+
+    current.push({ name: item.name, status: item.status, nameLines });
+    currentHeight += rowHeight;
+  }
+
+  if (current.length || !pages.length) {
+    pages.push({
+      type: 'turma-roster',
+      title: basePage.title,
+      subtitle: basePage.subtitle,
+      note: basePage.note,
+      items: current,
+      layout: { columns: 1, fontSize, lineGap: 1.45, gapX: 0, colWidth: contentWidth, mode: 'multi' },
+    });
+  }
+
+  return pages;
+}
+
 function buildPdfGeneralPage(dateLabel) {
   const turmas = getTurmasSorted();
   const calls = Object.values(state.chamadasByTurma || {});
@@ -1709,6 +1969,11 @@ function buildPdfGeneralPage(dateLabel) {
 }
 
 function drawReportPage(doc, page, meta) {
+  if (page?.items) {
+    drawRosterPage(doc, page, meta);
+    return;
+  }
+
   const width = doc.internal.pageSize.getWidth();
   const height = doc.internal.pageSize.getHeight();
   const margin = 12;
@@ -1766,7 +2031,107 @@ function drawReportPage(doc, page, meta) {
   doc.line(margin, height - 16, width - margin, height - 16);
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(8.5);
-  doc.text('O maior entre vocês é aquele que serve. - Mateus 23:11', margin, height - 10);
+  doc.text('Gerado diretamente no celular para compartilhamento rápido.', margin, height - 10);
+}
+
+function drawRosterPage(doc, page, meta) {
+  const width = doc.internal.pageSize.getWidth();
+  const height = doc.internal.pageSize.getHeight();
+  const margin = 12;
+  const contentWidth = width - margin * 2;
+  const layout = page.layout || { columns: 1, fontSize: 9, lineGap: 1.45, gapX: 0, colWidth: contentWidth, mode: 'multi' };
+  const columns = Math.max(1, Number(layout.columns || 1));
+  const gapX = Number(layout.gapX || 0);
+  const colWidth = Number(layout.colWidth || ((contentWidth - gapX * (columns - 1)) / columns));
+  const fontSize = Number(layout.fontSize || 9);
+  const lineGap = Number(layout.lineGap || 1.45);
+  const listTop = margin + 44;
+  const listBottom = height - 18;
+  const lineHeight = fontSize * 0.36 + lineGap;
+
+  doc.setFillColor(247, 249, 252);
+  doc.rect(0, 0, width, height, 'F');
+
+  doc.setFillColor(23, 43, 77);
+  doc.roundedRect(margin, margin, contentWidth, 28, 4, 4, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  const titleLines = doc.splitTextToSize(String(page.title || ''), contentWidth - 24);
+  doc.text(titleLines, margin + 8, margin + 11);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10.5);
+  doc.text(String(page.subtitle || ''), margin + 8, margin + 20);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.text(`Página ${meta.pageNumber}/${meta.totalPages}`, width - margin - 3, margin + 9, { align: 'right' });
+
+  doc.setTextColor(45, 55, 72);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text(String(page.note || ''), margin, margin + 38);
+
+  const statusWidth = Math.max(24, ...((page.items || []).map((item) => doc.getTextWidth(String(item.status || ''))))) + 3;
+  const nameWidth = Math.max(18, colWidth - statusWidth - 5);
+  const headerY = listTop - 4;
+
+  doc.setDrawColor(217, 224, 235);
+  doc.setLineWidth(0.2);
+  doc.line(margin, headerY, width - margin, headerY);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(Math.max(8, fontSize - 0.5));
+  doc.setTextColor(91, 102, 122);
+  doc.text('Aluno', margin, headerY - 1.5);
+  doc.text('Situação', width - margin, headerY - 1.5, { align: 'right' });
+  doc.line(margin, headerY + 2, width - margin, headerY + 2);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(fontSize);
+  doc.setTextColor(23, 43, 77);
+
+  const pageMarginBottom = listBottom;
+  const rows = Array.isArray(page.items) ? page.items : [];
+  const placements = page.placements && page.placements.length ? page.placements : null;
+
+  if (placements) {
+    placements.forEach((placement) => {
+      const x = margin + placement.col * (colWidth + gapX);
+      const rowTop = placement.y;
+      const rowBottom = rowTop + placement.rowHeight;
+      const name = String(placement.name || '').trim();
+      const status = String(placement.status || '').trim();
+      const nameLines = placement.nameLines || doc.splitTextToSize(name, nameWidth) || [name];
+
+      doc.text(nameLines, x, rowTop + 3.2);
+      doc.text(status, x + colWidth, rowTop + 3.2, { align: 'right' });
+      doc.setDrawColor(230, 236, 244);
+      doc.line(x, Math.min(rowBottom, pageMarginBottom), x + colWidth, Math.min(rowBottom, pageMarginBottom));
+    });
+  } else {
+    let y = listTop;
+    rows.forEach((item) => {
+      const name = String(item.name || '').trim() || 'Sem nome';
+      const status = String(item.status || 'Sem registro').trim() || 'Sem registro';
+      const nameLines = item.nameLines || doc.splitTextToSize(name, nameWidth) || [name];
+      const rowHeight = Math.max(nameLines.length, 1) * lineHeight + 1.7;
+      if (y + rowHeight > pageMarginBottom) return;
+      doc.text(nameLines, margin, y + 3.2);
+      doc.text(status, width - margin, y + 3.2, { align: 'right' });
+      doc.setDrawColor(230, 236, 244);
+      doc.line(margin, y + rowHeight, width - margin, y + rowHeight);
+      y += rowHeight;
+    });
+  }
+
+  doc.setDrawColor(221, 228, 239);
+  doc.line(margin, height - 16, width - margin, height - 16);
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(8.5);
+  doc.text('Lista organizada automaticamente para leitura rápida no celular.', margin, height - 10);
 }
 
 function drawMetricCard(doc, x, y, w, h, label, value, accent = false) {
