@@ -19,7 +19,7 @@ const SHEETS = {
   BASE: 'Base',
 };
 
-const CADASTRO_HEADERS = ['DATA_NASCIMENTO', 'MÊS', 'ALUNO', 'CLASSE', 'CPF'];
+const CADASTRO_HEADERS = ['DATA_NASCIMENTO', 'MÊS', 'ALUNO', 'CLASSE', 'CPF', 'STATUS'];
 const CHAMADA_HEADERS = [
   'DATA_CHAMADA',
   'ALUNO',
@@ -62,6 +62,13 @@ const LEGACY_SHEETS = [
 ];
 
 const AUTO_CUTOFF_MINUTES = 9 * 60 + 25;
+
+function normalizeStudentStatus_(value) {
+  const v = String(value || '').trim().toLowerCase();
+  if (['inativo', 'nao', 'não', 'false', '0', 'off', 'desativado'].includes(v)) return 'inativo';
+  if (['ativo', 'sim', 'true', '1', 'on', 'ativado'].includes(v)) return 'ativo';
+  return 'ativo';
+}
 
 function doGet(e) {
   const action = String(e?.parameter?.action || 'init').trim().toLowerCase();
@@ -400,6 +407,7 @@ function addTurma_(p) {
     ALUNO: '',
     CLASSE: nome,
     CPF: '',
+    STATUS: 'ativo',
   }]);
 
   return { ok: true, message: 'Classe cadastrada com sucesso.', turmaId: nome };
@@ -432,6 +440,7 @@ function addAluno_(p) {
     ALUNO: nome,
     CLASSE: turmaId,
     CPF: cpf,
+    STATUS: 'ativo',
   }]);
 
   return { ok: true, message: 'Aluno cadastrado com sucesso.' };
@@ -464,10 +473,34 @@ function moveAluno_(p) {
 }
 
 function toggleAluno_(p) {
-  // O novo Cadastro não tem coluna de status.
+  ensureSheets_();
+
+  const alunoId = String(p.alunoId || p.nome || '').trim();
+  if (!alunoId) throw new Error('Aluno inválido.');
+
+  const desiredStatus = String(p.status || p.ativo || '').trim().toLowerCase();
+  const sheet = getOrCreateSheet_(SHEETS.CADASTRO, CADASTRO_HEADERS);
+  const rows = readAllRows_(sheet, CADASTRO_HEADERS);
+
+  let changed = false;
+  for (const row of rows) {
+    if (normalizeKey_(row.ALUNO) !== normalizeKey_(alunoId)) continue;
+
+    const currentStatus = normalizeStudentStatus_(row.STATUS || row.Ativo || 'ativo');
+    const nextStatus = ['ativo', 'inativo'].includes(desiredStatus)
+      ? desiredStatus
+      : (currentStatus === 'inativo' ? 'ativo' : 'inativo');
+
+    row.STATUS = nextStatus;
+    changed = true;
+  }
+
+  if (!changed) throw new Error('Aluno não encontrado no Cadastro.');
+
+  writeAllRows_(sheet, CADASTRO_HEADERS, rows);
   return {
-    ok: false,
-    message: 'O Cadastro novo não possui campo de status ativo/inativo.',
+    ok: true,
+    message: 'Status atualizado com sucesso.',
   };
 }
 
@@ -560,6 +593,7 @@ function buildAlunosFromCadastro_(cadastroRows, baseRows = []) {
     if (!aluno || !classe) continue;
 
     const cpf = digitsOnly_(row.CPF || '');
+    const status = normalizeStudentStatus_(row.STATUS || row.Ativo || 'ativo');
     const key = normalizeKey_(`${classe}__${aluno}__${cpf || ''}`);
     grouped.set(key, {
       AlunoID: buildAlunoId_(aluno, classe, cpf),
@@ -567,8 +601,8 @@ function buildAlunosFromCadastro_(cadastroRows, baseRows = []) {
       TurmaID: classe,
       TurmaNome: classe,
       CPF: cpf,
-      Ativo: 'sim',
-      Status: 'ativo',
+      Ativo: status === 'ativo' ? 'sim' : 'nao',
+      Status: status,
       FaltasConsecutivas: 0,
       TotalPresencas: 0,
       TotalFaltas: 0,
