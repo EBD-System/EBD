@@ -456,17 +456,11 @@ function moveAluno_(p) {
 
   const sheet = getOrCreateSheet_(SHEETS.CADASTRO, CADASTRO_HEADERS);
   const rows = readAllRows_(sheet, CADASTRO_HEADERS);
-  let changed = false;
 
-  for (const row of rows) {
-    const sameAluno = normalizeKey_(row.ALUNO) === normalizeKey_(alunoId);
-    if (sameAluno) {
-      row.CLASSE = turmaId;
-      changed = true;
-    }
-  }
+  const row = findCadastroAlunoByIdentifier_(rows, alunoId);
+  if (!row) throw new Error('Aluno não encontrado no Cadastro.');
 
-  if (!changed) throw new Error('Aluno não encontrado no Cadastro.');
+  row.CLASSE = turmaId;
 
   writeAllRows_(sheet, CADASTRO_HEADERS, rows);
   return { ok: true, message: 'Aluno movido com sucesso.' };
@@ -482,20 +476,15 @@ function toggleAluno_(p) {
   const sheet = getOrCreateSheet_(SHEETS.CADASTRO, CADASTRO_HEADERS);
   const rows = readAllRows_(sheet, CADASTRO_HEADERS);
 
-  let changed = false;
-  for (const row of rows) {
-    if (normalizeKey_(row.ALUNO) !== normalizeKey_(alunoId)) continue;
+  const row = findCadastroAlunoByIdentifier_(rows, alunoId);
+  if (!row) throw new Error('Aluno não encontrado no Cadastro.');
 
-    const currentStatus = normalizeStudentStatus_(row.STATUS || row.Ativo || 'ativo');
-    const nextStatus = ['ativo', 'inativo'].includes(desiredStatus)
-      ? desiredStatus
-      : (currentStatus === 'inativo' ? 'ativo' : 'inativo');
+  const currentStatus = normalizeStudentStatus_(row.STATUS || row.Ativo || 'ativo');
+  const nextStatus = ['ativo', 'inativo'].includes(desiredStatus)
+    ? desiredStatus
+    : (currentStatus === 'inativo' ? 'ativo' : 'inativo');
 
-    row.STATUS = nextStatus;
-    changed = true;
-  }
-
-  if (!changed) throw new Error('Aluno não encontrado no Cadastro.');
+  row.STATUS = nextStatus;
 
   writeAllRows_(sheet, CADASTRO_HEADERS, rows);
   return {
@@ -1363,6 +1352,29 @@ function findCadastroByCpfPrefix_(cadastroRows, prefix) {
     // Prioriza correspondência exata de 5 primeiros dígitos; se houver mais de uma, retorna a primeira.
     return matches[0];
   }
+  return null;
+}
+
+
+function findCadastroAlunoByIdentifier_(cadastroRows, identifier) {
+  const target = normalizeKey_(identifier);
+  const digits = digitsOnly_(identifier);
+
+  for (const row of cadastroRows || []) {
+    const nome = String(row.ALUNO || '').trim();
+    const classe = String(row.CLASSE || '').trim();
+    const cpf = digitsOnly_(row.CPF || '');
+    const alunoId = buildAlunoId_(nome, classe, cpf);
+
+    if (
+      normalizeKey_(nome) === target ||
+      normalizeKey_(alunoId) === target ||
+      (digits && cpf && cpf === digits)
+    ) {
+      return row;
+    }
+  }
+
   return null;
 }
 
