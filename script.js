@@ -2031,7 +2031,7 @@ function drawReportPage(doc, page, meta) {
   doc.line(margin, height - 16, width - margin, height - 16);
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(8.5);
-  doc.text('Gerado diretamente no celular para compartilhamento rápido.', margin, height - 10);
+  doc.text('O maior entre vocês é aquele que serve. - Mateus 23:11', margin, height - 10);
 }
 
 function drawRosterPage(doc, page, meta) {
@@ -2131,7 +2131,7 @@ function drawRosterPage(doc, page, meta) {
   doc.line(margin, height - 16, width - margin, height - 16);
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(8.5);
-  doc.text('Lista organizada automaticamente para leitura rápida no celular.', margin, height - 10);
+  doc.text('O maior entre vocês é aquele que serve. - Mateus 23:11', margin, height - 10);
 }
 
 function drawMetricCard(doc, x, y, w, h, label, value, accent = false) {
