@@ -41,6 +41,7 @@ const els = {
   turmaSelect: document.getElementById('turmaSelect'),
   alunoTurma: document.getElementById('alunoTurma'),
   searchInput: document.getElementById('searchInput'),
+  responsavelLabel: document.getElementById('responsavelLabel'),
   showInactive: document.getElementById('showInactive'),
   reloadBtn: document.getElementById('reloadBtn'),
   clearBtn: document.getElementById('clearBtn'),
@@ -330,6 +331,12 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+function capitalizeFirstLetter(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
+}
+
 function getAccessCodeFromUrl() {
   try {
     return String(new URLSearchParams(window.location.search).get('code') || '').trim().toLowerCase();
@@ -365,6 +372,12 @@ function applyAccessMode() {
   document.body.classList.toggle('access-full', state.accessMode === 'full');
   document.body.classList.toggle('access-self', isSelfAccessMode());
   document.body.classList.toggle('access-share-reports', canShareRestrictedReports());
+}
+
+
+function renderResponsavelLabel() {
+  if (!els.responsavelLabel) return;
+  els.responsavelLabel.textContent = capitalizeFirstLetter(state.accessCode) || '—';
 }
 
 function normalizeSelfCpfPrefix(value) {
@@ -1172,18 +1185,15 @@ function renderTurmaSelects() {
 
 function renderSummary() {
   const call = getCurrentCall();
+  const turma = getCurrentTurma();
+  const turmaNome = turma ? String(turma.Nome || '').trim() : '';
 
-  els.turmaMeta.className = 'turma-meta';
+  if (!els.turmaMeta) return;
+
+  els.turmaMeta.classList.remove('turma-meta--ok', 'turma-meta--warn');
 
   if (!call) {
-    if (els.summary.total) {
-      els.summary.total.innerHTML = `
-        <span class="stat-total__value">0</span>
-        <span class="stat-total__separator">/</span>
-        <span class="stat-total__saved stat-total__saved--ok">0</span>
-      `;
-      els.summary.total.setAttribute('aria-label', 'Total de alunos: 0/0');
-    }
+    renderTotalAlunosStat(null);
     els.summary.presentes.textContent = '0';
     els.summary.ausentes.textContent = '0';
     els.summary.percentual.textContent = '0%';
@@ -1191,8 +1201,7 @@ function renderSummary() {
     els.summary.visitantes.textContent = '0';
     els.summary.biblias.textContent = '0';
     els.summary.revistas.textContent = '0';
-    els.turmaMeta.textContent = isRestrictedMode() ? 'Chamada não salva.' : 'Selecione uma turma para carregar a chamada.';
-    if (isRestrictedMode()) els.turmaMeta.classList.add('turma-meta--warn');
+    els.turmaMeta.textContent = turmaNome || 'Selecione uma turma para carregar a chamada.';
     return;
   }
 
@@ -1206,34 +1215,9 @@ function renderSummary() {
   els.summary.biblias.textContent = String(Number(call.biblias || 0));
   els.summary.revistas.textContent = String(Number(call.revistas || 0));
 
-  if (isRestrictedMode()) {
-    els.turmaMeta.textContent = call.isSaved ? 'Chamada salva.' : 'Chamada não salva.';
-    els.turmaMeta.classList.add(call.isSaved ? 'turma-meta--ok' : 'turma-meta--warn');
-    return;
-  }
-
-  const turma = getCurrentTurma();
-  const best = bestStudentForCurrentTurma();
-  const activeCount = getAlunosForTurma(call.turmaId).filter(
-    (a) => String(a.Status || 'ativo').trim().toLowerCase() !== 'inativo'
-  ).length;
-  const inactiveCount = getAlunosForTurma(call.turmaId).length - activeCount;
-  const missingMuchCount = getAlunosForTurma(call.turmaId).filter(
-    (a) => String(a.FaltandoMuito || '') === 'sim'
-  ).length;
-  const hasSavedMarks = (call.rows || []).some((row) => isSavedRow(row));
-  const isCallSaved = !!call.isSaved && hasSavedMarks;
-
-  els.turmaMeta.textContent = [
-    turma ? `Turma: ${turma.Nome}` : '',
-    `Ativos: ${activeCount}`,
-    `Inativos: ${inactiveCount}`,
-    `Atrasos: ${stats.atrasos}`,
-    `Faltando muito: ${missingMuchCount}`,
-    best ? `Melhor aluno: ${best.Nome} (${formatPercent(best.Percentual)})` : 'Melhor aluno: —',
-    isCallSaved ? 'Chamada salva no dia.' : 'Chamada ainda não salva.',
-  ].filter(Boolean).join(' • ');
+  els.turmaMeta.textContent = turmaNome || 'Selecione uma turma para carregar a chamada.';
 }
+
 function renderReports() {
   els.turmaReport.value = buildTurmaReportText();
   els.geralReport.value = buildGeneralReportText();
@@ -2382,6 +2366,7 @@ function loadSelectedTurma() {
 
 function renderAll() {
   applyAccessMode();
+  renderResponsavelLabel();
   updateSaveButtonVisibility();
   updateActionNotice();
   renderTurmaSelects();

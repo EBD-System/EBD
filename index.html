@@ -29,8 +29,8 @@
 
       <div class="hero-panel">
         <div class="hero-panel__item">
-          <span>Regra</span>
-          <strong>4 faltas → inativo</strong>
+          <span>Responsável</span>
+          <strong id="responsavelLabel">—</strong>
         </div>
       </div>
     </header>
@@ -88,7 +88,29 @@
       </div>
     </section>
 
-    <section class="summary-grid" id="summaryGrid">
+    
+
+    <section class="panel card">
+      <div class="panel__head">
+        <div>
+          <h2>Chamada da turma</h2>
+          <p id="turmaMeta">Selecione uma turma para carregar a chamada.</p>
+        </div>
+
+        <div class="panel__actions">
+          <button id="markAllPresentBtn" class="btn btn--soft" type="button">Todos presentes</button>
+          <button id="markAllAbsentBtn" class="btn btn--soft" type="button">Todos ausentes</button>
+        </div>
+      </div>
+
+      <div id="emptyState" class="empty-state">
+        Nenhuma turma encontrada. Cadastre uma turma para começar a chamada.
+      </div>
+
+      <div id="studentsList" class="students-list"></div>
+    </section>
+
+<section class="summary-grid" id="summaryGrid">
       <article class="stat card">
         <span>Total de alunos</span>
         <strong id="statTotalAlunos" aria-label="Total de alunos: 0/0"><span class="stat-total__value">0</span><span class="stat-total__separator">/</span><span class="stat-total__saved stat-total__saved--ok">0</span></strong>
@@ -124,24 +146,21 @@
 </article>
     </section>
 
-    <section class="panel card">
+<section class="panel card" id="actionsPanel">
       <div class="panel__head">
         <div>
-          <h2>Chamada da turma</h2>
-          <p id="turmaMeta">Selecione uma turma para carregar a chamada.</p>
+          <h2>Ações da chamada</h2>
+          <p>Salve a turma, envie o relatório e avance para a próxima.</p>
         </div>
 
         <div class="panel__actions">
-          <button id="markAllPresentBtn" class="btn btn--soft" type="button">Todos presentes</button>
-          <button id="markAllAbsentBtn" class="btn btn--soft" type="button">Todos ausentes</button>
+          <button id="saveBtn" class="btn btn--primary" type="button">Salvar chamada</button>
+          <button id="sendTurmaBtn" class="btn btn--soft" type="button">Compartilhar Turma</button>
+          <button id="sendGeralBtn" class="btn btn--soft" type="button">Compartilhar Geral</button>
+          <button id="saveNextBtn" class="btn btn--ghost" type="button">Salvar e avançar</button>
         </div>
       </div>
-
-      <div id="emptyState" class="empty-state">
-        Nenhuma turma encontrada. Cadastre uma turma para começar a chamada.
-      </div>
-
-      <div id="studentsList" class="students-list"></div>
+      <div id="feedback" class="feedback" aria-live="polite"></div>
     </section>
 
     <section class="panel card" id="reportsPanel">
@@ -211,22 +230,7 @@
       </div>
     </section>
 
-    <section class="panel card" id="actionsPanel">
-      <div class="panel__head">
-        <div>
-          <h2>Ações da chamada</h2>
-          <p>Salve a turma, envie o relatório e avance para a próxima.</p>
-        </div>
-
-        <div class="panel__actions">
-          <button id="saveBtn" class="btn btn--primary" type="button">Salvar chamada</button>
-          <button id="sendTurmaBtn" class="btn btn--soft" type="button">Compartilhar Turma</button>
-          <button id="sendGeralBtn" class="btn btn--soft" type="button">Compartilhar Geral</button>
-          <button id="saveNextBtn" class="btn btn--ghost" type="button">Salvar e avançar</button>
-        </div>
-      </div>
-      <div id="feedback" class="feedback" aria-live="polite"></div>
-    </section>
+    
   </main>
 
   <template id="studentTemplate">
