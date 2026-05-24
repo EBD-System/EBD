@@ -19,7 +19,7 @@ const SHEETS = {
   BASE: 'Base',
 };
 
-const CADASTRO_HEADERS = ['DATA_NASCIMENTO', 'MÊS', 'ALUNO', 'CLASSE', 'CPF'];
+const CADASTRO_HEADERS = ['DATA_NASCIMENTO', 'MÊS', 'ALUNO', 'CLASSE', 'CPF', 'STATUS'];
 const CHAMADA_HEADERS = [
   'DATA_CHAMADA',
   'ALUNO',
@@ -62,6 +62,13 @@ const LEGACY_SHEETS = [
 ];
 
 const AUTO_CUTOFF_MINUTES = 9 * 60 + 25;
+
+function normalizeStudentStatus_(value) {
+  const v = String(value || '').trim().toLowerCase();
+  if (['inativo', 'nao', 'não', 'false', '0', 'off', 'desativado'].includes(v)) return 'inativo';
+  if (['ativo', 'sim', 'true', '1', 'on', 'ativado'].includes(v)) return 'ativo';
+  return 'ativo';
+}
 
 function doGet(e) {
   const action = String(e?.parameter?.action || 'init').trim().toLowerCase();
@@ -190,44 +197,60 @@ function saveCall_(p) {
     }
   }
 
+  const existingBaseCache = currentBase.filter(r =>
+    normalizeKey_(r.CLASSE) === normalizeKey_(turma.Nome) &&
+    normalizeDateKey_(r.DATA) === dateKey
+  );
+
+  const existingBaseByAluno = new Map();
+  for (const row of existingBaseCache) {
+    const key = normalizeKey_(row.ALUNO);
+    if (key && !existingBaseByAluno.has(key)) {
+      existingBaseByAluno.set(key, row);
+    }
+  }
+
   const prepared = turmaAlunos.map(aluno => {
-    const payload = frontByAlunoId.get(normalizeKey_(aluno.AlunoID)) || frontByAlunoId.get(normalizeKey_(aluno.Nome)) || {};
-    const rowSalvo = toInt_(payload.salvo ?? payload.SALVO ?? 0);
-    if (rowSalvo !== 1) return null;
+    const payload = frontByAlunoId.get(normalizeKey_(aluno.AlunoID)) || frontByAlunoId.get(normalizeKey_(aluno.Nome)) || null;
+    if (!payload) return null;
 
     const previous = existingByAluno.get(normalizeKey_(aluno.Nome)) || null;
+    const previousBase = existingBaseByAluno.get(normalizeKey_(aluno.Nome)) || null;
+    const mergedPayload = previous ? { ...previous, ...payload } : { ...payload };
 
-    const isAutoPresence = toBool_(previous?.AUTO_PRESENÇA) || toBool_(payload.autoPresenca) || toBool_(payload.autoPresença);
-    const isAutoDelay = toBool_(previous?.AUTO_ATRASO) || toBool_(payload.autoAtraso) || toBool_(payload.autoAtraso);
+    const rowSalvo = toInt_(mergedPayload.salvo ?? mergedPayload.SALVO ?? previous?.SALVO ?? 0);
+    if (rowSalvo !== 1) return null;
 
-    const effectiveStatus = resolveEffectiveStatus_(payload, previous);
+    const effectiveStatus = resolveEffectiveStatus_(mergedPayload, previous);
     const ausSeguidas = computeConsecutiveAbsences_(currentBase, aluno, dateKey, turma.Nome, effectiveStatus);
 
     const chamadaRow = buildChamadaRow_({
       dateKey,
       aluno,
       turmaNome: turma.Nome,
-      oferta,
-      visitantes,
-      biblias,
-      revistas,
+      oferta: mergedPayload.oferta ?? mergedPayload.OFERTA,
+      visitantes: mergedPayload.visitantes ?? mergedPayload.VISITANTES,
+      biblias: mergedPayload.biblias ?? mergedPayload.BÍBLIAS,
+      revistas: mergedPayload.revistas ?? mergedPayload.REVISTAS,
       effectiveStatus,
-      autoPresence: isAutoPresence,
-      autoDelay: isAutoDelay,
+      autoPresence: mergedPayload.autoPresenca ?? mergedPayload.autoPresença,
+      autoDelay: mergedPayload.autoAtraso,
       ausSeguidas,
-      responsavel,
+      responsavel: mergedPayload.responsavel ?? mergedPayload.RESPONSÁVEL ?? responsavel,
       salvo: rowSalvo,
+      previousRow: previous,
     });
 
     const baseRow = buildBaseRow_({
       dateKey,
       aluno,
       turmaNome: turma.Nome,
-      oferta,
-      visitantes,
-      biblias,
-      revistas,
+      oferta: mergedPayload.oferta ?? mergedPayload.OFERTA,
+      visitantes: mergedPayload.visitantes ?? mergedPayload.VISITANTES,
+      biblias: mergedPayload.biblias ?? mergedPayload.BÍBLIAS,
+      revistas: mergedPayload.revistas ?? mergedPayload.REVISTAS,
       effectiveStatus,
+      previousRow: previousBase,
     });
 
     return { chamadaRow, baseRow };
@@ -384,6 +407,7 @@ function addTurma_(p) {
     ALUNO: '',
     CLASSE: nome,
     CPF: '',
+    STATUS: 'ativo',
   }]);
 
   return { ok: true, message: 'Classe cadastrada com sucesso.', turmaId: nome };
@@ -416,6 +440,7 @@ function addAluno_(p) {
     ALUNO: nome,
     CLASSE: turmaId,
     CPF: cpf,
+    STATUS: 'ativo',
   }]);
 
   return { ok: true, message: 'Aluno cadastrado com sucesso.' };
@@ -431,27 +456,40 @@ function moveAluno_(p) {
 
   const sheet = getOrCreateSheet_(SHEETS.CADASTRO, CADASTRO_HEADERS);
   const rows = readAllRows_(sheet, CADASTRO_HEADERS);
-  let changed = false;
 
-  for (const row of rows) {
-    const sameAluno = normalizeKey_(row.ALUNO) === normalizeKey_(alunoId);
-    if (sameAluno) {
-      row.CLASSE = turmaId;
-      changed = true;
-    }
-  }
+  const row = findCadastroAlunoByIdentifier_(rows, alunoId);
+  if (!row) throw new Error('Aluno não encontrado no Cadastro.');
 
-  if (!changed) throw new Error('Aluno não encontrado no Cadastro.');
+  row.CLASSE = turmaId;
 
   writeAllRows_(sheet, CADASTRO_HEADERS, rows);
   return { ok: true, message: 'Aluno movido com sucesso.' };
 }
 
 function toggleAluno_(p) {
-  // O novo Cadastro não tem coluna de status.
+  ensureSheets_();
+
+  const alunoId = String(p.alunoId || p.nome || '').trim();
+  if (!alunoId) throw new Error('Aluno inválido.');
+
+  const desiredStatus = String(p.status || p.ativo || '').trim().toLowerCase();
+  const sheet = getOrCreateSheet_(SHEETS.CADASTRO, CADASTRO_HEADERS);
+  const rows = readAllRows_(sheet, CADASTRO_HEADERS);
+
+  const row = findCadastroAlunoByIdentifier_(rows, alunoId);
+  if (!row) throw new Error('Aluno não encontrado no Cadastro.');
+
+  const currentStatus = normalizeStudentStatus_(row.STATUS || row.Ativo || 'ativo');
+  const nextStatus = ['ativo', 'inativo'].includes(desiredStatus)
+    ? desiredStatus
+    : (currentStatus === 'inativo' ? 'ativo' : 'inativo');
+
+  row.STATUS = nextStatus;
+
+  writeAllRows_(sheet, CADASTRO_HEADERS, rows);
   return {
-    ok: false,
-    message: 'O Cadastro novo não possui campo de status ativo/inativo.',
+    ok: true,
+    message: 'Status atualizado com sucesso.',
   };
 }
 
@@ -544,6 +582,7 @@ function buildAlunosFromCadastro_(cadastroRows, baseRows = []) {
     if (!aluno || !classe) continue;
 
     const cpf = digitsOnly_(row.CPF || '');
+    const status = normalizeStudentStatus_(row.STATUS || row.Ativo || 'ativo');
     const key = normalizeKey_(`${classe}__${aluno}__${cpf || ''}`);
     grouped.set(key, {
       AlunoID: buildAlunoId_(aluno, classe, cpf),
@@ -551,8 +590,8 @@ function buildAlunosFromCadastro_(cadastroRows, baseRows = []) {
       TurmaID: classe,
       TurmaNome: classe,
       CPF: cpf,
-      Ativo: 'sim',
-      Status: 'ativo',
+      Ativo: status === 'ativo' ? 'sim' : 'nao',
+      Status: status,
       FaltasConsecutivas: 0,
       TotalPresencas: 0,
       TotalFaltas: 0,
@@ -790,20 +829,21 @@ function buildBaseRow_(opts) {
   const d = normalizeDateKey_(opts.dateKey);
   const dt = parseIsoDate_(d) || new Date();
   const effectiveStatus = String(opts.effectiveStatus || 'ausencia').trim().toLowerCase();
+  const previousRow = opts.previousRow || null;
 
   return {
     DATA: d,
     ANO: String(dt.getFullYear()),
     MÊS: String(dt.getMonth() + 1).padStart(2, '0'),
-    ALUNO: String(opts.aluno?.Nome || '').trim(),
-    CLASSE: String(opts.turmaNome || '').trim(),
-    PRESENÇA: effectiveStatus === 'presenca' ? 1 : 0,
-    ATRASO: effectiveStatus === 'atraso' ? 1 : 0,
-    AUSÊNCIA: effectiveStatus === 'ausencia' ? 1 : 0,
-    OFERTA: parseMoney_(opts.oferta || 0),
-    VISITANTES: toInt_(opts.visitantes || 0),
-    BÍBLIAS: toInt_(opts.biblias || 0),
-    REVISTAS: toInt_(opts.revistas || 0),
+    ALUNO: String(opts.aluno?.Nome || previousRow?.ALUNO || '').trim(),
+    CLASSE: String(opts.turmaNome || previousRow?.CLASSE || '').trim(),
+    PRESENÇA: effectiveStatus === 'presenca' ? 1 : toInt_(previousRow?.PRESENÇA ?? 0),
+    ATRASO: effectiveStatus === 'atraso' ? 1 : toInt_(previousRow?.ATRASO ?? 0),
+    AUSÊNCIA: effectiveStatus === 'ausencia' ? 1 : toInt_(previousRow?.AUSÊNCIA ?? 0),
+    OFERTA: parseMoney_(opts.oferta ?? previousRow?.OFERTA ?? 0),
+    VISITANTES: toInt_(opts.visitantes ?? previousRow?.VISITANTES ?? 0),
+    BÍBLIAS: toInt_(opts.biblias ?? previousRow?.BÍBLIAS ?? 0),
+    REVISTAS: toInt_(opts.revistas ?? previousRow?.REVISTAS ?? 0),
   };
 }
 
@@ -875,14 +915,30 @@ function buildGeneralReportText_(dateKey, turmas, alunos, callsByTurma) {
  * ========================= */
 
 function resolveEffectiveStatus_(payload, previousRow) {
-  const raw = String(payload?.presenca ?? payload?.PRESENCA ?? payload?.presencaStatus ?? '').trim().toLowerCase();
-  const atrasoFlag = toBool_(payload?.atraso ?? payload?.Atraso);
+  const raw = String(payload?.presenca ?? payload?.PRESENCA ?? payload?.presencaStatus ?? previousRow?.PRESENÇA ?? previousRow?.PRESENCA ?? '').trim().toLowerCase();
+  const atrasoFlag = toBool_(payload?.atraso ?? payload?.Atraso ?? previousRow?.ATRASO);
   const autoPres = toBool_(payload?.autoPresenca ?? payload?.autoPresença ?? previousRow?.AUTO_PRESENÇA);
   const autoDelay = toBool_(payload?.autoAtraso ?? previousRow?.AUTO_ATRASO);
 
   if (autoDelay || ['atrasado', 'atrasada', 'delay', 'late'].includes(raw) || atrasoFlag) return 'atraso';
   if (autoPres || ['sim', 'presente', 'presença', 'presenca', '1', 'true', 'p'].includes(raw)) return 'presenca';
   if (['nao', 'não', 'ausente', 'ausencia', 'ausência', '0', 'false'].includes(raw)) return 'ausencia';
+
+  return inferStatusFromChamadaRow_(previousRow);
+}
+
+function inferStatusFromChamadaRow_(row) {
+  if (!row) return 'ausencia';
+
+  const autoPres = toBool_(row.AUTO_PRESENÇA);
+  const autoDelay = toBool_(row.AUTO_ATRASO);
+  const pres = toInt_(row.PRESENÇA);
+  const atr = toInt_(row.ATRASO);
+  const aus = toInt_(row.AUSÊNCIA);
+
+  if (autoDelay || atr === 1) return 'atraso';
+  if (autoPres || pres === 1) return 'presenca';
+  if (aus === 1) return 'ausencia';
 
   return 'ausencia';
 }
@@ -1296,6 +1352,29 @@ function findCadastroByCpfPrefix_(cadastroRows, prefix) {
     // Prioriza correspondência exata de 5 primeiros dígitos; se houver mais de uma, retorna a primeira.
     return matches[0];
   }
+  return null;
+}
+
+
+function findCadastroAlunoByIdentifier_(cadastroRows, identifier) {
+  const target = normalizeKey_(identifier);
+  const digits = digitsOnly_(identifier);
+
+  for (const row of cadastroRows || []) {
+    const nome = String(row.ALUNO || '').trim();
+    const classe = String(row.CLASSE || '').trim();
+    const cpf = digitsOnly_(row.CPF || '');
+    const alunoId = buildAlunoId_(nome, classe, cpf);
+
+    if (
+      normalizeKey_(nome) === target ||
+      normalizeKey_(alunoId) === target ||
+      (digits && cpf && cpf === digits)
+    ) {
+      return row;
+    }
+  }
+
   return null;
 }
 
