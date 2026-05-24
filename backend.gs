@@ -190,60 +190,44 @@ function saveCall_(p) {
     }
   }
 
-  const existingBaseCache = currentBase.filter(r =>
-    normalizeKey_(r.CLASSE) === normalizeKey_(turma.Nome) &&
-    normalizeDateKey_(r.DATA) === dateKey
-  );
-
-  const existingBaseByAluno = new Map();
-  for (const row of existingBaseCache) {
-    const key = normalizeKey_(row.ALUNO);
-    if (key && !existingBaseByAluno.has(key)) {
-      existingBaseByAluno.set(key, row);
-    }
-  }
-
   const prepared = turmaAlunos.map(aluno => {
-    const payload = frontByAlunoId.get(normalizeKey_(aluno.AlunoID)) || frontByAlunoId.get(normalizeKey_(aluno.Nome)) || null;
-    if (!payload) return null;
-
-    const previous = existingByAluno.get(normalizeKey_(aluno.Nome)) || null;
-    const previousBase = existingBaseByAluno.get(normalizeKey_(aluno.Nome)) || null;
-    const mergedPayload = previous ? { ...previous, ...payload } : { ...payload };
-
-    const rowSalvo = toInt_(mergedPayload.salvo ?? mergedPayload.SALVO ?? previous?.SALVO ?? 0);
+    const payload = frontByAlunoId.get(normalizeKey_(aluno.AlunoID)) || frontByAlunoId.get(normalizeKey_(aluno.Nome)) || {};
+    const rowSalvo = toInt_(payload.salvo ?? payload.SALVO ?? 0);
     if (rowSalvo !== 1) return null;
 
-    const effectiveStatus = resolveEffectiveStatus_(mergedPayload, previous);
+    const previous = existingByAluno.get(normalizeKey_(aluno.Nome)) || null;
+
+    const isAutoPresence = toBool_(previous?.AUTO_PRESENÇA) || toBool_(payload.autoPresenca) || toBool_(payload.autoPresença);
+    const isAutoDelay = toBool_(previous?.AUTO_ATRASO) || toBool_(payload.autoAtraso) || toBool_(payload.autoAtraso);
+
+    const effectiveStatus = resolveEffectiveStatus_(payload, previous);
     const ausSeguidas = computeConsecutiveAbsences_(currentBase, aluno, dateKey, turma.Nome, effectiveStatus);
 
     const chamadaRow = buildChamadaRow_({
       dateKey,
       aluno,
       turmaNome: turma.Nome,
-      oferta: mergedPayload.oferta ?? mergedPayload.OFERTA,
-      visitantes: mergedPayload.visitantes ?? mergedPayload.VISITANTES,
-      biblias: mergedPayload.biblias ?? mergedPayload.BÍBLIAS,
-      revistas: mergedPayload.revistas ?? mergedPayload.REVISTAS,
+      oferta,
+      visitantes,
+      biblias,
+      revistas,
       effectiveStatus,
-      autoPresence: mergedPayload.autoPresenca ?? mergedPayload.autoPresença,
-      autoDelay: mergedPayload.autoAtraso,
+      autoPresence: isAutoPresence,
+      autoDelay: isAutoDelay,
       ausSeguidas,
-      responsavel: mergedPayload.responsavel ?? mergedPayload.RESPONSÁVEL ?? responsavel,
+      responsavel,
       salvo: rowSalvo,
-      previousRow: previous,
     });
 
     const baseRow = buildBaseRow_({
       dateKey,
       aluno,
       turmaNome: turma.Nome,
-      oferta: mergedPayload.oferta ?? mergedPayload.OFERTA,
-      visitantes: mergedPayload.visitantes ?? mergedPayload.VISITANTES,
-      biblias: mergedPayload.biblias ?? mergedPayload.BÍBLIAS,
-      revistas: mergedPayload.revistas ?? mergedPayload.REVISTAS,
+      oferta,
+      visitantes,
+      biblias,
+      revistas,
       effectiveStatus,
-      previousRow: previousBase,
     });
 
     return { chamadaRow, baseRow };
@@ -806,21 +790,20 @@ function buildBaseRow_(opts) {
   const d = normalizeDateKey_(opts.dateKey);
   const dt = parseIsoDate_(d) || new Date();
   const effectiveStatus = String(opts.effectiveStatus || 'ausencia').trim().toLowerCase();
-  const previousRow = opts.previousRow || null;
 
   return {
     DATA: d,
     ANO: String(dt.getFullYear()),
     MÊS: String(dt.getMonth() + 1).padStart(2, '0'),
-    ALUNO: String(opts.aluno?.Nome || previousRow?.ALUNO || '').trim(),
-    CLASSE: String(opts.turmaNome || previousRow?.CLASSE || '').trim(),
-    PRESENÇA: effectiveStatus === 'presenca' ? 1 : toInt_(previousRow?.PRESENÇA ?? 0),
-    ATRASO: effectiveStatus === 'atraso' ? 1 : toInt_(previousRow?.ATRASO ?? 0),
-    AUSÊNCIA: effectiveStatus === 'ausencia' ? 1 : toInt_(previousRow?.AUSÊNCIA ?? 0),
-    OFERTA: parseMoney_(opts.oferta ?? previousRow?.OFERTA ?? 0),
-    VISITANTES: toInt_(opts.visitantes ?? previousRow?.VISITANTES ?? 0),
-    BÍBLIAS: toInt_(opts.biblias ?? previousRow?.BÍBLIAS ?? 0),
-    REVISTAS: toInt_(opts.revistas ?? previousRow?.REVISTAS ?? 0),
+    ALUNO: String(opts.aluno?.Nome || '').trim(),
+    CLASSE: String(opts.turmaNome || '').trim(),
+    PRESENÇA: effectiveStatus === 'presenca' ? 1 : 0,
+    ATRASO: effectiveStatus === 'atraso' ? 1 : 0,
+    AUSÊNCIA: effectiveStatus === 'ausencia' ? 1 : 0,
+    OFERTA: parseMoney_(opts.oferta || 0),
+    VISITANTES: toInt_(opts.visitantes || 0),
+    BÍBLIAS: toInt_(opts.biblias || 0),
+    REVISTAS: toInt_(opts.revistas || 0),
   };
 }
 
@@ -892,30 +875,14 @@ function buildGeneralReportText_(dateKey, turmas, alunos, callsByTurma) {
  * ========================= */
 
 function resolveEffectiveStatus_(payload, previousRow) {
-  const raw = String(payload?.presenca ?? payload?.PRESENCA ?? payload?.presencaStatus ?? previousRow?.PRESENÇA ?? previousRow?.PRESENCA ?? '').trim().toLowerCase();
-  const atrasoFlag = toBool_(payload?.atraso ?? payload?.Atraso ?? previousRow?.ATRASO);
+  const raw = String(payload?.presenca ?? payload?.PRESENCA ?? payload?.presencaStatus ?? '').trim().toLowerCase();
+  const atrasoFlag = toBool_(payload?.atraso ?? payload?.Atraso);
   const autoPres = toBool_(payload?.autoPresenca ?? payload?.autoPresença ?? previousRow?.AUTO_PRESENÇA);
   const autoDelay = toBool_(payload?.autoAtraso ?? previousRow?.AUTO_ATRASO);
 
   if (autoDelay || ['atrasado', 'atrasada', 'delay', 'late'].includes(raw) || atrasoFlag) return 'atraso';
   if (autoPres || ['sim', 'presente', 'presença', 'presenca', '1', 'true', 'p'].includes(raw)) return 'presenca';
   if (['nao', 'não', 'ausente', 'ausencia', 'ausência', '0', 'false'].includes(raw)) return 'ausencia';
-
-  return inferStatusFromChamadaRow_(previousRow);
-}
-
-function inferStatusFromChamadaRow_(row) {
-  if (!row) return 'ausencia';
-
-  const autoPres = toBool_(row.AUTO_PRESENÇA);
-  const autoDelay = toBool_(row.AUTO_ATRASO);
-  const pres = toInt_(row.PRESENÇA);
-  const atr = toInt_(row.ATRASO);
-  const aus = toInt_(row.AUSÊNCIA);
-
-  if (autoDelay || atr === 1) return 'atraso';
-  if (autoPres || pres === 1) return 'presenca';
-  if (aus === 1) return 'ausencia';
 
   return 'ausencia';
 }
