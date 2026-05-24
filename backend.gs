@@ -583,12 +583,16 @@ function buildCallForTurma_(dateKey, turma, alunos, chamadaRows, baseRows) {
   const turmaNome = String(turma?.Nome || turma?.TurmaID || '').trim();
   const turmaId = String(turma?.TurmaID || turmaNome).trim();
   const turmaKey = normalizeKey_(turmaNome);
+  const selectedDate = normalizeDateKey_(dateKey);
   const today = todayKey_();
+  const useBaseForDate = selectedDate !== today;
 
   const turmaAlunos = (alunos || []).filter(a => String(a.TurmaID) === String(turmaId));
-  const classRows = (chamadaRows || []).filter(r =>
+
+  const sourceRows = useBaseForDate ? (baseRows || []) : (chamadaRows || []);
+  const classRows = sourceRows.filter(r =>
     normalizeKey_(r.CLASSE) === turmaKey &&
-    sheetDateKey_(r.DATA_CHAMADA) === today
+    normalizeDateKey_(useBaseForDate ? r.DATA : r.DATA_CHAMADA) === selectedDate
   );
 
   const byAluno = new Map();
@@ -601,7 +605,9 @@ function buildCallForTurma_(dateKey, turma, alunos, chamadaRows, baseRows) {
 
   const effectiveRows = turmaAlunos.map(aluno => {
     const cached = byAluno.get(normalizeKey_(aluno.Nome)) || null;
-    return buildFrontRowFromChamada_(cached, aluno, turmaNome);
+    return useBaseForDate
+      ? buildFrontRowFromBase_(cached, aluno, turmaNome)
+      : buildFrontRowFromChamada_(cached, aluno, turmaNome);
   });
 
   const activeRows = effectiveRows.filter(r =>
@@ -617,10 +623,10 @@ function buildCallForTurma_(dateKey, turma, alunos, chamadaRows, baseRows) {
     data: dateKey,
     turmaId,
     turmaNome,
-    oferta: getCallLevelValue_(classRows, 'OFERTA'),
-    visitantes: getCallLevelValue_(classRows, 'VISITANTES', true),
-    biblias: getCallLevelValue_(classRows, 'BÍBLIAS', true),
-    revistas: getCallLevelValue_(classRows, 'REVISTAS', true),
+    oferta: getCallLevelValue_(classRows, useBaseForDate ? 'OFERTA' : 'OFERTA'),
+    visitantes: getCallLevelValue_(classRows, useBaseForDate ? 'VISITANTES' : 'VISITANTES', true),
+    biblias: getCallLevelValue_(classRows, useBaseForDate ? 'BÍBLIAS' : 'BÍBLIAS', true),
+    revistas: getCallLevelValue_(classRows, useBaseForDate ? 'REVISTAS' : 'REVISTAS', true),
     totalAlunos: activeRows.length,
     presentes,
     atrasos,
@@ -705,6 +711,42 @@ function buildFrontRowFromChamada_(cached, aluno, turmaNome) {
     ausSeguidas: cached ? toInt_(cached.AUS_SEGUIDA) : 0,
   };
 }
+
+function buildFrontRowFromBase_(cached, aluno, turmaNome) {
+  const pres = toInt_(cached?.PRESENÇA);
+  const atr = toInt_(cached?.ATRASO);
+  const aus = toInt_(cached?.AUSÊNCIA);
+
+  let presenca = 'nao';
+  let atraso = false;
+
+  if (atr === 1) {
+    presenca = 'atrasado';
+    atraso = true;
+  } else if (pres === 1) {
+    presenca = 'sim';
+    atraso = false;
+  } else if (aus === 1) {
+    presenca = 'nao';
+    atraso = false;
+  }
+
+  return {
+    alunoId: aluno.AlunoID,
+    nome: aluno.Nome,
+    turmaId: aluno.TurmaID,
+    turmaNome,
+    presenca,
+    atraso,
+    observacao: '',
+    statusAluno: aluno.Status || 'ativo',
+    autoPresenca: 0,
+    autoAtraso: 0,
+    salvo: cached ? 1 : 0,
+    ausSeguidas: 0,
+  };
+}
+
 
 function buildChamadaRow_(opts) {
   const effectiveStatus = String(opts.effectiveStatus || 'ausencia').trim().toLowerCase();
