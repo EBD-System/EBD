@@ -583,15 +583,12 @@ function buildCallForTurma_(dateKey, turma, alunos, chamadaRows, baseRows) {
   const turmaNome = String(turma?.Nome || turma?.TurmaID || '').trim();
   const turmaId = String(turma?.TurmaID || turmaNome).trim();
   const turmaKey = normalizeKey_(turmaNome);
-  const normalizedDate = normalizeDateKey_(dateKey);
   const today = todayKey_();
-  const isToday = normalizedDate === today;
 
   const turmaAlunos = (alunos || []).filter(a => String(a.TurmaID) === String(turmaId));
-  const sourceRows = isToday ? (chamadaRows || []) : (baseRows || []);
-  const classRows = sourceRows.filter(r =>
+  const classRows = (chamadaRows || []).filter(r =>
     normalizeKey_(r.CLASSE) === turmaKey &&
-    sheetDateKey_(r.DATA_CHAMADA || r.DATA) === normalizedDate
+    sheetDateKey_(r.DATA_CHAMADA) === today
   );
 
   const byAluno = new Map();
@@ -604,9 +601,7 @@ function buildCallForTurma_(dateKey, turma, alunos, chamadaRows, baseRows) {
 
   const effectiveRows = turmaAlunos.map(aluno => {
     const cached = byAluno.get(normalizeKey_(aluno.Nome)) || null;
-    return isToday
-      ? buildFrontRowFromChamada_(cached, aluno, turmaNome)
-      : buildFrontRowFromBase_(cached, aluno, turmaNome);
+    return buildFrontRowFromChamada_(cached, aluno, turmaNome);
   });
 
   const activeRows = effectiveRows.filter(r =>
@@ -616,11 +611,10 @@ function buildCallForTurma_(dateKey, turma, alunos, chamadaRows, baseRows) {
   const atrasos = activeRows.filter(r => isDelayedValue_(r.presenca)).length;
   const ausentes = activeRows.length - presentes;
   const percentual = activeRows.length ? round1_((presentes / activeRows.length) * 100) : 0;
-  const hasSavedRows = effectiveRows.some(r => isSavedRow(r));
 
   return {
-    chamadaId: `${turmaId}_${normalizedDate}`,
-    data: normalizedDate,
+    chamadaId: `${turmaId}_${dateKey}`,
+    data: dateKey,
     turmaId,
     turmaNome,
     oferta: getCallLevelValue_(classRows, 'OFERTA'),
@@ -633,7 +627,7 @@ function buildCallForTurma_(dateKey, turma, alunos, chamadaRows, baseRows) {
     ausentes,
     percentual,
     rows: effectiveRows,
-    isSaved: hasSavedRows,
+    isSaved: true,
   };
 }
 
@@ -708,27 +702,6 @@ function buildFrontRowFromChamada_(cached, aluno, turmaNome) {
     autoPresenca: autoPres ? 1 : 0,
     autoAtraso: autoDelay ? 1 : 0,
     salvo: cached ? toInt_(cached.SALVO) : 0,
-    ausSeguidas: cached ? toInt_(cached.AUS_SEGUIDA) : 0,
-  };
-}
-
-function buildFrontRowFromBase_(cached, aluno, turmaNome) {
-  const presence = cached ? (toInt_(cached.PRESENÇA) === 1 ? 'sim' : toInt_(cached.ATRASO) === 1 ? 'atrasado' : 'nao') : 'nao';
-  const atraso = presence === 'atrasado';
-  const salvo = cached ? 1 : 0;
-
-  return {
-    alunoId: aluno.AlunoID,
-    nome: aluno.Nome,
-    turmaId: aluno.TurmaID,
-    turmaNome,
-    presenca: presence,
-    atraso,
-    observacao: '',
-    statusAluno: aluno.Status || 'ativo',
-    autoPresenca: 0,
-    autoAtraso: 0,
-    salvo,
     ausSeguidas: cached ? toInt_(cached.AUS_SEGUIDA) : 0,
   };
 }
@@ -1160,13 +1133,8 @@ function sheetDateKey_(value) {
 function parseIsoDate_(value) {
   const s = String(value || '').trim();
   if (!s) return null;
-
-  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-
-  m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (m) return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
-
   const d = new Date(s);
   return isNaN(d.getTime()) ? null : d;
 }

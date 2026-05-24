@@ -1116,24 +1116,9 @@ function buildGeneralReportText() {
 
   return lines.join('\n');
 }
-function formatDateBR(dateValue) {
-  const raw = String(dateValue || todayKey()).trim();
-
-  if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
-    return raw;
-  }
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-    const [y, m, d] = raw.split('-');
-    return `${d}/${m}/${y}`;
-  }
-
-  const parsed = new Date(raw);
-  if (!Number.isNaN(parsed.getTime())) {
-    return parsed.toLocaleDateString('pt-BR');
-  }
-
-  return raw;
+function formatDateBR(dateKey) {
+  const [y, m, d] = String(dateKey || todayKey()).split('-');
+  return `${d}/${m}/${y}`;
 }
 
 function renderTurmaSelects() {
