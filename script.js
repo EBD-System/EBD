@@ -339,7 +339,7 @@ function capitalizeFirstLetter(value) {
 
 function getAccessCodeFromUrl() {
   try {
-    return String(new URLSearchParams(window.location.search).get('code') || '').trim().toLowerCase();
+    return String(new URLSearchParams(window.location.search).get('code') || '').trim();
   } catch (err) {
     return '';
   }
@@ -1414,6 +1414,7 @@ async function saveCurrentCall({ silent = false } = {}) {
     date: state.dateKey,
     turmaId: turma.TurmaID,
     chamadaId: call.chamadaId,
+    responsavel: state.accessCode || '',
     oferta: call.oferta ?? 0,
     visitantes: String(call.visitantes ?? 0),
     biblias: String(call.biblias ?? 0),

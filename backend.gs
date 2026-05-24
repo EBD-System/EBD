@@ -34,6 +34,7 @@ const CHAMADA_HEADERS = [
   'VISITANTES',
   'BÍBLIAS',
   'REVISTAS',
+  'RESPONSÁVEL',
   'SALVO',
 ];
 const BASE_HEADERS = [
@@ -145,6 +146,7 @@ function saveCall_(p) {
   const turmaId = String(p.turmaId || p.turmaNome || p.turma || '').trim();
   const chamadaId = String(p.chamadaId || `${turmaId}_${dateKey}`).trim();
   const rowsJson = String(p.rowsJson || '[]');
+  const responsavel = String(p.responsavel || p.code || '').trim().toLowerCase();
   const oferta = parseMoney_(p.oferta);
   const visitantes = toInt_(p.visitantes);
   const biblias = toInt_(p.biblias);
@@ -213,6 +215,7 @@ function saveCall_(p) {
       autoPresence: isAutoPresence,
       autoDelay: isAutoDelay,
       ausSeguidas,
+      responsavel,
       salvo: rowSalvo,
     });
 
@@ -778,6 +781,7 @@ function buildChamadaRow_(opts) {
     VISITANTES: toInt_(opts.visitantes || 0),
     BÍBLIAS: toInt_(opts.biblias || 0),
     REVISTAS: toInt_(opts.revistas || 0),
+    RESPONSÁVEL: String(opts.responsavel || '').trim().toLowerCase(),
     SALVO: toInt_(opts.salvo ? 1 : 0),
   };
 }
