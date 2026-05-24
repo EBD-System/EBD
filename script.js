@@ -172,10 +172,27 @@ function isSelectedDateToday() {
 
 function updateSaveButtonVisibility() {
   if (!els.saveBtn) return;
-  const shouldShow = isSelectedDateToday();
-  els.saveBtn.style.display = shouldShow ? '' : 'none';
-  els.saveBtn.setAttribute('aria-hidden', String(!shouldShow));
+  const isToday = isSelectedDateToday();
+  els.saveBtn.style.display = '';
+  els.saveBtn.disabled = !isToday;
+  els.saveBtn.classList.toggle('btn--date-locked', !isToday);
+  els.saveBtn.setAttribute('aria-disabled', String(!isToday));
+  els.saveBtn.setAttribute('aria-hidden', 'false');
 }
+function updateActionNotice() {
+  if (!els.feedback) return;
+
+  if (isSelectedDateToday()) {
+    showSuccess('Sistema pronto para uso.');
+    return;
+  }
+
+  setFeedback(
+    'warning',
+    `DATA SELECIONADA: ${formatDateBR(state.dateKey)}\n\nOBS:: Selecione a data de hoje para salvar a chamada do dia atual`
+  );
+}
+
 
 function onlyDigits(value) {
   return String(value || '').replace(/\D/g, '');
@@ -1753,6 +1770,7 @@ function loadSelectedTurma() {
 function renderAll() {
   applyAccessMode();
   updateSaveButtonVisibility();
+  updateActionNotice();
   renderTurmaSelects();
   loadSelectedTurma();
   renderSummary();
@@ -2269,10 +2287,8 @@ async function bootstrap() {
     }
 
     renderAll();
-    clearFeedback();
 
     state.initialized = true;
-    showSuccess('Sistema pronto para uso.');
   } finally {
     hideLoading();
   }
@@ -2288,6 +2304,7 @@ els.dateInput.addEventListener('change', async (event) => {
 
   state.dateKey = nextDate;
   updateSaveButtonVisibility();
+  updateActionNotice();
   const storage = storageState();
   storage.selectedDateKey = state.dateKey;
   saveStorageState(storage);

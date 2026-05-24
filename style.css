@@ -497,6 +497,13 @@ body.access-restricted .student__actions{
 .btn:hover{transform:translateY(-1px)}
 .btn:active{transform:translateY(0)}
 .btn:disabled{opacity:.55; cursor:not-allowed}
+.btn--date-locked:disabled{
+  background:#d6dbe6;
+  border-color:#c8cfdb;
+  color:#6b7280;
+  box-shadow:none;
+  opacity:1;
+}
 .btn--primary{
   color:#fff;
   background:linear-gradient(135deg, var(--accent), #2f6dff);
@@ -550,6 +557,7 @@ body.access-restricted .student__actions{
   border-radius:18px;
   line-height:1.55;
   font-weight:700;
+  white-space:pre-line;
 }
 .feedback.show{display:block}
 .feedback.success{
@@ -566,6 +574,11 @@ body.access-restricted .student__actions{
   background:rgba(79,134,255,.10);
   border:1px solid rgba(79,134,255,.20);
   color:var(--accent);
+}
+.feedback.warning{
+  background:rgba(245, 158, 11, .12);
+  border:1px solid rgba(245, 158, 11, .30);
+  color:#8a5a00;
 }
 .hidden{display:none !important;}
 
