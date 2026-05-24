@@ -186,6 +186,7 @@ function saveCall_(p) {
   const currentBase = loadSheetObjects_(SHEETS.BASE, BASE_HEADERS);
 
   const existingCache = currentChamada.filter(r =>
+    normalizeDateKey_(r.DATA_CHAMADA) === dateKey &&
     normalizeKey_(r.CLASSE) === normalizeKey_(turma.Nome)
   );
 
@@ -1124,7 +1125,11 @@ function buildBaseRowKey_(row) {
 }
 
 function buildChamadaRowKey_(row) {
-  return normalizeKey_(row?.ALUNO || '');
+  return [
+    normalizeDateKey_(row?.DATA_CHAMADA || row?.DATA || ''),
+    normalizeKey_(row?.CLASSE || ''),
+    normalizeKey_(row?.ALUNO || ''),
+  ].join('__');
 }
 
 function upsertRowsInPlace_(sheetName, headers, existingRows, newRows, keyFn, options = {}) {

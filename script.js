@@ -765,6 +765,13 @@ function buildStudentRowFromAluno(aluno) {
   });
 }
 
+
+function preferDraftValue(draftValue, serverValue, fallbackValue = '') {
+  if (draftValue === undefined || draftValue === null) return serverValue ?? fallbackValue;
+  if (typeof draftValue === 'string' && draftValue.trim() === '') return serverValue ?? fallbackValue;
+  return draftValue;
+}
+
 function buildSyncedCall(turma, serverCall = null, draft = null) {
   const roster = getAlunosForTurma(turma.TurmaID);
   const serverRows = Array.isArray(serverCall?.rows) ? serverCall.rows : [];
@@ -806,7 +813,7 @@ function buildSyncedCall(turma, serverCall = null, draft = null) {
     data: serverCall?.data || state.dateKey,
     turmaId: turma.TurmaID,
     turmaNome: turma.Nome,
-    oferta: draft?.oferta ?? serverCall?.oferta ?? '',
+    oferta: preferDraftValue(draft?.oferta, serverCall?.oferta, ''),
     visitantes: Number(draft?.visitantes ?? serverCall?.visitantes ?? 0) || 0,
     biblias: Number(draft?.biblias ?? serverCall?.biblias ?? 0) || 0,
     revistas: Number(draft?.revistas ?? serverCall?.revistas ?? 0) || 0,
@@ -905,7 +912,7 @@ function restoreDraft(call) {
 
   return {
     ...call,
-    oferta: draft.oferta ?? call.oferta,
+    oferta: preferDraftValue(draft.oferta, call.oferta),
     visitantes: draft.visitantes ?? call.visitantes,
     biblias: draft.biblias ?? call.biblias,
     revistas: draft.revistas ?? call.revistas,
