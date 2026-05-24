@@ -1545,37 +1545,285 @@ async function saveCurrentCall({ silent = false } = {}) {
   }
 }
 
+
 async function sendReport(scope) {
   if (isRestrictedMode()) {
     throw new Error('Ação indisponível neste modo.');
   }
+
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    throw new Error('Biblioteca de PDF não carregada.');
+  }
+
   const turma = getCurrentTurma();
-  if (scope === 'turma' && !turma) throw new Error('Selecione uma turma.');
+  if (scope === 'turma' && !turma) {
+    throw new Error('Selecione uma turma.');
+  }
+
   if (state.dirty) {
     await saveCurrentCall({ silent: true });
   }
 
-  showLoading(scope === 'geral' ? 'Enviando relatório geral...' : 'Enviando relatório da turma...');
+  const scopeLabel = scope === 'geral' ? 'relatório geral' : 'relatório da turma';
+  showLoading(`Gerando ${scopeLabel} em PDF...`, 40000);
+
   try {
-    const result = await apiPost({
-      action: 'sendReport',
-      scope,
-      date: state.dateKey,
-      turmaId: turma ? turma.TurmaID : '',
+    const report = buildPdfReportModel(scope);
+    const doc = new window.jspdf.jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+      compress: true,
     });
 
-    if (result.text) {
-      if (scope === 'turma') els.turmaReport.value = result.text;
-      if (scope === 'geral') els.geralReport.value = result.text;
-    }
+    doc.setProperties({
+      title: report.fileName.replace(/\.pdf$/i, ''),
+      subject: report.title,
+      author: 'EBD',
+      creator: 'EBD',
+    });
 
-    showSuccess(result.message || 'Relatório enviado.');
-    await refreshFromBackend(false);
-    renderAll();
+    report.pages.forEach((page, index) => {
+      if (index > 0) doc.addPage();
+      drawReportPage(doc, page, {
+        pageNumber: index + 1,
+        totalPages: report.pages.length,
+      });
+    });
+
+    const blob = doc.output('blob');
+    const file = new File([blob], report.fileName, { type: 'application/pdf' });
+
+    await sharePdfFile(file, {
+      title: report.title,
+      text: report.shareText,
+    });
+
+    showSuccess(report.successMessage);
   } finally {
     hideLoading();
   }
 }
+
+function buildPdfReportModel(scope) {
+  const selectedDate = String(state.dateKey || todayKey());
+  const dateLabel = formatDateBR(selectedDate);
+  const turmas = getTurmasSorted();
+
+  if (scope === 'turma') {
+    const turma = getCurrentTurma();
+    const call = getCurrentCall();
+    if (!turma) throw new Error('Selecione uma turma.');
+
+    return {
+      title: `Relatório da turma • ${turma.Nome}`,
+      fileName: `relatorio-turma-${slugifyForFileName(turma.Nome)}-${selectedDate}.pdf`,
+      shareText: `Relatório em PDF da turma ${turma.Nome} (${dateLabel}).`,
+      successMessage: 'PDF da turma pronto para compartilhar.',
+      pages: [
+        buildPdfTurmaPage(turma, call, dateLabel),
+      ],
+    };
+  }
+
+  const pages = turmas.map((turma) => buildPdfTurmaPage(turma, state.chamadasByTurma?.[turma.TurmaID] || null, dateLabel));
+  pages.push(buildPdfGeneralPage(dateLabel));
+
+  return {
+    title: 'Relatório geral consolidado',
+    fileName: `relatorio-geral-${selectedDate}.pdf`,
+    shareText: `Relatório geral consolidado em PDF (${dateLabel}).`,
+    successMessage: 'PDF geral pronto para compartilhar.',
+    pages,
+  };
+}
+
+function buildPdfTurmaPage(turma, call, dateLabel) {
+  const roster = getAlunosForTurma(turma.TurmaID);
+  const matriculados = roster.filter((aluno) => String(aluno.Status || 'ativo').trim().toLowerCase() !== 'inativo').length;
+
+  const presentes = Number(call?.presentes || 0);
+  const visitantes = Number(call?.visitantes || 0);
+  const ausentes = Number(call?.ausentes || Math.max(matriculados - presentes, 0));
+  const biblias = Number(call?.biblias || 0);
+  const revistas = Number(call?.revistas || 0);
+  const oferta = Number(call?.oferta || 0);
+  const total = presentes + visitantes;
+
+  return {
+    type: 'turma',
+    title: turma?.Nome || 'Turma',
+    subtitle: `Data: ${dateLabel}`,
+    note: 'Total = Presentes + Visitantes',
+    metrics: [
+      { label: 'Matriculados', value: formatIntegerBR(matriculados) },
+      { label: 'Ausentes', value: formatIntegerBR(ausentes) },
+      { label: 'Presentes', value: formatIntegerBR(presentes) },
+      { label: 'Visitantes', value: formatIntegerBR(visitantes) },
+      { label: 'Total', value: formatIntegerBR(total) },
+      { label: 'Bíblicas', value: formatIntegerBR(biblias) },
+      { label: 'Revistas', value: formatIntegerBR(revistas) },
+      { label: 'Ofertas', value: formatMoney(oferta) },
+    ],
+  };
+}
+
+function buildPdfGeneralPage(dateLabel) {
+  const turmas = getTurmasSorted();
+  const calls = Object.values(state.chamadasByTurma || {});
+  const resumido = state.resumoGeral || {};
+
+  const totalMatriculados = turmas.reduce((acc, turma) => {
+    const roster = getAlunosForTurma(turma.TurmaID);
+    const ativos = roster.filter((aluno) => String(aluno.Status || 'ativo').trim().toLowerCase() !== 'inativo').length;
+    return acc + ativos;
+  }, 0);
+
+  const presentes = calls.reduce((acc, call) => acc + Number(call?.presentes || 0), 0);
+  const visitantes = calls.reduce((acc, call) => acc + Number(call?.visitantes || 0), 0);
+  const ausentes = calls.reduce((acc, call) => acc + Number(call?.ausentes || 0), 0);
+  const biblias = calls.reduce((acc, call) => acc + Number(call?.biblias || 0), 0);
+  const revistas = calls.reduce((acc, call) => acc + Number(call?.revistas || 0), 0);
+  const oferta = calls.reduce((acc, call) => acc + Number(call?.oferta || 0), 0);
+  const total = presentes + visitantes;
+
+  const turmasSalvas = Number(resumido?.turmasSalvas ?? calls.filter((c) => c && c.isSaved).length);
+  const totalTurmas = Number(resumido?.totalTurmas ?? turmas.length);
+
+  return {
+    type: 'geral',
+    title: 'Relatório geral consolidado',
+    subtitle: `Data: ${dateLabel}`,
+    note: `Turmas salvas: ${turmasSalvas}/${totalTurmas}`,
+    metrics: [
+      { label: 'Matriculados', value: formatIntegerBR(totalMatriculados) },
+      { label: 'Ausentes', value: formatIntegerBR(ausentes) },
+      { label: 'Presentes', value: formatIntegerBR(presentes) },
+      { label: 'Visitantes', value: formatIntegerBR(visitantes) },
+      { label: 'Total', value: formatIntegerBR(total) },
+      { label: 'Bíblicas', value: formatIntegerBR(biblias) },
+      { label: 'Revistas', value: formatIntegerBR(revistas) },
+      { label: 'Ofertas', value: formatMoney(oferta) },
+    ],
+  };
+}
+
+function drawReportPage(doc, page, meta) {
+  const width = doc.internal.pageSize.getWidth();
+  const height = doc.internal.pageSize.getHeight();
+  const margin = 12;
+  const contentWidth = width - margin * 2;
+
+  doc.setFillColor(247, 249, 252);
+  doc.rect(0, 0, width, height, 'F');
+
+  doc.setFillColor(23, 43, 77);
+  doc.roundedRect(margin, margin, contentWidth, 28, 4, 4, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(17);
+  const titleLines = doc.splitTextToSize(String(page.title || ''), contentWidth - 24);
+  doc.text(titleLines, margin + 8, margin + 11);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10.5);
+  doc.text(String(page.subtitle || ''), margin + 8, margin + 20);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.text(`Página ${meta.pageNumber}/${meta.totalPages}`, width - margin - 3, margin + 9, { align: 'right' });
+
+  doc.setTextColor(45, 55, 72);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text(String(page.note || ''), margin, margin + 38);
+
+  const cardW = (contentWidth - 6) / 2;
+  const cardH = 24;
+  const startY = margin + 44;
+  const gapY = 6;
+  const gapX = 6;
+
+  const positions = [
+    [margin, startY],
+    [margin + cardW + gapX, startY],
+    [margin, startY + cardH + gapY],
+    [margin + cardW + gapX, startY + cardH + gapY],
+    [margin, startY + (cardH + gapY) * 2],
+    [margin + cardW + gapX, startY + (cardH + gapY) * 2],
+    [margin, startY + (cardH + gapY) * 3],
+    [margin + cardW + gapX, startY + (cardH + gapY) * 3],
+  ];
+
+  page.metrics.forEach((metric, index) => {
+    const pos = positions[index];
+    if (!pos) return;
+    drawMetricCard(doc, pos[0], pos[1], cardW, cardH, metric.label, metric.value, index % 2 === 0);
+  });
+
+  doc.setDrawColor(221, 228, 239);
+  doc.line(margin, height - 16, width - margin, height - 16);
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(8.5);
+  doc.text('Gerado diretamente no celular para compartilhamento rápido.', margin, height - 10);
+}
+
+function drawMetricCard(doc, x, y, w, h, label, value, accent = false) {
+  doc.setDrawColor(215, 223, 236);
+  doc.setFillColor(accent ? 255 : 255, accent ? 248 : 255, accent ? 244 : 255);
+  doc.roundedRect(x, y, w, h, 3, 3, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(91, 102, 122);
+  doc.text(String(label || ''), x + 4, y + 7);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(23, 43, 77);
+  const valueText = String(value || '');
+  const lines = doc.splitTextToSize(valueText, w - 8);
+  doc.text(lines, x + 4, y + 16);
+}
+
+function formatIntegerBR(value) {
+  const number = Number(value || 0);
+  return Number.isFinite(number) ? String(Math.trunc(number)) : '0';
+}
+
+function slugifyForFileName(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase() || 'turma';
+}
+
+async function sharePdfFile(file, { title = 'Relatório em PDF', text = '' } = {}) {
+  if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
+    await navigator.share({
+      title,
+      text,
+      files: [file],
+    });
+    return;
+  }
+
+  const url = URL.createObjectURL(file);
+  try {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = file.name || 'relatorio.pdf';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 15000);
+  }
+}
+
 
 function moveStudent(alunoId) {
   if (isRestrictedMode()) {
