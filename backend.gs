@@ -154,10 +154,6 @@ function saveCall_(p) {
   const chamadaId = String(p.chamadaId || `${turmaId}_${dateKey}`).trim();
   const rowsJson = String(p.rowsJson || '[]');
   const responsavel = String(p.responsavel || p.code || '').trim().toLowerCase();
-  const oferta = parseMoney_(p.oferta);
-  const visitantes = toInt_(p.visitantes);
-  const biblias = toInt_(p.biblias);
-  const revistas = toInt_(p.revistas);
 
   if (!turmaId) throw new Error('Turma inválida.');
 
@@ -186,7 +182,6 @@ function saveCall_(p) {
   const currentBase = loadSheetObjects_(SHEETS.BASE, BASE_HEADERS);
 
   const existingCache = currentChamada.filter(r =>
-    normalizeDateKey_(r.DATA_CHAMADA) === dateKey &&
     normalizeKey_(r.CLASSE) === normalizeKey_(turma.Nome)
   );
 
@@ -211,6 +206,28 @@ function saveCall_(p) {
     }
   }
 
+  const currentDateChamadaRows = currentChamada.filter(r =>
+    normalizeKey_(r.CLASSE) === normalizeKey_(turma.Nome) &&
+    normalizeDateKey_(r.DATA_CHAMADA) === dateKey
+  );
+
+  const hasOwn = (obj, prop) => Object.prototype.hasOwnProperty.call(obj || {}, prop);
+  const resolveCallLevelValue = (propLower, propUpper, fallbackRows, parser, defaultValue) => {
+    if (hasOwn(p, propLower)) return parser(p[propLower]);
+    if (hasOwn(p, propUpper)) return parser(p[propUpper]);
+    const fallback = getCallLevelValue_(fallbackRows, propUpper, parser === toInt_ || parser === parseMoney_);
+    return fallback !== '' && fallback !== null && fallback !== undefined
+      ? fallback
+      : defaultValue;
+  };
+
+  const resolvedCallLevel = {
+    oferta: resolveCallLevelValue('oferta', 'OFERTA', currentDateChamadaRows, parseMoney_, 0),
+    visitantes: resolveCallLevelValue('visitantes', 'VISITANTES', currentDateChamadaRows, toInt_, 0),
+    biblias: resolveCallLevelValue('biblias', 'BÍBLIAS', currentDateChamadaRows, toInt_, 0),
+    revistas: resolveCallLevelValue('revistas', 'REVISTAS', currentDateChamadaRows, toInt_, 0),
+  };
+
   const prepared = turmaAlunos.map(aluno => {
     const payload = frontByAlunoId.get(normalizeKey_(aluno.AlunoID)) || frontByAlunoId.get(normalizeKey_(aluno.Nome)) || null;
     if (!payload) return null;
@@ -229,10 +246,10 @@ function saveCall_(p) {
       dateKey,
       aluno,
       turmaNome: turma.Nome,
-      oferta: mergedPayload.oferta ?? mergedPayload.OFERTA,
-      visitantes: mergedPayload.visitantes ?? mergedPayload.VISITANTES,
-      biblias: mergedPayload.biblias ?? mergedPayload.BÍBLIAS,
-      revistas: mergedPayload.revistas ?? mergedPayload.REVISTAS,
+      oferta: resolvedCallLevel.oferta,
+      visitantes: resolvedCallLevel.visitantes,
+      biblias: resolvedCallLevel.biblias,
+      revistas: resolvedCallLevel.revistas,
       effectiveStatus,
       autoPresence: mergedPayload.autoPresenca ?? mergedPayload.autoPresença,
       autoDelay: mergedPayload.autoAtraso,
@@ -246,10 +263,10 @@ function saveCall_(p) {
       dateKey,
       aluno,
       turmaNome: turma.Nome,
-      oferta: mergedPayload.oferta ?? mergedPayload.OFERTA,
-      visitantes: mergedPayload.visitantes ?? mergedPayload.VISITANTES,
-      biblias: mergedPayload.biblias ?? mergedPayload.BÍBLIAS,
-      revistas: mergedPayload.revistas ?? mergedPayload.REVISTAS,
+      oferta: resolvedCallLevel.oferta,
+      visitantes: resolvedCallLevel.visitantes,
+      biblias: resolvedCallLevel.biblias,
+      revistas: resolvedCallLevel.revistas,
       effectiveStatus,
       previousRow: previousBase,
     });
@@ -285,6 +302,7 @@ function saveCall_(p) {
     },
   };
 }
+
 
 function selfPresence_(p) {
   ensureSheets_();
@@ -795,6 +813,7 @@ function buildChamadaRow_(opts) {
   const effectiveStatus = String(opts.effectiveStatus || 'ausencia').trim().toLowerCase();
   const autoPresence = toBool_(opts.autoPresence);
   const autoDelay = toBool_(opts.autoDelay);
+  const previousRow = opts.previousRow || null;
 
   const isPresence = effectiveStatus === 'presenca';
   const isDelay = effectiveStatus === 'atraso';
@@ -808,23 +827,24 @@ function buildChamadaRow_(opts) {
   const ausenciaValue = (autoPresence || autoDelay) ? 0 : (isAbsence ? 1 : 0);
 
   return {
-    DATA_CHAMADA: normalizeDateKey_(opts.dateKey),
-    ALUNO: String(opts.aluno?.Nome || '').trim(),
-    CLASSE: String(opts.turmaNome || '').trim(),
-    AUTO_PRESENÇA: autoPresence ? 1 : 0,
+    DATA_CHAMADA: normalizeDateKey_(opts.dateKey || previousRow?.DATA_CHAMADA || previousRow?.DATA || ''),
+    ALUNO: String(opts.aluno?.Nome || previousRow?.ALUNO || '').trim(),
+    CLASSE: String(opts.turmaNome || previousRow?.CLASSE || '').trim(),
+    AUTO_PRESENÇA: autoPresence ? 1 : toInt_(previousRow?.AUTO_PRESENÇA ?? 0),
     PRESENÇA: presencaValue,
-    AUTO_ATRASO: autoDelay ? 1 : 0,
+    AUTO_ATRASO: autoDelay ? 1 : toInt_(previousRow?.AUTO_ATRASO ?? 0),
     ATRASO: atrasoValue,
     AUSÊNCIA: ausenciaValue,
-    AUS_SEGUIDA: toInt_(opts.ausSeguidas || 0),
-    OFERTA: parseMoney_(opts.oferta || 0),
-    VISITANTES: toInt_(opts.visitantes || 0),
-    BÍBLIAS: toInt_(opts.biblias || 0),
-    REVISTAS: toInt_(opts.revistas || 0),
-    RESPONSÁVEL: String(opts.responsavel || '').trim().toLowerCase(),
-    SALVO: toInt_(opts.salvo ? 1 : 0),
+    AUS_SEGUIDA: toInt_(opts.ausSeguidas ?? previousRow?.AUS_SEGUIDA ?? 0),
+    OFERTA: parseMoney_(opts.oferta ?? previousRow?.OFERTA ?? 0),
+    VISITANTES: toInt_(opts.visitantes ?? previousRow?.VISITANTES ?? 0),
+    BÍBLIAS: toInt_(opts.biblias ?? previousRow?.BÍBLIAS ?? 0),
+    REVISTAS: toInt_(opts.revistas ?? previousRow?.REVISTAS ?? 0),
+    RESPONSÁVEL: String(opts.responsavel ?? previousRow?.RESPONSÁVEL ?? '').trim().toLowerCase(),
+    SALVO: toInt_(opts.salvo ? 1 : previousRow?.SALVO ?? 0),
   };
 }
+
 
 function buildBaseRow_(opts) {
   const d = normalizeDateKey_(opts.dateKey);
@@ -1125,11 +1145,7 @@ function buildBaseRowKey_(row) {
 }
 
 function buildChamadaRowKey_(row) {
-  return [
-    normalizeDateKey_(row?.DATA_CHAMADA || row?.DATA || ''),
-    normalizeKey_(row?.CLASSE || ''),
-    normalizeKey_(row?.ALUNO || ''),
-  ].join('__');
+  return normalizeKey_(row?.ALUNO || '');
 }
 
 function upsertRowsInPlace_(sheetName, headers, existingRows, newRows, keyFn, options = {}) {
@@ -1384,11 +1400,15 @@ function findCadastroAlunoByIdentifier_(cadastroRows, identifier) {
 }
 
 function getCallLevelValue_(rows, field, asNumber = false) {
-  const first = (rows || [])[0];
-  if (!first) return asNumber ? 0 : '';
-  const v = first[field];
-  return asNumber ? toInt_(v) : v;
+  for (const row of rows || []) {
+    const v = row?.[field];
+    if (v !== undefined && v !== null && String(v).trim() !== '') {
+      return asNumber ? toInt_(v) : v;
+    }
+  }
+  return asNumber ? 0 : '';
 }
+
 
 function isPresentLikeValue_(value) {
   const v = String(value || '').trim().toLowerCase();
