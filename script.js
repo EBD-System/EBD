@@ -165,6 +165,18 @@ function todayKey() {
   return new Date(Date.now() - tz).toISOString().slice(0, 10);
 }
 
+
+function isSelectedDateToday() {
+  return String(state.dateKey || '') === todayKey();
+}
+
+function updateSaveButtonVisibility() {
+  if (!els.saveBtn) return;
+  const shouldShow = isSelectedDateToday();
+  els.saveBtn.style.display = shouldShow ? '' : 'none';
+  els.saveBtn.setAttribute('aria-hidden', String(!shouldShow));
+}
+
 function onlyDigits(value) {
   return String(value || '').replace(/\D/g, '');
 }
@@ -1740,6 +1752,7 @@ function loadSelectedTurma() {
 
 function renderAll() {
   applyAccessMode();
+  updateSaveButtonVisibility();
   renderTurmaSelects();
   loadSelectedTurma();
   renderSummary();
@@ -2274,6 +2287,7 @@ els.dateInput.addEventListener('change', async (event) => {
 }
 
   state.dateKey = nextDate;
+  updateSaveButtonVisibility();
   const storage = storageState();
   storage.selectedDateKey = state.dateKey;
   saveStorageState(storage);
