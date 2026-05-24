@@ -228,15 +228,22 @@ function saveCall_(p) {
       dateKey,
       aluno,
       turmaNome: turma.Nome,
-      oferta: mergedPayload.oferta ?? mergedPayload.OFERTA,
-      visitantes: mergedPayload.visitantes ?? mergedPayload.VISITANTES,
-      biblias: mergedPayload.biblias ?? mergedPayload.BÍBLIAS,
-      revistas: mergedPayload.revistas ?? mergedPayload.REVISTAS,
+      // CORREÇÃO: usa os valores de nível de chamada vindos diretamente dos
+      // parâmetros top-level do POST (p.oferta / p.visitantes / p.biblias /
+      // p.revistas), já parseados no início de saveCall_.
+      // Antes, eram lidos de mergedPayload (linha por aluno), que nunca contém
+      // esses campos → sempre salvava como 0.
+      oferta,
+      visitantes,
+      biblias,
+      revistas,
       effectiveStatus,
       autoPresence: mergedPayload.autoPresenca ?? mergedPayload.autoPresença,
       autoDelay: mergedPayload.autoAtraso,
       ausSeguidas,
-      responsavel: mergedPayload.responsavel ?? mergedPayload.RESPONSÁVEL ?? responsavel,
+      // CORREÇÃO: o responsável enviado pelo frontend deve sempre substituir o
+      // anterior, não ser sobrescrito pelo valor já gravado na planilha.
+      responsavel,
       salvo: rowSalvo,
       previousRow: previous,
     });
@@ -245,10 +252,12 @@ function saveCall_(p) {
       dateKey,
       aluno,
       turmaNome: turma.Nome,
-      oferta: mergedPayload.oferta ?? mergedPayload.OFERTA,
-      visitantes: mergedPayload.visitantes ?? mergedPayload.VISITANTES,
-      biblias: mergedPayload.biblias ?? mergedPayload.BÍBLIAS,
-      revistas: mergedPayload.revistas ?? mergedPayload.REVISTAS,
+      // CORREÇÃO: mesma origem que buildChamadaRow_ acima — valores top-level
+      // do POST, não do payload por-aluno que não os contém.
+      oferta,
+      visitantes,
+      biblias,
+      revistas,
       effectiveStatus,
       previousRow: previousBase,
     });
@@ -1379,10 +1388,31 @@ function findCadastroAlunoByIdentifier_(cadastroRows, identifier) {
 }
 
 function getCallLevelValue_(rows, field, asNumber = false) {
-  const first = (rows || [])[0];
-  if (!first) return asNumber ? 0 : '';
-  const v = first[field];
-  return asNumber ? toInt_(v) : v;
+  if (!rows || !rows.length) return asNumber ? 0 : '';
+
+  // CORREÇÃO: percorre todas as linhas da turma em busca do primeiro valor
+  // não-zero/não-vazio.
+  //
+  // Contexto: oferta/visitantes/bíblias/revistas são campos de nível de turma
+  // — são replicados em todas as linhas dos alunos. Porém, em cenários de
+  // atualização parcial (ex.: linhas salvas em momentos diferentes), algumas
+  // linhas podem ter ficado com o valor zerado enquanto outras já têm o valor
+  // correto. Depender apenas do primeiro aluno encontrado fazia o frontend
+  // ignorar o valor real e montar a turma com 0.
+  for (const row of rows) {
+    const v = row[field];
+    if (asNumber) {
+      const n = toInt_(v);
+      if (n > 0) return n;
+    } else {
+      // Para OFERTA (string/número), compara o valor monetário.
+      if (parseMoney_(v) > 0) return v;
+    }
+  }
+
+  // Nenhuma linha tem valor > 0; retorna o valor da primeira linha (zero/vazio).
+  const first = rows[0];
+  return asNumber ? toInt_(first[field]) : (first[field] ?? '');
 }
 
 function isPresentLikeValue_(value) {
