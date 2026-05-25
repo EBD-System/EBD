@@ -199,27 +199,145 @@ function onlyDigits(value) {
   return String(value || '').replace(/\D/g, '');
 }
 
+function stripLeadingZeros_(value) {
+  const digits = onlyDigits(value);
+  if (!digits) return '';
+  const normalized = digits.replace(/^0+(?=\d)/, '');
+  return normalized || '0';
+}
+
+function formatToBrPhone(phone = '') {
+  const splitNumber = String(phone || '').replace(/\D/g, '').split('');
+
+  if (splitNumber.length > 11) {
+    splitNumber.length = 11;
+  }
+
+  phone = splitNumber.join('');
+
+  if (!phone) return '';
+
+  const areaBr = phone.substring(0, 2);
+  const areaCode = phone.substring(2, 3);
+  const middle = phone.substring(3, 7);
+  const last = phone.substring(7, 11);
+
+  if (phone.length <= 2) {
+    return `(${areaBr}`;
+  }
+
+  if (phone.length <= 3) {
+    return `(${areaBr}) ${areaCode}`;
+  }
+
+  if (phone.length <= 7) {
+    return `(${areaBr}) ${areaCode} ${middle}`;
+  }
+
+  return `(${areaBr}) ${areaCode} ${middle}-${last}`;
+}
+
 function formatBrazilCellPhone(value) {
-  const d = onlyDigits(value).slice(0, 11);
-  const ddd = d.slice(0, 2);
-  const first = d.slice(2, 3);
-  const middle = d.slice(3, 7);
-  const last = d.slice(7, 11);
-  let out = '';
-  if (ddd) out += `(${ddd}`;
-  if (ddd.length === 2) out += ')';
-  if (first) out += ` ${first}`;
-  if (middle) out += ` ${middle}`;
-  if (last) out += `-${last}`;
-  return out.trim();
+  return formatToBrPhone(value);
 }
 
 function formatCelular(value) {
-  return formatBrazilCellPhone(value);
+  return formatToBrPhone(value);
 }
 
 function isModifierKey(event) {
   return !!(event?.ctrlKey || event?.metaKey || event?.altKey);
+}
+
+function getDigitsBeforeCaret_(value, caretIndex) {
+  return String(value || '')
+    .slice(0, Math.max(0, caretIndex || 0))
+    .replace(/\D/g, '').length;
+}
+
+function caretFromDigitIndex_(formattedValue, digitIndex) {
+  if (digitIndex <= 0) return 0;
+  let digitsSeen = 0;
+  const text = String(formattedValue || '');
+  for (let i = 0; i < text.length; i += 1) {
+    if (/\d/.test(text[i])) {
+      digitsSeen += 1;
+      if (digitsSeen >= digitIndex) {
+        return i + 1;
+      }
+    }
+  }
+  return text.length;
+}
+
+function normalizeWholeNumberText(value) {
+  return stripLeadingZeros_(value);
+}
+
+function getCurrentPresentCount() {
+  const call = getCurrentCall();
+  if (!call) return 0;
+  return (call.rows || []).reduce((count, row) => {
+    if (isInactiveStudent(row)) return count;
+    return count + (isPresentLikeValue(row.presenca) ? 1 : 0);
+  }, 0);
+}
+
+function clampWholeNumber(value, max = null) {
+  let normalized = normalizeWholeNumberText(value);
+  let numeric = normalized === '' ? 0 : Number(normalized);
+  if (!Number.isFinite(numeric) || numeric < 0) numeric = 0;
+
+  if (Number.isFinite(max)) {
+    const maxInt = Math.max(0, Math.floor(max));
+    if (numeric > maxInt) {
+      numeric = maxInt;
+    }
+  }
+
+  return numeric;
+}
+
+function normalizeNumericInputValue_(value) {
+  const normalized = normalizeWholeNumberText(value);
+  return normalized === '' ? '' : String(Number(normalized));
+}
+
+function showNumericLimitAlert_(limit, presentes, visitantes, label = 'O número máximo permitido') {
+  if (Number(limit) === 50 && String(label || '').toLowerCase().includes('visitantes')) {
+    window.alert('O número máximo permitido para visitantes é 50.');
+    return;
+  }
+
+  window.alert(`${label} é ${limit}, pois existem ${presentes} presentes e ${visitantes} visitantes.`);
+}
+
+function syncNumericInputField(input, { max = null, alertOnClamp = false, alertLabel = 'O número máximo permitido' } = {}) {
+  if (!input) return 0;
+
+  const raw = String(input.value ?? '');
+  const normalizedText = normalizeWholeNumberText(raw);
+  const numericBeforeClamp = normalizedText === '' ? 0 : Number(normalizedText);
+  let numeric = Number.isFinite(numericBeforeClamp) && numericBeforeClamp >= 0 ? numericBeforeClamp : 0;
+  let clamped = false;
+
+  if (Number.isFinite(max)) {
+    const maxInt = Math.max(0, Math.floor(max));
+    if (numeric > maxInt) {
+      numeric = maxInt;
+      clamped = true;
+    }
+  }
+
+  input.value = normalizedText === '' && raw === '' ? '' : String(numeric);
+
+  if (clamped && alertOnClamp) {
+    const presentes = getCurrentPresentCount();
+    const visitantes = clampWholeNumber(document.getElementById('visitantesInput')?.value ?? 0, 50);
+    showNumericLimitAlert_(Number.isFinite(max) ? Math.floor(max) : numeric, presentes, visitantes, alertLabel);
+  }
+
+  return numeric;
 }
 
 function formatTensToBRL(event) {
@@ -995,22 +1113,19 @@ function updateCallFromInputs() {
   call.oferta = parseCurrencyBR(ofertaInput?.value ?? 0);
 
   // VISITANTES
-  call.visitantes =
-    visitantesInput?.value === ''
-      ? 0
-      : Number(visitantesInput.value);
+  call.visitantes = clampWholeNumber(visitantesInput?.value ?? 0, 50);
+  if (visitantesInput) visitantesInput.value = normalizeNumericInputValue_(call.visitantes);
+
+  const presentes = getCurrentPresentCount();
+  const bibliasMax = presentes + call.visitantes;
 
   // BÍBLIAS
-  call.biblias =
-    bibliasInput?.value === ''
-      ? 0
-      : Number(bibliasInput.value);
+  call.biblias = clampWholeNumber(bibliasInput?.value ?? 0, bibliasMax);
+  if (bibliasInput) bibliasInput.value = normalizeNumericInputValue_(call.biblias);
 
   // REVISTAS
-  call.revistas =
-    revistasInput?.value === ''
-      ? 0
-      : Number(revistasInput.value);
+  call.revistas = clampWholeNumber(revistasInput?.value ?? 0, bibliasMax);
+  if (revistasInput) revistasInput.value = normalizeNumericInputValue_(call.revistas);
 
   // TEXTO VISITANTES
   // ANTIGO // call.visitantesTexto = visitantesTextoInput?.value?.trim?.() ?? '';
@@ -1018,6 +1133,11 @@ function updateCallFromInputs() {
   console.log('[updateCallFromInputs]', {
     ofertaInput: ofertaInput?.value,
     ofertaFinal: call.oferta,
+    visitantes: call.visitantes,
+    biblias: call.biblias,
+    revistas: call.revistas,
+    presentes,
+    bibliasMax,
   });
 }
 
@@ -1388,6 +1508,7 @@ function setStudentPresence(alunoId, presence) {
   row.salvo = 1;
   row.SALVO = 1;
   state.dirty = true;
+  updateCallFromInputs();
   persistDraft(call);
   renderAll();
 }
@@ -1402,6 +1523,7 @@ function setAllPresence(presence) {
     row.SALVO = 1;
   });
   state.dirty = true;
+  updateCallFromInputs();
   persistDraft(call);
   renderAll();
 }
@@ -2290,7 +2412,7 @@ async function addAluno(event) {
   }
   event.preventDefault();
   const nome = els.alunoNome.value.trim();
-  const celular = formatBrazilCellPhone(els.alunoCelular.value);
+  const celular = formatToBrPhone(els.alunoCelular.value);
   const turmaId = els.alunoTurma.value;
   if (!nome) {
     showError('Informe o nome do aluno.');
@@ -2398,55 +2520,53 @@ function bindCallFieldValues() {
   //const visitantesTextoInput = document.getElementById('visitantesTextoInput');
 
   if (ofertaInput) {
-  ofertaInput.value =
-    formatCurrencyBR(
-      call.oferta ?? 0
-    );
-}
-  if (visitantesInput) visitantesInput.value = String(call.visitantes || 0);
-  if (bibliasInput) bibliasInput.value = String(call.biblias || 0);
-  if (revistasInput) revistasInput.value = String(call.revistas || 0);
+    ofertaInput.value = formatCurrencyBR(call.oferta ?? 0);
+  }
+
+  if (visitantesInput) {
+    visitantesInput.value = normalizeNumericInputValue_(call.visitantes ?? 0);
+  }
+
+  if (bibliasInput) {
+    bibliasInput.value = normalizeNumericInputValue_(call.biblias ?? 0);
+  }
+
+  if (revistasInput) {
+    revistasInput.value = normalizeNumericInputValue_(call.revistas ?? 0);
+  }
+
   //if (visitantesTextoInput) visitantesTextoInput.value = call.visitantesTexto || '';
 
-if (ofertaInput && !ofertaInput.dataset.bound) {
+  if (ofertaInput && !ofertaInput.dataset.bound) {
+    ofertaInput.dataset.bound = '1';
+    ofertaInput.addEventListener('input', (event) => {
+      formatTensToBRL(event);
 
-  ofertaInput.dataset.bound = '1';
+      const current = getCurrentCall();
+      if (!current) return;
 
-  ofertaInput.addEventListener('input', (event) => {
-
-    formatTensToBRL(event);
-
-    const current = getCurrentCall();
-
-    if (!current) return;
-
-    current.oferta =
-      parseCurrencyBR(event.target.value);
-
-    console.log(
-      '[ofertaInput]',
-      {
-        digitado: event.target.value,
-        armazenado: current.oferta,
-      }
-    );
-
-    persistDraft(current);
-
-    markDirty();
-
-    renderSummary();
-
-    renderReports();
-  });
-}
+      current.oferta = parseCurrencyBR(event.target.value);
+      persistDraft(current);
+      markDirty();
+      renderSummary();
+      renderReports();
+    });
+  }
 
   if (visitantesInput && !visitantesInput.dataset.bound) {
     visitantesInput.dataset.bound = '1';
     visitantesInput.addEventListener('input', (event) => {
       const current = getCurrentCall();
       if (!current) return;
-      current.visitantes = Number(event.target.value || 0) || 0;
+
+      const sanitized = syncNumericInputField(event.target, {
+        max: 50,
+        alertOnClamp: true,
+        alertLabel: 'O número máximo permitido para visitantes',
+      });
+
+      current.visitantes = sanitized;
+      updateCallFromInputs();
       persistDraft(current);
       markDirty();
       renderSummary();
@@ -2459,7 +2579,18 @@ if (ofertaInput && !ofertaInput.dataset.bound) {
     bibliasInput.addEventListener('input', (event) => {
       const current = getCurrentCall();
       if (!current) return;
-      current.biblias = Number(event.target.value || 0) || 0;
+
+      const presentes = getCurrentPresentCount();
+      const visitantes = clampWholeNumber(document.getElementById('visitantesInput')?.value ?? current.visitantes ?? 0, 50);
+      const maxAllowed = presentes + visitantes;
+
+      const sanitized = syncNumericInputField(event.target, {
+        max: maxAllowed,
+        alertOnClamp: true,
+      });
+
+      current.visitantes = visitantes;
+      current.biblias = sanitized;
       persistDraft(current);
       markDirty();
       renderSummary();
@@ -2472,7 +2603,18 @@ if (ofertaInput && !ofertaInput.dataset.bound) {
     revistasInput.addEventListener('input', (event) => {
       const current = getCurrentCall();
       if (!current) return;
-      current.revistas = Number(event.target.value || 0) || 0;
+
+      const presentes = getCurrentPresentCount();
+      const visitantes = clampWholeNumber(document.getElementById('visitantesInput')?.value ?? current.visitantes ?? 0, 50);
+      const maxAllowed = presentes + visitantes;
+
+      const sanitized = syncNumericInputField(event.target, {
+        max: maxAllowed,
+        alertOnClamp: true,
+      });
+
+      current.visitantes = visitantes;
+      current.revistas = sanitized;
       persistDraft(current);
       markDirty();
       renderSummary();
@@ -2493,8 +2635,8 @@ if (ofertaInput && !ofertaInput.dataset.bound) {
     });
   }
   */
-  
 }
+
 
 
 async function refreshFromBackend(showMessage = false, { silent = false } = {}) {
@@ -2857,7 +2999,24 @@ function validateApiUrl() {
 }
 
 function normalizeCelularInput(event) {
-  event.target.value = formatBrazilCellPhone(event.target.value);
+  const input = event?.target;
+  if (!input) return;
+
+  const rawValue = String(input.value || '');
+  const caret = typeof input.selectionStart === 'number' ? input.selectionStart : rawValue.length;
+  const digitsBeforeCaret = getDigitsBeforeCaret_(rawValue, caret);
+  const formatted = formatToBrPhone(rawValue);
+
+  input.value = formatted;
+
+  const nextCaret = caretFromDigitIndex_(formatted, digitsBeforeCaret);
+  requestAnimationFrame(() => {
+    try {
+      input.setSelectionRange(nextCaret, nextCaret);
+    } catch (err) {
+      // Ignore selection errors on mobile/browser edge cases.
+    }
+  });
 }
 
 async function bootstrap() {
@@ -2994,5 +3153,6 @@ els.alunoForm.addEventListener('submit', (event) => {
 });
 
 els.alunoCelular.addEventListener('input', normalizeCelularInput);
+els.alunoCelular.addEventListener('blur', normalizeCelularInput);
 
 document.addEventListener('DOMContentLoaded', bootstrap);

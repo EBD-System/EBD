@@ -155,9 +155,6 @@ function saveCall_(p) {
   const rowsJson = String(p.rowsJson || '[]');
   const responsavel = String(p.responsavel || p.code || '').trim().toLowerCase();
   const oferta = parseMoney_(p.oferta);
-  const visitantes = toInt_(p.visitantes);
-  const biblias = toInt_(p.biblias);
-  const revistas = toInt_(p.revistas);
 
   if (!turmaId) throw new Error('Turma inválida.');
 
@@ -177,6 +174,13 @@ function saveCall_(p) {
   const alunos = buildAlunosFromCadastro_(cadastro);
   const turmaAlunos = alunos.filter(a => String(a.TurmaID) === String(turmaId));
   const frontByAlunoId = new Map();
+
+  const activeRows = rows.filter(row => String(row?.statusAluno || row?.STATUS || 'ativo').trim().toLowerCase() !== 'inativo');
+  const presentesCount = countPresentesFromRows_(activeRows);
+  const visitantes = clampInt_(p.visitantes, 0, 50);
+  const maxBibliasRevistas = Math.max(0, presentesCount + visitantes);
+  const biblias = clampInt_(p.biblias, 0, maxBibliasRevistas);
+  const revistas = clampInt_(p.revistas, 0, maxBibliasRevistas);
   for (const row of rows) {
     const key = normalizeKey_(row?.alunoId || row?.nome || '');
     if (key) frontByAlunoId.set(key, row);
@@ -1283,6 +1287,22 @@ function onlyDigits_(value) {
 function toInt_(value) {
   const n = parseInt(String(value ?? '').trim(), 10);
   return Number.isFinite(n) ? n : 0;
+}
+
+function clampInt_(value, min, max) {
+  const n = toInt_(value);
+  const lower = Number.isFinite(min) ? Math.max(n, Math.floor(min)) : n;
+  const upper = Number.isFinite(max) ? Math.min(lower, Math.floor(max)) : lower;
+  return Number.isFinite(upper) ? upper : 0;
+}
+
+function countPresentesFromRows_(rows) {
+  return (rows || []).reduce((count, row) => {
+    if (!row) return count;
+    const statusAluno = String(row.statusAluno || row.STATUS || 'ativo').trim().toLowerCase();
+    if (statusAluno === 'inativo') return count;
+    return count + (isPresentLikeValue_(row.presenca) ? 1 : 0);
+  }, 0);
 }
 
 function toBool_(value) {
