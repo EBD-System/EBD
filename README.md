@@ -1,5 +1,7 @@
 # Sistema de Lista de Presença da EBD
 
+### [By: Everton Lourenço](https://github.com/Everton-Lourens)
+
 Este projeto foi criado para resolver um problema prático: fazer a chamada das turmas de forma rápida, organizada e sem depender de contas manuais ou anotações espalhadas.  
 Com ele, é possível registrar presença, cadastrar alunos e turmas, acompanhar faltas, gerar relatórios e manter tudo sincronizado com a planilha do Google Sheets.
 
