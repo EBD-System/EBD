@@ -1,6 +1,6 @@
 # Sistema de Chamada e Presença de Turmas
 
-### [By Everton Lourenço](https://github.com/Everton-Lourens)
+### [By: Everton Lourenço](https://github.com/Everton-Lourens)
 
 Sistema web para gerenciamento de chamada, controle de presença, relatórios e administração de turmas/alunos, com sincronização via Google Apps Script e persistência local no navegador.
 
