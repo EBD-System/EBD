@@ -1751,6 +1751,7 @@ function buildPdfReportModel(scope) {
 
   const pages = turmas.map((turma) => buildPdfTurmaPage(turma, state.chamadasByTurma?.[turma.TurmaID] || null, dateLabel));
   pages.push(buildPdfGeneralPage(dateLabel));
+  pages.push(buildPdfRankingsPage(dateLabel));
 
   return {
     title: 'Relatório geral consolidado',
@@ -1762,16 +1763,11 @@ function buildPdfReportModel(scope) {
 }
 
 function buildPdfTurmaPage(turma, call, dateLabel) {
-  const roster = getAlunosForTurma(turma.TurmaID);
-  const matriculados = roster.filter((aluno) => String(aluno.Status || 'ativo').trim().toLowerCase() !== 'inativo').length;
-
-  const presentes = Number(call?.presentes || 0);
-  const visitantes = Number(call?.visitantes || 0);
-  const ausentes = Number(call?.ausentes || Math.max(matriculados - presentes, 0));
+  const stats = getTurmaPresenceStats_(turma, call);
   const biblias = Number(call?.biblias || 0);
   const revistas = Number(call?.revistas || 0);
-  const oferta = Number(call?.oferta || 0);
-  const total = presentes + visitantes;
+  const oferta = parseCurrencyBR(call?.oferta || 0);
+  const total = stats.presentes + stats.visitantes;
 
   return {
     type: 'turma',
@@ -1779,11 +1775,12 @@ function buildPdfTurmaPage(turma, call, dateLabel) {
     subtitle: `Data: ${dateLabel}`,
     note: 'Total = Presentes + Visitantes',
     metrics: [
-      { label: 'Matriculados', value: formatIntegerBR(matriculados) },
-      { label: 'Ausentes', value: formatIntegerBR(ausentes) },
-      { label: 'Presentes', value: formatIntegerBR(presentes) },
-      { label: 'Visitantes', value: formatIntegerBR(visitantes) },
+      { label: 'Matriculados', value: formatIntegerBR(stats.matriculados) },
+      { label: 'Ausentes', value: formatIntegerBR(stats.ausentes) },
+      { label: 'Presentes', value: formatIntegerBR(stats.presentes) },
+      { label: 'Visitantes', value: formatIntegerBR(stats.visitantes) },
       { label: 'Total', value: formatIntegerBR(total) },
+      { label: 'Presença da turma', value: formatPresencePercentBR(stats.percentual) },
       { label: 'Bíblicas', value: formatIntegerBR(biblias) },
       { label: 'Revistas', value: formatIntegerBR(revistas) },
       { label: 'Ofertas', value: formatMoney(oferta) },
@@ -2055,13 +2052,14 @@ function buildPdfGeneralPage(dateLabel) {
     return acc + ativos;
   }, 0);
 
-  const presentes = calls.reduce((acc, call) => acc + Number(call?.presentes || 0), 0);
+  const presentes = calls.reduce((acc, call) => acc + getTurmaPresenceStats_(getTurmasSorted().find((t) => String(t.TurmaID) === String(call?.turmaId)), call).presentes, 0);
   const visitantes = calls.reduce((acc, call) => acc + Number(call?.visitantes || 0), 0);
-  const ausentes = calls.reduce((acc, call) => acc + Number(call?.ausentes || 0), 0);
+  const ausentes = calls.reduce((acc, call) => acc + getTurmaPresenceStats_(getTurmasSorted().find((t) => String(t.TurmaID) === String(call?.turmaId)), call).ausentes, 0);
   const biblias = calls.reduce((acc, call) => acc + Number(call?.biblias || 0), 0);
   const revistas = calls.reduce((acc, call) => acc + Number(call?.revistas || 0), 0);
-  const oferta = calls.reduce((acc, call) => acc + Number(call?.oferta || 0), 0);
+  const oferta = calls.reduce((acc, call) => acc + parseCurrencyBR(call?.oferta || 0), 0);
   const total = presentes + visitantes;
+  const percentualGeral = totalMatriculados ? (presentes / totalMatriculados) * 100 : 0;
 
   const turmasSalvas = Number(resumido?.turmasSalvas ?? calls.filter((c) => c && c.isSaved).length);
   const totalTurmas = Number(resumido?.totalTurmas ?? turmas.length);
@@ -2077,6 +2075,7 @@ function buildPdfGeneralPage(dateLabel) {
       { label: 'Presentes', value: formatIntegerBR(presentes) },
       { label: 'Visitantes', value: formatIntegerBR(visitantes) },
       { label: 'Total', value: formatIntegerBR(total) },
+      { label: 'Presença geral', value: formatPresencePercentBR(percentualGeral) },
       { label: 'Bíblicas', value: formatIntegerBR(biblias) },
       { label: 'Revistas', value: formatIntegerBR(revistas) },
       { label: 'Ofertas', value: formatMoney(oferta) },
@@ -2084,9 +2083,107 @@ function buildPdfGeneralPage(dateLabel) {
   };
 }
 
+function getTurmaPresenceStats_(turma, call) {
+  const roster = turma ? getAlunosForTurma(turma.TurmaID) : [];
+  const matriculados = roster.filter((aluno) => String(aluno.Status || 'ativo').trim().toLowerCase() !== 'inativo').length;
+  const rows = getAllActiveRows(call);
+  const presentes = rows.filter((row) => isPresentLikeValue(row.presenca)).length;
+  const ausentes = rows.filter((row) => normalizePresenceValue(row.presenca) === 'nao').length;
+  const visitantes = Number(call?.visitantes || 0);
+  const percentual = matriculados ? (presentes / matriculados) * 100 : 0;
+  return {
+    matriculados,
+    presentes,
+    ausentes,
+    visitantes,
+    percentual,
+  };
+}
+
+function formatPresencePercentBR(value) {
+  const number = Number(value || 0);
+  if (!Number.isFinite(number)) return '0%';
+  const rounded = Math.round(number * 10) / 10;
+  return Number.isInteger(rounded) ? `${rounded.toFixed(0)}%` : `${rounded.toFixed(1).replace('.', ',')}%`;
+}
+
+function buildPdfRankingsPage(dateLabel) {
+  const turmas = getTurmasSorted();
+  const rankings = buildReportRankings_(turmas);
+
+  return {
+    type: 'rankings',
+    title: 'Rankings das turmas',
+    subtitle: `Data: ${dateLabel}`,
+    note: 'Os 3 primeiros colocados de cada ranking estão destacados.',
+    sections: [
+      { title: 'Ranking em Presença', rows: rankings.presenca },
+      { title: 'Ranking em Oferta', rows: rankings.oferta },
+      { title: 'Ranking em Visitantes', rows: rankings.visitantes },
+    ],
+  };
+}
+
+function buildReportRankings_(turmas) {
+  const source = turmas.map((turma) => {
+    const call = state.chamadasByTurma?.[turma.TurmaID] || null;
+    const stats = getTurmaPresenceStats_(turma, call);
+    return {
+      turmaId: turma.TurmaID,
+      name: String(turma.Nome || 'Turma').trim() || 'Turma',
+      presenceValue: stats.percentual,
+      offerValue: parseCurrencyBR(call?.oferta || 0),
+      visitorsValue: Number(call?.visitantes || 0),
+    };
+  });
+
+  return {
+    presenca: buildRankingGroups_(source, 'presenceValue', (value) => formatPresencePercentBR(value)),
+    oferta: buildRankingGroups_(source, 'offerValue', (value) => formatMoney(value)),
+    visitantes: buildRankingGroups_(source, 'visitorsValue', (value) => `${formatIntegerBR(value)} visitantes`),
+  };
+}
+
+function buildRankingGroups_(items, valueKey, formatValue) {
+  const sorted = [...items].sort((a, b) => {
+    const diff = Number(b[valueKey] || 0) - Number(a[valueKey] || 0);
+    if (diff !== 0) return diff;
+    return String(a.name || '').localeCompare(String(b.name || ''));
+  });
+
+  const groups = [];
+  const epsilon = 1e-9;
+
+  sorted.forEach((item) => {
+    const value = Number(item[valueKey] || 0);
+    const last = groups[groups.length - 1];
+    if (last && Math.abs(last.value - value) < epsilon) {
+      last.names.push(item.name);
+      return;
+    }
+    groups.push({
+      value,
+      names: [item.name],
+      display: formatValue(value, item),
+    });
+  });
+
+  return groups.map((group, index) => ({
+    rank: index + 1,
+    highlight: index < 3,
+    names: group.names.join(' & '),
+    value: group.display,
+  }));
+}
+
 function drawReportPage(doc, page, meta) {
   if (page?.items) {
     drawRosterPage(doc, page, meta);
+    return;
+  }
+
+  if (page?.sections) {
+    drawRankingPage(doc, page, meta);
     return;
   }
 
@@ -2125,22 +2222,23 @@ function drawReportPage(doc, page, meta) {
   const startY = margin + 44;
   const gapY = 6;
   const gapX = 6;
+  const metrics = Array.isArray(page.metrics) ? page.metrics : [];
+  const positions = metrics.map((_, index) => {
+    const isSpecialLast = metrics.length === 9 && index === 8;
+    if (isSpecialLast) {
+      return [margin, startY + 4 * (cardH + gapY), contentWidth];
+    }
+    const row = Math.floor(index / 2);
+    const col = index % 2;
+    const x = col === 0 ? margin : margin + cardW + gapX;
+    const y = startY + row * (cardH + gapY);
+    return [x, y, cardW];
+  });
 
-  const positions = [
-    [margin, startY],
-    [margin + cardW + gapX, startY],
-    [margin, startY + cardH + gapY],
-    [margin + cardW + gapX, startY + cardH + gapY],
-    [margin, startY + (cardH + gapY) * 2],
-    [margin + cardW + gapX, startY + (cardH + gapY) * 2],
-    [margin, startY + (cardH + gapY) * 3],
-    [margin + cardW + gapX, startY + (cardH + gapY) * 3],
-  ];
-
-  page.metrics.forEach((metric, index) => {
+  metrics.forEach((metric, index) => {
     const pos = positions[index];
     if (!pos) return;
-    drawMetricCard(doc, pos[0], pos[1], cardW, cardH, metric.label, metric.value, index % 2 === 0);
+    drawMetricCard(doc, pos[0], pos[1], pos[2], cardH, metric.label, metric.value, index < 3);
   });
 
   doc.setDrawColor(221, 228, 239);
@@ -2242,6 +2340,130 @@ function drawRosterPage(doc, page, meta) {
       y += rowHeight;
     });
   }
+
+  doc.setDrawColor(221, 228, 239);
+  doc.line(margin, height - 16, width - margin, height - 16);
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(8.5);
+  doc.text('O maior entre vocês é aquele que serve. - Mateus 23:11', margin, height - 10);
+}
+
+
+function drawRankingPage(doc, page, meta) {
+  const width = doc.internal.pageSize.getWidth();
+  const height = doc.internal.pageSize.getHeight();
+  const margin = 12;
+  const contentWidth = width - margin * 2;
+  const sections = Array.isArray(page.sections) ? page.sections : [];
+  const sectionGap = 5;
+  const sectionHeaderH = 8;
+  const sectionTitleH = 6.5;
+  const rowGap = 1.2;
+  const rowFontSize = 8.4;
+  const rowLineHeight = rowFontSize * 0.36 + rowGap;
+  const rowPadY = 1.8;
+
+  doc.setFillColor(247, 249, 252);
+  doc.rect(0, 0, width, height, 'F');
+
+  doc.setFillColor(23, 43, 77);
+  doc.roundedRect(margin, margin, contentWidth, 28, 4, 4, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  const titleLines = doc.splitTextToSize(String(page.title || ''), contentWidth - 24);
+  doc.text(titleLines, margin + 8, margin + 11);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10.5);
+  doc.text(String(page.subtitle || ''), margin + 8, margin + 20);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.text(`Página ${meta.pageNumber}/${meta.totalPages}`, width - margin - 3, margin + 9, { align: 'right' });
+
+  doc.setTextColor(45, 55, 72);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text(String(page.note || ''), margin, margin + 38);
+
+  const startY = margin + 44;
+  const availableHeight = height - 16 - startY;
+  const baseMaxRows = Math.max(1, ...sections.map((section) => (section.rows || []).length), 1);
+  const baseEstimated = sections.reduce((sum, section) => {
+    const rowCount = (section.rows || []).length;
+    return sum + sectionTitleH + sectionHeaderH + rowCount * (rowLineHeight + rowPadY) + 4;
+  }, sectionGap * Math.max(0, sections.length - 1));
+  const scale = baseEstimated > availableHeight ? Math.max(0.84, availableHeight / baseEstimated) : 1;
+  const effectiveFontSize = Math.max(7.2, rowFontSize * scale);
+  const effectiveLineHeight = effectiveFontSize * 0.36 + rowGap;
+  let currentY = startY;
+
+  sections.forEach((section, sectionIndex) => {
+    const rows = Array.isArray(section.rows) ? section.rows : [];
+    const boxX = margin;
+    const boxW = contentWidth;
+    const labelWidth = boxW - 26;
+    const rowHeights = rows.map((row) => {
+      const labelLines = doc.splitTextToSize(String(row.names || ''), labelWidth) || [String(row.names || '')];
+      return Math.max(1, labelLines.length) * effectiveLineHeight + rowPadY;
+    });
+    const sectionHeight = sectionTitleH + sectionHeaderH + rowHeights.reduce((a, b) => a + b, 0) + 4;
+
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(216, 224, 236);
+    doc.roundedRect(boxX, currentY, boxW, sectionHeight, 4, 4, 'FD');
+
+    doc.setFillColor(23, 43, 77);
+    doc.roundedRect(boxX, currentY, boxW, sectionTitleH + 1.3, 4, 4, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9.8);
+    doc.text(String(section.title || ''), boxX + 4, currentY + 4.3);
+
+    doc.setTextColor(91, 102, 122);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.1);
+    doc.text('Turma', boxX + 4, currentY + sectionTitleH + 4.2);
+    doc.text('Valor', boxW + boxX - 4, currentY + sectionTitleH + 4.2, { align: 'right' });
+
+    let rowY = currentY + sectionTitleH + sectionHeaderH - 0.2;
+    rows.forEach((row, rowIndex) => {
+      const label = String(row.names || '').trim() || '—';
+      const value = String(row.value || '').trim() || '—';
+      const labelLines = doc.splitTextToSize(label, labelWidth) || [label];
+      const rowHeight = rowHeights[rowIndex] || (effectiveLineHeight + rowPadY);
+      const highlight = row.highlight === true;
+      const tint = row.rank === 1 ? [255, 247, 214] : row.rank === 2 ? [240, 243, 247] : row.rank === 3 ? [255, 237, 224] : [255, 255, 255];
+
+      doc.setFillColor(tint[0], tint[1], tint[2]);
+      doc.rect(boxX + 1, rowY - 0.8, boxW - 2, rowHeight, 'F');
+
+      if (highlight) {
+        doc.setDrawColor(23, 43, 77);
+        doc.setLineWidth(0.45);
+      } else {
+        doc.setDrawColor(232, 237, 244);
+        doc.setLineWidth(0.2);
+      }
+      doc.line(boxX + 1, rowY + rowHeight - 0.1, boxX + boxW - 1, rowY + rowHeight - 0.1);
+
+      doc.setTextColor(23, 43, 77);
+      doc.setFont('helvetica', highlight ? 'bold' : 'normal');
+      doc.setFontSize(8.6);
+      doc.text(labelLines, boxX + 4, rowY + 2.7);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.8);
+      doc.text(value, boxX + boxW - 4, rowY + 2.7, { align: 'right' });
+
+      rowY += rowHeight;
+    });
+
+    currentY += sectionHeight + sectionGap;
+  });
 
   doc.setDrawColor(221, 228, 239);
   doc.line(margin, height - 16, width - margin, height - 16);
