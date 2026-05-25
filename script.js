@@ -2115,7 +2115,7 @@ function buildPdfRankingsPage(dateLabel) {
     type: 'rankings',
     title: 'Rankings das turmas',
     subtitle: `Data: ${dateLabel}`,
-    note: 'Os 3 primeiros colocados de cada ranking estão destacados.',
+    note: 'Os 3 primeiros colocados de cada ranking estão destacados. Empates são agrupados.',
     sections: [
       { title: 'Ranking em Presença', rows: rankings.presenca },
       { title: 'Ranking em Oferta', rows: rankings.oferta },
@@ -2171,9 +2171,63 @@ function buildRankingGroups_(items, valueKey, formatValue) {
   return groups.map((group, index) => ({
     rank: index + 1,
     highlight: index < 3,
+    isTie: group.names.length > 1,
+    namesList: group.names,
     names: group.names.join(' & '),
     value: group.display,
   }));
+}
+
+
+function getRankingLabel_(row) {
+  const names = Array.isArray(row?.namesList) && row.namesList.length
+    ? row.namesList.map((name) => String(name || '').trim()).filter(Boolean)
+    : [String(row?.names || '').trim()].filter(Boolean);
+
+  if (!names.length) return '—';
+  if (row?.isTie && names.length > 1) {
+    return `(EMPATE) ${names.join('  &  ')}`;
+  }
+  return names[0];
+}
+
+function drawRankingLabel_(doc, x, y, row) {
+  const names = Array.isArray(row?.namesList) && row.namesList.length
+    ? row.namesList.map((name) => String(name || '').trim()).filter(Boolean)
+    : [String(row?.names || '').trim()].filter(Boolean);
+
+  if (!names.length) {
+    doc.text('—', x, y);
+    return;
+  }
+
+  const isTie = row?.isTie && names.length > 1;
+  if (!isTie) {
+    doc.setFont('helvetica', row?.highlight ? 'bold' : 'normal');
+    doc.text(names[0], x, y);
+    return;
+  }
+
+  const prefix = '(EMPATE) ';
+  const connector = '  &  ';
+  const prefixWidth = doc.getTextWidth(prefix);
+  const nameWidths = names.map((name) => doc.getTextWidth(name));
+  const connectorWidth = doc.getTextWidth(connector);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text(prefix, x, y);
+
+  let cursorX = x + prefixWidth;
+  names.forEach((name, index) => {
+    doc.setFont('helvetica', 'normal');
+    doc.text(name, cursorX, y);
+    cursorX += nameWidths[index];
+    if (index < names.length - 1) {
+      doc.setFont('helvetica', 'bold');
+      doc.text(connector, cursorX, y);
+      cursorX += connectorWidth;
+    }
+  });
 }
 
 function drawReportPage(doc, page, meta) {
@@ -2362,6 +2416,7 @@ function drawRankingPage(doc, page, meta) {
   const rowFontSize = 8.4;
   const rowLineHeight = rowFontSize * 0.36 + rowGap;
   const rowPadY = 1.8;
+  const separatorHeight = 10.5;
 
   doc.setFillColor(247, 249, 252);
   doc.rect(0, 0, width, height, 'F');
@@ -2393,7 +2448,8 @@ function drawRankingPage(doc, page, meta) {
   const baseMaxRows = Math.max(1, ...sections.map((section) => (section.rows || []).length), 1);
   const baseEstimated = sections.reduce((sum, section) => {
     const rowCount = (section.rows || []).length;
-    return sum + sectionTitleH + sectionHeaderH + rowCount * (rowLineHeight + rowPadY) + 4;
+    const hasSeparator = rowCount > 3 ? separatorHeight : 0;
+    return sum + sectionTitleH + sectionHeaderH + rowCount * (rowLineHeight + rowPadY) + hasSeparator + 4;
   }, sectionGap * Math.max(0, sections.length - 1));
   const scale = baseEstimated > availableHeight ? Math.max(0.84, availableHeight / baseEstimated) : 1;
   const effectiveFontSize = Math.max(7.2, rowFontSize * scale);
@@ -2406,10 +2462,11 @@ function drawRankingPage(doc, page, meta) {
     const boxW = contentWidth;
     const labelWidth = boxW - 26;
     const rowHeights = rows.map((row) => {
-      const labelLines = doc.splitTextToSize(String(row.names || ''), labelWidth) || [String(row.names || '')];
+      const labelText = getRankingLabel_(row);
+      const labelLines = doc.splitTextToSize(String(labelText || ''), labelWidth) || [String(labelText || '')];
       return Math.max(1, labelLines.length) * effectiveLineHeight + rowPadY;
     });
-    const sectionHeight = sectionTitleH + sectionHeaderH + rowHeights.reduce((a, b) => a + b, 0) + 4;
+    const sectionHeight = sectionTitleH + sectionHeaderH + rowHeights.reduce((a, b) => a + b, 0) + 4 + (rows.length > 3 ? separatorHeight : 0);
 
     doc.setFillColor(255, 255, 255);
     doc.setDrawColor(216, 224, 236);
@@ -2431,7 +2488,7 @@ function drawRankingPage(doc, page, meta) {
 
     let rowY = currentY + sectionTitleH + sectionHeaderH - 0.2;
     rows.forEach((row, rowIndex) => {
-      const label = String(row.names || '').trim() || '—';
+      const label = getRankingLabel_(row);
       const value = String(row.value || '').trim() || '—';
       const labelLines = doc.splitTextToSize(label, labelWidth) || [label];
       const rowHeight = rowHeights[rowIndex] || (effectiveLineHeight + rowPadY);
@@ -2451,15 +2508,33 @@ function drawRankingPage(doc, page, meta) {
       doc.line(boxX + 1, rowY + rowHeight - 0.1, boxX + boxW - 1, rowY + rowHeight - 0.1);
 
       doc.setTextColor(23, 43, 77);
-      doc.setFont('helvetica', highlight ? 'bold' : 'normal');
       doc.setFontSize(8.6);
-      doc.text(labelLines, boxX + 4, rowY + 2.7);
+      if (row.isTie && Array.isArray(row.namesList) && row.namesList.length > 1) {
+        drawRankingLabel_(doc, boxX + 4, rowY + 2.7, row);
+      } else {
+        doc.setFont('helvetica', highlight ? 'bold' : 'normal');
+        doc.text(labelLines, boxX + 4, rowY + 2.7);
+      }
 
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8.8);
       doc.text(value, boxX + boxW - 4, rowY + 2.7, { align: 'right' });
 
       rowY += rowHeight;
+
+      if (rowIndex === 2 && rows.length > 3) {
+        doc.setDrawColor(210, 218, 230);
+        doc.setLineWidth(0.25);
+        doc.line(boxX + 4, rowY + 2.5, boxX + boxW - 4, rowY + 2.5);
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8.1);
+        doc.setTextColor(91, 102, 122);
+        doc.text('3 primeiras', boxX + 4, rowY + 5.0);
+        doc.text('Demais turmas', boxX + 4, rowY + 8.5);
+
+        rowY += separatorHeight;
+      }
     });
 
     currentY += sectionHeight + sectionGap;
