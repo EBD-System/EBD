@@ -127,8 +127,8 @@ Retorna a data atual no formato `YYYY-MM-DD`, ajustada ao fuso local.
 ### `onlyDigits(value)`
 Remove todos os caracteres não numéricos de uma string.
 
-### `formatCpf(value)`
-Formata automaticamente um CPF parcial ou completo no padrão `000.000.000-00`.
+### `formatCelular(value)`
+Formata automaticamente um celular parcial ou completo no padrão brasileiro de celular.
 
 ### `formatMoney(value)`
 Formata um número como moeda brasileira (`R$ 0,00`).
@@ -352,8 +352,8 @@ Salva a chamada atual e avança automaticamente para a próxima turma.
 ### `copyText(text)`
 Copia um texto para a área de transferência.
 
-### `normalizeCpfInput(event)`
-Formata o CPF enquanto o usuário digita.
+### `normalizeCelularInput(event)`
+Formata o celular enquanto o usuário digita.
 
 ---
 
@@ -416,7 +416,7 @@ O script registra listeners para:
 - marcar todos como ausentes;
 - copiar relatórios;
 - envio dos formulários de turma e aluno;
-- formatação automática de CPF;
+- formatação automática de celular;
 - carregamento inicial da página.
 
 ---
@@ -862,7 +862,7 @@ O front fornece a entrada do usuário; o backend é quem transforma isso em cada
 Envia `action=addAluno` com:
 
 - `nome`
-- `cpf`
+- `celular`
 - `turmaId` fileciteturn0file0
 
 ### No backend: `addAluno_(p)`
@@ -990,7 +990,7 @@ Log de relatórios, chamadas e envios. fileciteturn3file0
 **Backend:** `addTurma_()` persiste em `__TURMAS_META`. fileciteturn0file0turn3file0
 
 ### `addAluno()`
-**Front:** coleta nome, CPF e turma.  
+**Front:** coleta nome, celular e turma.  
 **Backend:** `addAluno_()` grava em `ReadBase` e `__ALUNOS_META`. fileciteturn0file0turn3file0
 
 ### `moveStudent()`

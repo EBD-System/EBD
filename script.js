@@ -27,7 +27,7 @@ const state = {
   autosaveTimer: null,
   accessCode: '',
   accessMode: 'self',
-  selfCpfPrefix: '',
+  selfCelularSuffix: '',
   baseRowsCount: 0,
 };
 
@@ -58,7 +58,7 @@ const els = {
   turmaOrdem: document.getElementById('turmaOrdem'),
   alunoForm: document.getElementById('alunoForm'),
   alunoNome: document.getElementById('alunoNome'),
-  alunoCpf: document.getElementById('alunoCpf'),
+  alunoCelular: document.getElementById('alunoCelular'),
   feedback: document.getElementById('feedback'),
   turmaMeta: document.getElementById('turmaMeta'),
   summary: {
@@ -199,18 +199,23 @@ function onlyDigits(value) {
   return String(value || '').replace(/\D/g, '');
 }
 
-function formatCpf(value) {
+function formatBrazilCellPhone(value) {
   const d = onlyDigits(value).slice(0, 11);
-  const p1 = d.slice(0, 3);
-  const p2 = d.slice(3, 6);
-  const p3 = d.slice(6, 9);
-  const p4 = d.slice(9, 11);
+  const ddd = d.slice(0, 2);
+  const first = d.slice(2, 3);
+  const middle = d.slice(3, 7);
+  const last = d.slice(7, 11);
   let out = '';
-  if (p1) out += p1;
-  if (p2) out += `.${p2}`;
-  if (p3) out += `.${p3}`;
-  if (p4) out += `-${p4}`;
-  return out;
+  if (ddd) out += `(${ddd}`;
+  if (ddd.length === 2) out += ')';
+  if (first) out += ` ${first}`;
+  if (middle) out += ` ${middle}`;
+  if (last) out += `-${last}`;
+  return out.trim();
+}
+
+function formatCelular(value) {
+  return formatBrazilCellPhone(value);
 }
 
 function isModifierKey(event) {
@@ -380,8 +385,8 @@ function renderResponsavelLabel() {
   els.responsavelLabel.textContent = capitalizeFirstLetter(state.accessCode) || '—';
 }
 
-function normalizeSelfCpfPrefix(value) {
-  return onlyDigits(value).slice(0, 5);
+function normalizeSelfCelularSuffix(value) {
+  return onlyDigits(value).slice(0, 4);
 }
 
 function ensureSelfAccessGate() {
@@ -394,71 +399,75 @@ function ensureSelfAccessGate() {
   panel.innerHTML = `
     <div class="self-access-card card">
       <span class="badge">Acesso do aluno</span>
-      <h1>Digite os 5 primeiros do CPF</h1>
-      <p>Use apenas os 5 primeiros números do CPF para registrar sua presença.</p>
+      <h1>Digite os 4 últimos do celular</h1>
+      <p>Use apenas os 4 últimos números do celular para registrar sua presença.</p>
       <label class="self-access-field">
-        <span>CPF</span>
-        <input
-          id="selfCpfInput"
-          type="text"
-          inputmode="numeric"
-          autocomplete="off"
-          maxlength="5"
-          placeholder="Digite os 5 primeiros do CPF"
-        />
+        <span>Celular</span>
+        <div class="self-access-phone">
+          <span class="self-access-phone__prefix">(XX) X XXXX-</span>
+          <input
+            id="selfCelularSuffixInput"
+            class="self-access-phone__input"
+            type="text"
+            inputmode="numeric"
+            autocomplete="off"
+            maxlength="4"
+            placeholder="____"
+          />
+        </div>
       </label>
-      <button id="selfCpfSubmitBtn" class="btn btn--primary" type="button">Confirmar presença</button>
-      <div id="selfCpfMessage" class="feedback feedback--inline" aria-live="polite"></div>
+      <button id="selfCelularSubmitBtn" class="btn btn--primary" type="button">Confirmar presença</button>
+      <div id="selfCelularMessage" class="feedback feedback--inline" aria-live="polite"></div>
     </div>
   `;
 
   document.body.prepend(panel);
 
-  const input = panel.querySelector('#selfCpfInput');
-  const btn = panel.querySelector('#selfCpfSubmitBtn');
+  const input = panel.querySelector('#selfCelularSuffixInput');
+  const btn = panel.querySelector('#selfCelularSubmitBtn');
 
   if (input && !input.dataset.bound) {
     input.dataset.bound = '1';
     input.addEventListener('input', (event) => {
-      event.target.value = normalizeSelfCpfPrefix(event.target.value);
+      event.target.value = normalizeSelfCelularSuffix(event.target.value);
     });
     input.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {
         event.preventDefault();
-        handleSelfCpfSubmit();
+        handleSelfCelularSubmit();
       }
     });
   }
 
   if (btn && !btn.dataset.bound) {
     btn.dataset.bound = '1';
-    btn.addEventListener('click', handleSelfCpfSubmit);
+    btn.addEventListener('click', handleSelfCelularSubmit);
   }
 
   return panel;
 }
 
 function setSelfAccessMessage(type, message) {
-  const messageBox = document.getElementById('selfCpfMessage');
+  const messageBox = document.getElementById('selfCelularMessage');
   if (!messageBox) return;
   messageBox.className = `feedback feedback--inline show ${type}`;
   messageBox.textContent = message;
 }
 
-async function handleSelfCpfSubmit() {
-  const input = document.getElementById('selfCpfInput');
-  const btn = document.getElementById('selfCpfSubmitBtn');
-  const prefix = normalizeSelfCpfPrefix(input?.value || '');
+async function handleSelfCelularSubmit() {
+  const input = document.getElementById('selfCelularSuffixInput');
+  const btn = document.getElementById('selfCelularSubmitBtn');
+  const suffix = normalizeSelfCelularSuffix(input?.value || '');
 
-  if (prefix.length !== 5) {
-    setSelfAccessMessage('error', 'Digite os 5 primeiros números do CPF.');
+  if (suffix.length !== 4) {
+    setSelfAccessMessage('error', 'Digite os 4 últimos números do celular.');
     return null;
   }
 
-  state.selfCpfPrefix = prefix;
-  localStorage.setItem('prb_self_cpf_prefix_v1', prefix);
+  state.selfCelularSuffix = suffix;
+  localStorage.setItem('prb_self_celular_suffix_v1', suffix);
   window.dispatchEvent(
-    new CustomEvent('selfCpfPrefixReady', { detail: { cpfPrefix: prefix } })
+    new CustomEvent('selfCelularSuffixReady', { detail: { celularSuffix: suffix } })
   );
 
   if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('COLE_AQUI')) {
@@ -479,12 +488,12 @@ async function handleSelfCpfSubmit() {
 
     const result = await apiPost({
       action: 'selfPresence',
-      cpfPrefix: prefix,
+      celularSuffix: suffix,
       date: state.dateKey,
     });
 
     setSelfAccessMessage('success', result.message || 'Presença confirmada com sucesso.');
-    return prefix;
+    return suffix;
   } catch (err) {
     setSelfAccessMessage('error', err.message || 'Não foi possível registrar a presença.');
     return null;
@@ -2281,7 +2290,7 @@ async function addAluno(event) {
   }
   event.preventDefault();
   const nome = els.alunoNome.value.trim();
-  const cpf = onlyDigits(els.alunoCpf.value).slice(0, 11);
+  const celular = formatBrazilCellPhone(els.alunoCelular.value);
   const turmaId = els.alunoTurma.value;
   if (!nome) {
     showError('Informe o nome do aluno.');
@@ -2296,13 +2305,13 @@ async function addAluno(event) {
   const result = await apiPost({
     action: 'addAluno',
     nome,
-    cpf,
+    celular,
     turmaId,
   });
 
   showSuccess(result.message || 'Aluno cadastrado.');
   els.alunoNome.value = '';
-  els.alunoCpf.value = '';
+  els.alunoCelular.value = '';
   await refreshFromBackend(false);
   renderAll();
 }
@@ -2847,9 +2856,8 @@ function validateApiUrl() {
   return true;
 }
 
-function normalizeCpfInput(event) {
-  const digits = onlyDigits(event.target.value).slice(0, 11);
-  event.target.value = formatCpf(digits);
+function normalizeCelularInput(event) {
+  event.target.value = formatBrazilCellPhone(event.target.value);
 }
 
 async function bootstrap() {
@@ -2985,6 +2993,6 @@ els.alunoForm.addEventListener('submit', (event) => {
   addAluno(event).catch((err) => showError(err.message || 'Falha ao cadastrar aluno.'));
 });
 
-els.alunoCpf.addEventListener('input', normalizeCpfInput);
+els.alunoCelular.addEventListener('input', normalizeCelularInput);
 
 document.addEventListener('DOMContentLoaded', bootstrap);

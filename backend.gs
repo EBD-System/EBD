@@ -19,7 +19,7 @@ const SHEETS = {
   BASE: 'Base',
 };
 
-const CADASTRO_HEADERS = ['DATA_NASCIMENTO', 'MÊS', 'ALUNO', 'CLASSE', 'CPF', 'STATUS'];
+const CADASTRO_HEADERS = ['DATA_NASCIMENTO', 'MÊS', 'ALUNO', 'CLASSE', 'CELULAR', 'STATUS'];
 const CHAMADA_HEADERS = [
   'DATA_CHAMADA',
   'ALUNO',
@@ -298,15 +298,15 @@ function selfPresence_(p) {
   ensureSheets_();
 
   const dateKey = normalizeDateKey_(p.date || todayKey_());
-  const cpfPrefix = String(p.cpfPrefix || p.cpf || '').replace(/\D/g, '').slice(0, 5);
-  if (cpfPrefix.length !== 5) {
-    throw new Error('Digite os 5 primeiros números do CPF.');
+  const celularSuffix = String(p.celularSuffix || '').replace(/\D/g, '').slice(0, 4);
+  if (celularSuffix.length !== 4) {
+    throw new Error('Digite os 4 últimos números do celular.');
   }
 
   const cadastro = loadSheetObjects_(SHEETS.CADASTRO, CADASTRO_HEADERS);
-  const match = findCadastroByCpfPrefix_(cadastro, cpfPrefix);
+  const match = findCadastroByCelularSuffix_(cadastro, celularSuffix);
   if (!match) {
-    throw new Error('CPF não encontrado no Cadastro.');
+    throw new Error('Celular não encontrado no Cadastro.');
   }
 
   const turmaNome = String(match.CLASSE || '').trim();
@@ -322,11 +322,11 @@ function selfPresence_(p) {
   const turma = turmas.find(t => String(t.Nome) === String(turmaNome)) || { TurmaID: turmaNome, Nome: turmaNome, Ordem: 0 };
   const alunos = buildAlunosFromCadastro_(cadastro);
   const aluno = alunos.find(a => normalizeKey_(a.Nome) === normalizeKey_(alunoNome) && normalizeKey_(a.TurmaNome) === normalizeKey_(turmaNome)) || {
-    AlunoID: buildAlunoId_(alunoNome, turmaNome, match.CPF),
+    AlunoID: buildAlunoId_(alunoNome, turmaNome, match.CELULAR),
     Nome: alunoNome,
     TurmaID: turmaNome,
     TurmaNome: turmaNome,
-    CPF: digitsOnly_(match.CPF),
+    CELULAR: digitsOnly_(match.CELULAR),
     Status: 'ativo',
   };
 
@@ -415,7 +415,7 @@ function addTurma_(p) {
     MÊS: '',
     ALUNO: '',
     CLASSE: nome,
-    CPF: '',
+    CELULAR: '',
     STATUS: 'ativo',
   }]);
 
@@ -426,7 +426,7 @@ function addAluno_(p) {
   ensureSheets_();
 
   const nome = String(p.nome || '').trim();
-  const cpf = digitsOnly_(p.cpf || '').slice(0, 11);
+  const celular = digitsOnly_(p.celular || '').slice(0, 11);
   const turmaId = String(p.turmaId || '').trim();
 
   if (!nome) throw new Error('Informe o nome do aluno.');
@@ -448,7 +448,7 @@ function addAluno_(p) {
     MÊS: '',
     ALUNO: nome,
     CLASSE: turmaId,
-    CPF: cpf,
+    CELULAR: celular,
     STATUS: 'ativo',
   }]);
 
@@ -590,15 +590,15 @@ function buildAlunosFromCadastro_(cadastroRows, baseRows = []) {
     const classe = String(row.CLASSE || '').trim();
     if (!aluno || !classe) continue;
 
-    const cpf = digitsOnly_(row.CPF || '');
+    const celular = digitsOnly_(row.CELULAR || '');
     const status = normalizeStudentStatus_(row.STATUS || row.Ativo || 'ativo');
-    const key = normalizeKey_(`${classe}__${aluno}__${cpf || ''}`);
+    const key = normalizeKey_(`${classe}__${aluno}__${celular || ''}`);
     grouped.set(key, {
-      AlunoID: buildAlunoId_(aluno, classe, cpf),
+      AlunoID: buildAlunoId_(aluno, classe, celular),
       Nome: aluno,
       TurmaID: classe,
       TurmaNome: classe,
-      CPF: cpf,
+      CELULAR: celular,
       Ativo: status === 'ativo' ? 'sim' : 'nao',
       Status: status,
       FaltasConsecutivas: 0,
@@ -1348,17 +1348,17 @@ function buildHeaderIndexMap_(actualHeaders, expectedHeaders) {
   return map;
 }
 
-function buildAlunoId_(nome, classe, cpf) {
-  const cpfTail = String(cpf || '').slice(-4);
-  return normalizeKey_(`${classe}__${nome}__${cpfTail || ''}`);
+function buildAlunoId_(nome, classe, celular) {
+  const celularTail = String(celular || '').slice(-4);
+  return normalizeKey_(`${classe}__${nome}__${celularTail || ''}`);
 }
 
-function findCadastroByCpfPrefix_(cadastroRows, prefix) {
-  const p = digitsOnly_(prefix).slice(0, 5);
-  const matches = (cadastroRows || []).filter(r => digitsOnly_(r.CPF || '').startsWith(p));
+function findCadastroByCelularSuffix_(cadastroRows, suffix) {
+  const s = digitsOnly_(suffix).slice(0, 4);
+  const matches = (cadastroRows || []).filter(r => digitsOnly_(r.CELULAR || '').slice(-4) === s);
   if (matches.length === 1) return matches[0];
   if (matches.length > 1) {
-    // Prioriza correspondência exata de 5 primeiros dígitos; se houver mais de uma, retorna a primeira.
+    // Prioriza correspondência exata dos 4 últimos dígitos; se houver mais de uma, retorna a primeira.
     return matches[0];
   }
   return null;
@@ -1372,13 +1372,13 @@ function findCadastroAlunoByIdentifier_(cadastroRows, identifier) {
   for (const row of cadastroRows || []) {
     const nome = String(row.ALUNO || '').trim();
     const classe = String(row.CLASSE || '').trim();
-    const cpf = digitsOnly_(row.CPF || '');
-    const alunoId = buildAlunoId_(nome, classe, cpf);
+    const celular = digitsOnly_(row.CELULAR || '');
+    const alunoId = buildAlunoId_(nome, classe, celular);
 
     if (
       normalizeKey_(nome) === target ||
       normalizeKey_(alunoId) === target ||
-      (digits && cpf && cpf === digits)
+      (digits && celular && celular === digits)
     ) {
       return row;
     }

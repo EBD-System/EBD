@@ -724,6 +724,29 @@ body.access-self #selfAccessPanel {
   margin-bottom: 16px;
 }
 
+.self-access-phone {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.self-access-phone__prefix {
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.self-access-phone__input {
+  flex: 1 1 140px;
+  min-width: 120px;
+  text-align: center;
+  letter-spacing: 0.2em;
+  font-weight: 700;
+}
+
 .feedback--inline {
   margin-top: 14px;
 }
