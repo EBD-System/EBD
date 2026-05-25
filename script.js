@@ -2530,8 +2530,8 @@ function drawRankingPage(doc, page, meta) {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8.1);
         doc.setTextColor(91, 102, 122);
-        doc.text('- - - - - - - - - - - - -', boxX + 4, rowY + 5.0);
-        doc.text('- - - - - - - - - - - - -', boxX + 4, rowY + 8.5);
+        doc.text('- - - - - - - - - - - - - - - - - - - - - - - - - -', boxX + 4, rowY + 5.0);
+        doc.text('Demais turmas:', boxX + 4, rowY + 8.5);
 
         rowY += separatorHeight;
       }
