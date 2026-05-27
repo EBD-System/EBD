@@ -3324,14 +3324,17 @@ async function bootstrap() {
     state.accessMode = resolveAccessMode(state.accessCode);
     applyAccessMode();
 
+    state.dateKey = todayKey();
     els.dateInput.value = state.dateKey;
     els.showInactive.checked = true;
     els.searchInput.value = '';
 
     const storage = storageState();
     state.selectedTurmaId = storage.selectedTurmaId || '';
-    state.dateKey = storage.selectedDateKey || state.dateKey;
-    els.dateInput.value = state.dateKey;
+    if (storage.selectedDateKey) {
+      delete storage.selectedDateKey;
+      saveStorageState(storage);
+    }
 
     if (isSelfAccessMode()) {
       renderSelfAccessGate();
@@ -3368,9 +3371,6 @@ els.dateInput.addEventListener('change', async (event) => {
   state.dateKey = nextDate;
   updateSaveButtonVisibility();
   updateActionNotice();
-  const storage = storageState();
-  storage.selectedDateKey = state.dateKey;
-  saveStorageState(storage);
   await refreshFromBackend(true);
   renderAll();
 });
