@@ -33,7 +33,7 @@ const state = {
 
 const ACCESS_CODES = {
   full: new Set(['50292230']),
-  restricted: new Set(['ninha', 'professor1', 'professor2']),
+  restricted: new Set(['ninha', 'cleverton', 'larissa', 'taiz', 'alais', 'samuel']),
 };
 
 const els = {
