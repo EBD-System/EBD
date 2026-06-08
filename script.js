@@ -483,7 +483,7 @@ function isRestrictedMode() {
 }
 
 function canShareRestrictedReports() {
-  return String(state.accessCode || '').trim().toLowerCase() === 'ninha';
+  return ACCESS_CODES.restricted.has(String(state.accessCode || '').trim().toLowerCase());
 }
 
 function isSelfAccessMode() {
