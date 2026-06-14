@@ -979,9 +979,14 @@ function getTurmasSorted() {
 }
 
 function getAlunosForTurma(turmaId) {
-  return state.alunos.filter(
-    (a) => String(a.TurmaID || '') === String(turmaId || '')
-  );
+  return [...state.alunos]
+    .filter((a) => String(a.TurmaID || '') === String(turmaId || ''))
+    .sort((a, b) => {
+      const oa = Number(a.OrdemCadastro || 0) || 0;
+      const ob = Number(b.OrdemCadastro || 0) || 0;
+      if (oa !== ob) return oa - ob;
+      return 0;
+    });
 }
 
 function blankCallForTurma(turma) {
@@ -1538,12 +1543,6 @@ async function saveCurrentCall({ silent = false } = {}) {
   );
 
   if (pendingRows.length) {
-    if (typeof window !== 'undefined') {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
-    }
-
     const suffix = pendingRows.length === 1
       ? '1 aluno está sem registro de presença, ausência ou atraso.'
       : `${pendingRows.length} alunos estão sem registro de presença, ausência ou atraso.`;

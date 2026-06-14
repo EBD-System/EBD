@@ -172,7 +172,14 @@ function saveCall_(p) {
   if (!turma) throw new Error('Turma não encontrada.');
 
   const alunos = buildAlunosFromCadastro_(cadastro);
-  const turmaAlunos = alunos.filter(a => String(a.TurmaID) === String(turmaId));
+  const turmaAlunos = alunos
+    .filter(a => String(a.TurmaID) === String(turmaId))
+    .sort((a, b) => {
+      const oa = Number(a.OrdemCadastro || 0) || 0;
+      const ob = Number(b.OrdemCadastro || 0) || 0;
+      if (oa !== ob) return oa - ob;
+      return String(a.Nome || '').localeCompare(String(b.Nome || ''));
+    });
   const frontByAlunoId = new Map();
 
   const activeRows = rows.filter(row => String(row?.statusAluno || row?.STATUS || 'ativo').trim().toLowerCase() !== 'inativo');
@@ -593,15 +600,16 @@ function buildTurmasFromCadastro_(cadastroRows) {
 function buildAlunosFromCadastro_(cadastroRows, baseRows = []) {
   const grouped = new Map();
 
-  for (const row of cadastroRows || []) {
+  (cadastroRows || []).forEach((row, index) => {
     const aluno = String(row.ALUNO || '').trim();
     const classe = String(row.CLASSE || '').trim();
-    if (!aluno || !classe) continue;
+    if (!aluno || !classe) return;
 
     const celular = digitsOnly_(row.CELULAR || '');
     const status = normalizeStudentStatus_(row.STATUS || row.Ativo || 'ativo');
     const key = normalizeKey_(`${classe}__${aluno}__${celular || ''}`);
-    grouped.set(key, {
+
+    const entry = {
       AlunoID: buildAlunoId_(aluno, classe, celular),
       Nome: aluno,
       TurmaID: classe,
@@ -619,10 +627,28 @@ function buildAlunosFromCadastro_(cadastroRows, baseRows = []) {
       RealocadoDe: '',
       CriadoEm: '',
       AtualizadoEm: '',
-    });
-  }
+      OrdemCadastro: Number(row._rowNumber || (index + 2)) || (index + 2),
+    };
 
-  const students = [...grouped.values()];
+    if (grouped.has(key)) {
+      const current = grouped.get(key);
+      grouped.set(key, {
+        ...current,
+        ...entry,
+        OrdemCadastro: current.OrdemCadastro || entry.OrdemCadastro,
+      });
+    } else {
+      grouped.set(key, entry);
+    }
+  });
+
+  const students = [...grouped.values()].sort((a, b) => {
+    const oa = Number(a.OrdemCadastro || 0) || 0;
+    const ob = Number(b.OrdemCadastro || 0) || 0;
+    if (oa !== ob) return oa - ob;
+    return String(a.Nome || '').localeCompare(String(b.Nome || ''));
+  });
+
   const statsMap = computeStudentStatsFromBase_(students, baseRows || []);
 
   return students.map(st => ({
@@ -639,7 +665,14 @@ function buildCallForTurma_(dateKey, turma, alunos, chamadaRows, baseRows) {
   const today = todayKey_();
   const useBaseForDate = selectedDate !== today;
 
-  const turmaAlunos = (alunos || []).filter(a => String(a.TurmaID) === String(turmaId));
+  const turmaAlunos = (alunos || [])
+    .filter(a => String(a.TurmaID) === String(turmaId))
+    .sort((a, b) => {
+      const oa = Number(a.OrdemCadastro || 0) || 0;
+      const ob = Number(b.OrdemCadastro || 0) || 0;
+      if (oa !== ob) return oa - ob;
+      return String(a.Nome || '').localeCompare(String(b.Nome || ''));
+    });
 
   const sourceRows = useBaseForDate ? (baseRows || []) : (chamadaRows || []);
   const classRows = sourceRows.filter(r =>
