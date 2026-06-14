@@ -979,14 +979,9 @@ function getTurmasSorted() {
 }
 
 function getAlunosForTurma(turmaId) {
-  return state.alunos
-    .filter((a) => String(a.TurmaID || '') === String(turmaId || ''))
-    .sort((a, b) => {
-      const ia = String(a.Status || 'ativo') === 'inativo' ? 1 : 0;
-      const ib = String(b.Status || 'ativo') === 'inativo' ? 1 : 0;
-      if (ia !== ib) return ia - ib;
-      return String(a.Nome || '').localeCompare(String(b.Nome || ''));
-    });
+  return state.alunos.filter(
+    (a) => String(a.TurmaID || '') === String(turmaId || '')
+  );
 }
 
 function blankCallForTurma(turma) {
@@ -1536,6 +1531,25 @@ async function saveCurrentCall({ silent = false } = {}) {
 
   if (!turma || !call) {
     throw new Error('Selecione uma turma antes de salvar.');
+  }
+
+  const pendingRows = (call.rows || []).filter(
+    (row) => !isInactiveStudent(row) && !isSavedRow(row)
+  );
+
+  if (pendingRows.length) {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }
+
+    const suffix = pendingRows.length === 1
+      ? '1 aluno está sem registro de presença, ausência ou atraso.'
+      : `${pendingRows.length} alunos estão sem registro de presença, ausência ou atraso.`;
+
+    showError(`Existe ${suffix} Marque todos os alunos antes de salvar.`);
+    throw new Error('Existe aluno sem registro de presença, ausência ou atraso.');
   }
 
   const beforeRows = Number(state.baseRowsCount || 0);

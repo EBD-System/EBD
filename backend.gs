@@ -176,6 +176,10 @@ function saveCall_(p) {
   const frontByAlunoId = new Map();
 
   const activeRows = rows.filter(row => String(row?.statusAluno || row?.STATUS || 'ativo').trim().toLowerCase() !== 'inativo');
+  const incompleteRows = activeRows.filter(row => toInt_(row?.salvo ?? row?.SALVO ?? 0) !== 1);
+  if (incompleteRows.length) {
+    throw new Error('Existe aluno sem registro de presença, ausência ou atraso. Marque todos antes de salvar.');
+  }
   const presentesCount = countPresentesFromRows_(activeRows);
   const visitantes = clampInt_(p.visitantes, 0, 50);
   const maxBibliasRevistas = Math.max(0, presentesCount + visitantes);
@@ -624,14 +628,7 @@ function buildAlunosFromCadastro_(cadastroRows, baseRows = []) {
   return students.map(st => ({
     ...st,
     ...(statsMap.get(normalizeKey_(`${st.TurmaID}__${st.Nome}`)) || {}),
-  })).sort((a, b) => {
-    const ia = String(a.Status || 'ativo').trim().toLowerCase() === 'inativo' ? 1 : 0;
-    const ib = String(b.Status || 'ativo').trim().toLowerCase() === 'inativo' ? 1 : 0;
-    if (ia !== ib) return ia - ib;
-    const turmaCmp = String(a.TurmaNome || '').localeCompare(String(b.TurmaNome || ''));
-    if (turmaCmp !== 0) return turmaCmp;
-    return String(a.Nome || '').localeCompare(String(b.Nome || ''));
-  });
+  }));
 }
 
 function buildCallForTurma_(dateKey, turma, alunos, chamadaRows, baseRows) {
