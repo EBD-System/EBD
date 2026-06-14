@@ -173,13 +173,7 @@ function saveCall_(p) {
 
   const alunos = buildAlunosFromCadastro_(cadastro);
   const turmaAlunos = alunos
-    .filter(a => String(a.TurmaID) === String(turmaId))
-    .sort((a, b) => {
-      const oa = Number(a.OrdemCadastro || 0) || 0;
-      const ob = Number(b.OrdemCadastro || 0) || 0;
-      if (oa !== ob) return oa - ob;
-      return String(a.Nome || '').localeCompare(String(b.Nome || ''));
-    });
+    .filter(a => String(a.TurmaID) === String(turmaId));
   const frontByAlunoId = new Map();
 
   const activeRows = rows.filter(row => String(row?.statusAluno || row?.STATUS || 'ativo').trim().toLowerCase() !== 'inativo');
@@ -642,12 +636,8 @@ function buildAlunosFromCadastro_(cadastroRows, baseRows = []) {
     }
   });
 
-  const students = [...grouped.values()].sort((a, b) => {
-    const oa = Number(a.OrdemCadastro || 0) || 0;
-    const ob = Number(b.OrdemCadastro || 0) || 0;
-    if (oa !== ob) return oa - ob;
-    return String(a.Nome || '').localeCompare(String(b.Nome || ''));
-  });
+  // Mantém exatamente a ordem de leitura da planilha.
+  const students = [...grouped.values()];
 
   const statsMap = computeStudentStatsFromBase_(students, baseRows || []);
 
@@ -666,13 +656,7 @@ function buildCallForTurma_(dateKey, turma, alunos, chamadaRows, baseRows) {
   const useBaseForDate = selectedDate !== today;
 
   const turmaAlunos = (alunos || [])
-    .filter(a => String(a.TurmaID) === String(turmaId))
-    .sort((a, b) => {
-      const oa = Number(a.OrdemCadastro || 0) || 0;
-      const ob = Number(b.OrdemCadastro || 0) || 0;
-      if (oa !== ob) return oa - ob;
-      return String(a.Nome || '').localeCompare(String(b.Nome || ''));
-    });
+    .filter(a => String(a.TurmaID) === String(turmaId));
 
   const sourceRows = useBaseForDate ? (baseRows || []) : (chamadaRows || []);
   const classRows = sourceRows.filter(r =>

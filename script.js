@@ -979,14 +979,9 @@ function getTurmasSorted() {
 }
 
 function getAlunosForTurma(turmaId) {
-  return [...state.alunos]
-    .filter((a) => String(a.TurmaID || '') === String(turmaId || ''))
-    .sort((a, b) => {
-      const oa = Number(a.OrdemCadastro || 0) || 0;
-      const ob = Number(b.OrdemCadastro || 0) || 0;
-      if (oa !== ob) return oa - ob;
-      return 0;
-    });
+  return [...state.alunos].filter(
+    (a) => String(a.TurmaID || '') === String(turmaId || '')
+  );
 }
 
 function blankCallForTurma(turma) {
