@@ -62,7 +62,6 @@ const LEGACY_SHEETS = [
 ];
 
 const AUTO_CUTOFF_MINUTES = 9 * 60 + 25;
-const STUDENT_NUMBER_WIDTH = 3;
 
 function normalizeStudentStatus_(value) {
   const v = String(value || '').trim().toLowerCase();
@@ -103,14 +102,12 @@ function doPost(e) {
         return json_(addTurma_(p));
       case 'addaluno':
         return json_(addAluno_(p));
-      case 'editaluno':
-        return json_(editAluno_(p));
-      case 'deletealuno':
-        return json_(deleteAluno_(p));
       case 'movealuno':
         return json_(moveAluno_(p));
       case 'togglealuno':
         return json_(toggleAluno_(p));
+      case 'updatealuno':
+        return json_(updateAluno_(p));
       case 'sendreport':
         return json_(sendReport_(p));
       default:
@@ -442,7 +439,6 @@ function addAluno_(p) {
   ensureSheets_();
 
   const nome = String(p.nome || '').trim();
-  const complemento = String(p.complemento || '').trim();
   const celular = digitsOnly_(p.celular || '').slice(0, 11);
   const turmaId = String(p.turmaId || '').trim();
 
@@ -452,37 +448,34 @@ function addAluno_(p) {
   const cadastroSheet = getOrCreateSheet_(SHEETS.CADASTRO, CADASTRO_HEADERS);
   const cadastro = loadSheetObjects_(SHEETS.CADASTRO, CADASTRO_HEADERS);
 
-  const numero = getNextStudentNumber_(cadastro);
-  const label = composeStudentLabel_(nome, numero, complemento);
+  const duplicate = cadastro.some(r =>
+    normalizeKey_(r.ALUNO) === normalizeKey_(nome) &&
+    normalizeKey_(r.CLASSE) === normalizeKey_(turmaId)
+  );
+  if (duplicate) {
+    return { ok: true, message: 'Aluno já cadastrado nesta classe.' };
+  }
 
   appendObjects_(cadastroSheet, CADASTRO_HEADERS, [{
     DATA_NASCIMENTO: '',
     MÊS: '',
-    ALUNO: label,
+    ALUNO: nome,
     CLASSE: turmaId,
     CELULAR: celular,
     STATUS: 'ativo',
   }]);
 
-  return {
-    ok: true,
-    message: `Aluno cadastrado com sucesso. Número atribuído: #${numero}.`,
-    aluno: {
-      numero,
-      nome: label,
-      turmaId,
-    },
-  };
+  return { ok: true, message: 'Aluno cadastrado com sucesso.' };
 }
 
-function editAluno_(p) {
+function updateAluno_(p) {
   ensureSheets_();
 
-  const alunoId = String(p.alunoId || '').trim();
+  const alunoId = String(p.alunoId || p.nome || '').trim();
   const nome = String(p.nome || '').trim();
-  const complemento = String(p.complemento || '').trim();
   const celular = digitsOnly_(p.celular || '').slice(0, 11);
   const turmaId = String(p.turmaId || '').trim();
+  const status = normalizeStudentStatus_(p.status || p.ativo || 'ativo');
 
   if (!alunoId) throw new Error('Aluno inválido.');
   if (!nome) throw new Error('Informe o nome do aluno.');
@@ -493,60 +486,22 @@ function editAluno_(p) {
   const row = findCadastroAlunoByIdentifier_(rows, alunoId);
   if (!row) throw new Error('Aluno não encontrado no Cadastro.');
 
-  const currentLabel = String(row.ALUNO || '').trim();
-  const parsed = splitStudentLabel_(currentLabel);
-  const numero = parsed.numero || extractStudentNumber_(p.numero) || getStudentNumberFromRow_(row);
-  if (!numero) throw new Error('Não foi possível identificar a numeração do aluno.');
+  const duplicate = rows.some(other =>
+    other !== row &&
+    normalizeKey_(other.ALUNO) === normalizeKey_(nome) &&
+    normalizeKey_(other.CLASSE) === normalizeKey_(turmaId)
+  );
+  if (duplicate) {
+    throw new Error('Já existe outro aluno com esse nome nesta classe.');
+  }
 
-  const nextLabel = composeStudentLabel_(nome, numero, complemento || parsed.complemento);
-  row.ALUNO = nextLabel;
+  row.ALUNO = nome;
   row.CLASSE = turmaId;
   row.CELULAR = celular;
-  row.STATUS = normalizeStudentStatus_(row.STATUS || row.Ativo || 'ativo');
+  row.STATUS = status;
 
   writeAllRows_(sheet, CADASTRO_HEADERS, rows);
-  updateStudentLabelAcrossDataSheets_(currentLabel, nextLabel, numero);
-
-  return {
-    ok: true,
-    message: `Aluno atualizado com sucesso. Número preservado: #${numero}.`,
-    aluno: {
-      numero,
-      nome: nextLabel,
-      turmaId,
-    },
-  };
-}
-
-function deleteAluno_(p) {
-  ensureSheets_();
-
-  const alunoId = String(p.alunoId || '').trim();
-  if (!alunoId) throw new Error('Aluno inválido.');
-
-  const sheet = getOrCreateSheet_(SHEETS.CADASTRO, CADASTRO_HEADERS);
-  const rows = readAllRows_(sheet, CADASTRO_HEADERS);
-  const row = findCadastroAlunoByIdentifier_(rows, alunoId);
-  if (!row) throw new Error('Aluno não encontrado no Cadastro.');
-
-  const currentLabel = String(row.ALUNO || '').trim();
-  const parsed = splitStudentLabel_(currentLabel);
-  const numero = parsed.numero || getStudentNumberFromRow_(row) || extractStudentNumber_(alunoId);
-
-  const nextRows = rows.filter((candidate) => candidate !== row);
-  writeAllRows_(sheet, CADASTRO_HEADERS, nextRows);
-
-  return {
-    ok: true,
-    message: numero
-      ? `Aluno removido com sucesso. Número preservado no histórico: #${numero}.`
-      : 'Aluno removido com sucesso.',
-    aluno: {
-      numero,
-      nome: currentLabel,
-      turmaId: String(row.CLASSE || '').trim(),
-    },
-  };
+  return { ok: true, message: 'Aluno atualizado com sucesso.' };
 }
 
 function moveAluno_(p) {
@@ -680,27 +635,17 @@ function buildAlunosFromCadastro_(cadastroRows, baseRows = []) {
   const grouped = new Map();
 
   (cadastroRows || []).forEach((row, index) => {
-    const rawAluno = String(row.ALUNO || '').trim();
+    const aluno = String(row.ALUNO || '').trim();
     const classe = String(row.CLASSE || '').trim();
-    if (!rawAluno || !classe) return;
+    if (!aluno || !classe) return;
 
-    const parsed = splitStudentLabel_(rawAluno);
-    const numero = normalizeStudentNumber_(parsed.numero || row.NUMERO || '');
-    const baseName = parsed.nomeBase || rawAluno;
-    const complemento = parsed.complemento || '';
-    const label = composeStudentLabel_(baseName, numero, complemento);
     const celular = digitsOnly_(row.CELULAR || '');
     const status = normalizeStudentStatus_(row.STATUS || row.Ativo || 'ativo');
-    const key = numero
-      ? `num__${numero}`
-      : normalizeKey_(`${classe}__${label}__${celular || ''}`);
+    const key = normalizeKey_(`${classe}__${aluno}__${celular || ''}`);
 
     const entry = {
-      AlunoID: numero || buildAlunoId_(label, classe, celular),
-      Numero: numero,
-      NomeBase: baseName,
-      Complemento: complemento,
-      Nome: label,
+      AlunoID: buildAlunoId_(aluno, classe, celular),
+      Nome: aluno,
       TurmaID: classe,
       TurmaNome: classe,
       CELULAR: celular,
@@ -733,11 +678,12 @@ function buildAlunosFromCadastro_(cadastroRows, baseRows = []) {
 
   // Mantém exatamente a ordem de leitura da planilha.
   const students = [...grouped.values()];
+
   const statsMap = computeStudentStatsFromBase_(students, baseRows || []);
 
   return students.map(st => ({
     ...st,
-    ...(statsMap.get(buildStudentLookupKey_(st.Nome, st.Numero)) || {}),
+    ...(statsMap.get(normalizeKey_(`${st.TurmaID}__${st.Nome}`)) || {}),
   }));
 }
 
@@ -749,7 +695,8 @@ function buildCallForTurma_(dateKey, turma, alunos, chamadaRows, baseRows) {
   const today = todayKey_();
   const useBaseForDate = selectedDate !== today;
 
-  const turmaAlunos = (alunos || []).filter(a => String(a.TurmaID) === String(turmaId));
+  const turmaAlunos = (alunos || [])
+    .filter(a => String(a.TurmaID) === String(turmaId));
 
   const sourceRows = useBaseForDate ? (baseRows || []) : (chamadaRows || []);
   const classRows = sourceRows.filter(r =>
@@ -759,14 +706,14 @@ function buildCallForTurma_(dateKey, turma, alunos, chamadaRows, baseRows) {
 
   const byAluno = new Map();
   for (const row of classRows) {
-    const key = buildStudentLookupKey_(row.ALUNO, row.AlunoID || row.NUMERO || '');
+    const key = normalizeKey_(row.ALUNO);
     if (key && !byAluno.has(key)) {
       byAluno.set(key, row);
     }
   }
 
   const effectiveRows = turmaAlunos.map(aluno => {
-    const cached = byAluno.get(buildStudentLookupKey_(aluno.Nome, aluno.Numero)) || null;
+    const cached = byAluno.get(normalizeKey_(aluno.Nome)) || null;
     return useBaseForDate
       ? buildFrontRowFromBase_(cached, aluno, turmaNome)
       : buildFrontRowFromChamada_(cached, aluno, turmaNome);
@@ -785,10 +732,10 @@ function buildCallForTurma_(dateKey, turma, alunos, chamadaRows, baseRows) {
     data: dateKey,
     turmaId,
     turmaNome,
-    oferta: getCallLevelValue_(classRows, 'OFERTA'),
-    visitantes: getCallLevelValue_(classRows, 'VISITANTES', true),
-    biblias: getCallLevelValue_(classRows, 'BÍBLIAS', true),
-    revistas: getCallLevelValue_(classRows, 'REVISTAS', true),
+    oferta: getCallLevelValue_(classRows, useBaseForDate ? 'OFERTA' : 'OFERTA'),
+    visitantes: getCallLevelValue_(classRows, useBaseForDate ? 'VISITANTES' : 'VISITANTES', true),
+    biblias: getCallLevelValue_(classRows, useBaseForDate ? 'BÍBLIAS' : 'BÍBLIAS', true),
+    revistas: getCallLevelValue_(classRows, useBaseForDate ? 'REVISTAS' : 'REVISTAS', true),
     totalAlunos: activeRows.length,
     presentes,
     atrasos,
@@ -860,8 +807,6 @@ function buildFrontRowFromChamada_(cached, aluno, turmaNome) {
 
   return {
     alunoId: aluno.AlunoID,
-    numero: aluno.Numero || '',
-    nomeBase: aluno.NomeBase || '',
     nome: aluno.Nome,
     turmaId: aluno.TurmaID,
     turmaNome,
@@ -897,8 +842,6 @@ function buildFrontRowFromBase_(cached, aluno, turmaNome) {
 
   return {
     alunoId: aluno.AlunoID,
-    numero: aluno.Numero || '',
-    nomeBase: aluno.NomeBase || '',
     nome: aluno.Nome,
     turmaId: aluno.TurmaID,
     turmaNome,
@@ -912,6 +855,8 @@ function buildFrontRowFromBase_(cached, aluno, turmaNome) {
     ausSeguidas: 0,
   };
 }
+
+
 function buildChamadaRow_(opts) {
   const effectiveStatus = String(opts.effectiveStatus || 'ausencia').trim().toLowerCase();
   const autoPresence = toBool_(opts.autoPresence);
@@ -1096,14 +1041,12 @@ function computeStudentStatsFromBase_(students, baseRows) {
   const map = new Map();
 
   for (const student of students || []) {
-    const studentKey = buildStudentLookupKey_(student.Nome, student.Numero);
-    const studentClassKey = normalizeKey_(student.TurmaID);
+    const key = normalizeKey_(`${student.TurmaID}__${student.Nome}`);
     const history = (baseRows || [])
-      .filter(r => {
-        const rowKey = buildStudentLookupKey_(r.ALUNO, r.AlunoID || r.NUMERO || '');
-        return normalizeKey_(r.CLASSE) === studentClassKey &&
-          (rowKey === studentKey || normalizeKey_(r.ALUNO) === normalizeKey_(student.Nome));
-      })
+      .filter(r =>
+        normalizeKey_(r.CLASSE) === normalizeKey_(student.TurmaID) &&
+        normalizeKey_(r.ALUNO) === normalizeKey_(student.Nome)
+      )
       .sort((a, b) => normalizeDateKey_(a.DATA).localeCompare(normalizeDateKey_(b.DATA)));
 
     const totalPresencas = history.filter(r => toInt_(r.PRESENÇA) === 1 || toInt_(r.ATRASO) === 1).length;
@@ -1118,9 +1061,10 @@ function computeStudentStatsFromBase_(students, baseRows) {
 
     const lastPresence = [...history].reverse().find(r => toInt_(r.PRESENÇA) === 1 || toInt_(r.ATRASO) === 1);
     const lastAbsence = [...history].reverse().find(r => toInt_(r.AUSÊNCIA) === 1);
+
     const isInactive = streak >= 4;
 
-    map.set(studentKey, {
+    map.set(key, {
       FaltasConsecutivas: streak,
       TotalPresencas: totalPresencas,
       TotalFaltas: totalFaltas,
@@ -1472,7 +1416,6 @@ function buildMemorySeed_(dateKey, turmas, alunos, callsByTurma, resumoGeral) {
     handoff: [
       'Consulte esta memória antes de responder a perguntas repetidas sobre o projeto.',
       'A base oficial continua sendo Google Sheets via Apps Script; a UI só mantém rascunhos e cache local.',
-      'Os alunos usam numeração imutável após #; adicionar gera o próximo número livre, editar preserva o número e excluir remove apenas do cadastro do site/planilha.',
       'As decisões e regras do projeto devem ficar em documentos curtos e versionáveis.',
     ].join('\n\n'),
     decisions: [
@@ -1491,16 +1434,6 @@ function buildMemorySeed_(dateKey, turmas, alunos, callsByTurma, resumoGeral) {
         body: [
           'Os rascunhos de chamada e caches auxiliares ficam no localStorage do navegador.',
           'Isso evita perda de edição durante o preenchimento da chamada, mas não substitui o salvamento no backend.',
-        ].join('\n'),
-        meta: { dateKey },
-      },
-      {
-        key: 'student-numbering-immutable',
-        title: 'Numeração imutável dos alunos',
-        body: [
-          'A numeração após # é gerada apenas no cadastro de um novo aluno.',
-          'Na edição, o número do aluno permanece fixo e não pode ser alterado pela interface.',
-          'A exclusão remove o aluno do cadastro, mas não reutiliza o número já atribuído.',
         ].join('\n'),
         meta: { dateKey },
       },
@@ -1526,16 +1459,6 @@ function buildMemorySeed_(dateKey, turmas, alunos, callsByTurma, resumoGeral) {
         ].join('\n'),
         meta: { dateKey },
       },
-      {
-        key: 'gerir-alunos-cadastro',
-        title: 'Gerir alunos no cadastro',
-        body: [
-          'Usar a aba de cadastro para adicionar, editar ou excluir alunos.',
-          'Ao adicionar, o backend escolhe automaticamente o próximo número livre.',
-          'Ao editar, o número exibido após # é apenas leitura.',
-        ].join('\n'),
-        meta: { dateKey },
-      },
     ],
     gotchas: [
       {
@@ -1553,15 +1476,6 @@ function buildMemorySeed_(dateKey, turmas, alunos, callsByTurma, resumoGeral) {
         body: [
           'A interface bloqueia o salvamento quando a data selecionada não é a data de hoje.',
           'Isso protege o fluxo operacional da chamada diária.',
-        ].join('\n'),
-        meta: { dateKey },
-      },
-      {
-        key: 'numero-de-aluno-nao-reutilizado',
-        title: 'Número de aluno não reutilizado',
-        body: [
-          'Depois que um número é atribuído a um aluno, ele não deve ser reaproveitado para outro cadastro.',
-          'Isso evita colisões visuais e mantém a referência histórica dos registros.',
         ].join('\n'),
         meta: { dateKey },
       },
@@ -1586,15 +1500,6 @@ function buildMemorySeed_(dateKey, turmas, alunos, callsByTurma, resumoGeral) {
         ].join('\n'),
         meta: { dateKey },
       },
-      {
-        key: 'numero-automatico-e-readonly',
-        title: 'Número do aluno é somente leitura',
-        body: [
-          'A interface de cadastro e edição sempre mostra o número após #, mas o campo não é editável.',
-          'Esse número é definido pelo backend no cadastro e preservado em edições posteriores.',
-        ].join('\n'),
-        meta: { dateKey },
-      },
     ],
     sessions: [
       {
@@ -1607,16 +1512,6 @@ function buildMemorySeed_(dateKey, turmas, alunos, callsByTurma, resumoGeral) {
         ].join('\n'),
         meta: { dateKey },
       },
-      {
-        key: `cadastro-alunos-${dateKey}`,
-        title: `Atualização do cadastro de alunos (${dateKey})`,
-        body: [
-          'Adicionar aluno passa a gerar automaticamente o próximo número livre após #.',
-          'Editar aluno preserva o número existente e o campo fica travado na interface.',
-          'Excluir aluno remove apenas o cadastro e mantém o histórico da planilha intacto.',
-        ].join('\n'),
-        meta: { dateKey },
-      },
     ],
   };
 }
@@ -1626,99 +1521,6 @@ function json_(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-function normalizeStudentNumber_(value) {
-  const digits = digitsOnly_(value || '');
-  if (!digits) return '';
-  return digits.padStart(Math.max(STUDENT_NUMBER_WIDTH, digits.length), '0');
-}
-
-function splitStudentLabel_(value) {
-  const raw = String(value || '').trim();
-  if (!raw) {
-    return { nomeBase: '', numero: '', complemento: '' };
-  }
-
-  const match = raw.match(/^(.*)\s*#\s*(\d+)(.*)$/);
-  if (!match) {
-    return { nomeBase: raw, numero: '', complemento: '' };
-  }
-
-  return {
-    nomeBase: String(match[1] || '').trim(),
-    numero: normalizeStudentNumber_(match[2]),
-    complemento: String(match[3] || '').trim(),
-  };
-}
-
-function composeStudentLabel_(nomeBase, numero, complemento = '') {
-  const cleanBase = String(nomeBase || '').replace(/\s*#\s*\d+.*$/, '').trim();
-  const cleanNumero = normalizeStudentNumber_(numero);
-  const cleanComplemento = String(complemento || '').trim();
-
-  return [cleanBase, cleanNumero ? `#${cleanNumero}` : '', cleanComplemento]
-    .filter(Boolean)
-    .join(' ')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
-}
-
-function extractStudentNumber_(value) {
-  return splitStudentLabel_(value).numero;
-}
-
-function getStudentNumberFromRow_(row) {
-  return extractStudentNumber_(row?.ALUNO || '');
-}
-
-function buildStudentLookupKey_(value, numero = '') {
-  const cleanNumero = normalizeStudentNumber_(numero || extractStudentNumber_(value));
-  if (cleanNumero) return `#${cleanNumero}`;
-  return normalizeKey_(String(value || '').trim());
-}
-
-function getNextStudentNumber_(cadastroRows) {
-  let highest = 0;
-  for (const row of cadastroRows || []) {
-    const numero = normalizeStudentNumber_(row?.NUMERO || getStudentNumberFromRow_(row));
-    if (!numero) continue;
-    const parsed = parseInt(numero, 10);
-    if (!Number.isNaN(parsed)) {
-      highest = Math.max(highest, parsed);
-    }
-  }
-  return String(highest + 1).padStart(STUDENT_NUMBER_WIDTH, '0');
-}
-
-function updateStudentLabelInSheet_(sheetName, headers, oldLabel, newLabel, numero) {
-  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName(sheetName);
-  if (!sheet) return false;
-
-  const rows = readAllRows_(sheet, headers);
-  let changed = false;
-
-  for (const row of rows) {
-    const rowLabel = String(row.ALUNO || '').trim();
-    const rowNumero = extractStudentNumber_(rowLabel);
-    const matchesByNumber = numero && rowNumero && rowNumero === normalizeStudentNumber_(numero);
-    const matchesByLabel = normalizeKey_(rowLabel) === normalizeKey_(oldLabel);
-    if (matchesByNumber || matchesByLabel) {
-      row.ALUNO = newLabel;
-      changed = true;
-    }
-  }
-
-  if (changed) {
-    writeAllRows_(sheet, headers, rows);
-  }
-
-  return changed;
-}
-
-function updateStudentLabelAcrossDataSheets_(oldLabel, newLabel, numero) {
-  updateStudentLabelInSheet_(SHEETS.CHAMADA, CHAMADA_HEADERS, oldLabel, newLabel, numero);
-  updateStudentLabelInSheet_(SHEETS.BASE, BASE_HEADERS, oldLabel, newLabel, numero);
-}
 function buildHeaderIndexMap_(actualHeaders, expectedHeaders) {
   const map = new Map();
   const normalizedActual = (actualHeaders || []).map(h => normalizeKey_(h));
@@ -1734,9 +1536,7 @@ function buildHeaderIndexMap_(actualHeaders, expectedHeaders) {
   return map;
 }
 
-function buildAlunoId_(nome, classe, celular, numero = '') {
-  const cleanNumero = normalizeStudentNumber_(numero || extractStudentNumber_(nome));
-  if (cleanNumero) return cleanNumero;
+function buildAlunoId_(nome, classe, celular) {
   const celularTail = String(celular || '').slice(-4);
   return normalizeKey_(`${classe}__${nome}__${celularTail || ''}`);
 }
@@ -1755,23 +1555,18 @@ function findCadastroByCelularSuffix_(cadastroRows, suffix) {
 
 function findCadastroAlunoByIdentifier_(cadastroRows, identifier) {
   const target = normalizeKey_(identifier);
-  const targetNumero = normalizeStudentNumber_(identifier);
   const digits = digitsOnly_(identifier);
 
   for (const row of cadastroRows || []) {
-    const rawAluno = String(row.ALUNO || '').trim();
-    const parsed = splitStudentLabel_(rawAluno);
-    const numero = parsed.numero || normalizeStudentNumber_(extractStudentNumber_(row.NUMERO || ''));
-    const alunoId = buildAlunoId_(rawAluno, String(row.CLASSE || '').trim(), row.CELULAR || '', numero);
-    const labelKey = normalizeKey_(rawAluno);
-    const numeroMatch = targetNumero && numero && targetNumero === numero;
-    const digitsMatch = digits && numero && normalizeStudentNumber_(digits) === numero;
+    const nome = String(row.ALUNO || '').trim();
+    const classe = String(row.CLASSE || '').trim();
+    const celular = digitsOnly_(row.CELULAR || '');
+    const alunoId = buildAlunoId_(nome, classe, celular);
 
     if (
-      labelKey === target ||
+      normalizeKey_(nome) === target ||
       normalizeKey_(alunoId) === target ||
-      numeroMatch ||
-      digitsMatch
+      (digits && celular && celular === digits)
     ) {
       return row;
     }

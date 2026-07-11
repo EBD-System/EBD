@@ -53,50 +53,9 @@ function normalizeBoolValue(value) {
   return v === 'sim' || v === 'true' || v === '1' || v === 'yes' || v === 'y';
 }
 
-function splitStudentLabel(value) {
-  const raw = String(value || '').trim();
-  if (!raw) {
-    return { nomeBase: '', numero: '', complemento: '' };
-  }
-
-  const match = raw.match(/^(.*)\s*#\s*(\d+)(.*)$/);
-  if (!match) {
-    return { nomeBase: raw, numero: '', complemento: '' };
-  }
-
-  return {
-    nomeBase: String(match[1] || '').trim(),
-    numero: String(match[2] || '').padStart(3, '0'),
-    complemento: String(match[3] || '').trim(),
-  };
-}
-
-function composeStudentLabel(nomeBase, numero, complemento = '') {
-  const cleanBase = String(nomeBase || '').replace(/\s*#\s*\d+.*$/, '').trim();
-  const cleanNumero = String(numero || '').replace(/\D+/g, '').trim();
-  const cleanComplemento = String(complemento || '').trim();
-
-  return [cleanBase, cleanNumero ? `#${cleanNumero.padStart(3, '0')}` : '', cleanComplemento]
-    .filter(Boolean)
-    .join(' ')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
-}
-
-function getNextStudentNumber(alunos = []) {
-  let highest = 0;
-  (alunos || []).forEach((aluno) => {
-    const parsed = splitStudentLabel(aluno?.Nome || aluno?.nome || '');
-    const raw = String(aluno?.Numero || aluno?.numero || parsed.numero || '').replace(/\D+/g, '');
-    const value = parseInt(raw || '0', 10);
-    if (value > highest) highest = value;
-  });
-  return String(highest + 1).padStart(3, '0');
-}
-
 function buildWhatsAppEditUrl(alunoNome, turmaNome) {
   const phone = '5571981768164';
-  const message = `Olá, preciso editar o aluno [${String(alunoNome || '').trim()}], da classe [${String(turmaNome || '').trim()}]. O número deve permanecer inalterado.`;
+  const message = `Olá, eu gostaria de editar o aluno [${String(alunoNome || '').trim()}], da classe [${String(turmaNome || '').trim()}].`;
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }
 function setFeedback(type, message) {
@@ -254,8 +213,6 @@ function rosterFingerprintTurma(turma) {
 function rosterFingerprintAluno(aluno) {
   return [
     aluno?.AlunoID ?? '',
-    aluno?.Numero ?? '',
-    aluno?.NomeBase ?? '',
     aluno?.Nome ?? '',
     aluno?.TurmaID ?? '',
     aluno?.Status ?? '',
@@ -289,9 +246,9 @@ function mergeById(prevList = [], nextList = [], idField, fingerprintFn = null) 
 function buildStudentRowFromAluno(aluno) {
   return syncRowPresenceFields({
     alunoId: aluno.AlunoID,
-    numero: aluno.Numero || '',
-    nomeBase: aluno.NomeBase || '',
     nome: aluno.Nome,
+    codigo: aluno.OrdemCadastro || '',
+    ordemCadastro: aluno.OrdemCadastro || '',
     presenca: 'nao',
     atraso: false,
     salvo: 0,

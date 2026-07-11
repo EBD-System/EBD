@@ -163,6 +163,27 @@ els.saveNextBtn.addEventListener('click', async () => {
     showError(err.message || 'Falha ao salvar e avançar.');
   }
 });
+
+if (els.studentEditForm) {
+  els.studentEditForm.addEventListener('submit', (event) => {
+    submitStudentEditForm(event).catch((err) => showError(err.message || 'Falha ao atualizar aluno.'));
+  });
+}
+
+if (els.studentEditModal) {
+  els.studentEditModal.addEventListener('click', (event) => {
+    const target = event.target;
+    if (target instanceof HTMLElement && target.dataset.action === 'close') {
+      closeStudentEditModal();
+    }
+  });
+}
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && els.studentEditModal?.classList.contains('is-open')) {
+    closeStudentEditModal();
+  }
+});
 els.markAllPresentBtn.addEventListener('click', () => setAllPresence('sim'));
 els.markAllAbsentBtn.addEventListener('click', () => setAllPresence('nao'));
 els.copyTurmaBtn.addEventListener('click', () => copyText(buildTurmaReportText()));
@@ -171,30 +192,11 @@ els.turmaForm.addEventListener('submit', (event) => {
   event.preventDefault();
   addTurma(event).catch((err) => showError(err.message || 'Falha ao cadastrar turma.'));
 });
-els.registrationAddTabBtn?.addEventListener('click', () => setRegistrationTab('add'));
-els.registrationManageTabBtn?.addEventListener('click', () => setRegistrationTab('manage'));
-
 els.alunoForm.addEventListener('submit', (event) => {
   event.preventDefault();
   addAluno(event).catch((err) => showError(err.message || 'Falha ao cadastrar aluno.'));
 });
 
-els.alunoEditForm?.addEventListener('submit', (event) => {
-  saveStudentEdit(event).catch((err) => showError(err.message || 'Falha ao salvar edição do aluno.'));
-});
-els.alunoManualEditBtn?.addEventListener('click', () => {
-  manualEditStudentOnWhatsApp();
-});
-els.alunoDeleteBtn?.addEventListener('click', () => {
-  deleteSelectedStudent().catch((err) => showError(err.message || 'Falha ao excluir aluno.'));
-});
-els.alunoEditCancelBtn?.addEventListener('click', () => {
-  clearStudentEditor();
-  setRegistrationTab('add');
-});
-els.alunoEditNome?.addEventListener('input', updateEditorPreview);
-els.alunoEditComplemento?.addEventListener('input', updateEditorPreview);
-els.alunoEditNumero?.addEventListener('input', updateEditorPreview);
 els.alunoCelular.addEventListener('input', normalizeCelularInput);
 els.alunoCelular.addEventListener('blur', normalizeCelularInput);
 

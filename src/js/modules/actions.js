@@ -1,209 +1,3 @@
-function setRegistrationTab(mode = 'add') {
-  const isManage = mode === 'manage';
-
-  if (els.registrationAddTabBtn) {
-    els.registrationAddTabBtn.classList.toggle('is-active', !isManage);
-  }
-  if (els.registrationManageTabBtn) {
-    els.registrationManageTabBtn.classList.toggle('is-active', isManage);
-  }
-  if (els.registrationAddView) {
-    els.registrationAddView.hidden = isManage;
-  }
-  if (els.registrationManageView) {
-    els.registrationManageView.hidden = !isManage;
-  }
-}
-
-function refreshCadastroPreview() {
-  if (els.alunoNumeroPreview) {
-    const nextNumber = getNextStudentNumber(state.alunos || []);
-    els.alunoNumeroPreview.textContent = `Será gerado automaticamente: #${nextNumber}`;
-  }
-
-  if (els.alunoEditId?.value) {
-    updateEditorPreview();
-  } else if (els.alunoEditPreview) {
-    els.alunoEditPreview.textContent = 'Selecione um aluno para editar';
-  }
-}
-
-function getEditorStudent() {
-  const alunoId = String(els.alunoEditId?.value || '').trim();
-  if (!alunoId) return null;
-  return (state.alunos || []).find((aluno) => String(aluno.AlunoID || '') === alunoId) || null;
-}
-
-function updateEditorPreview() {
-  if (!els.alunoEditPreview) return;
-
-  const numero = String(els.alunoEditNumero?.value || '').trim();
-  const nome = String(els.alunoEditNome?.value || '').trim();
-  const complemento = String(els.alunoEditComplemento?.value || '').trim();
-  const preview = composeStudentLabel(nome, numero, complemento);
-
-  els.alunoEditPreview.textContent = preview || 'Selecione um aluno para editar';
-}
-
-function fillStudentEditor(alunoId) {
-  const aluno = (state.alunos || []).find((item) => String(item.AlunoID || '') === String(alunoId || ''));
-  if (!aluno) {
-    showError('Aluno não encontrado.');
-    return false;
-  }
-
-  const parsed = splitStudentLabel(aluno.Nome || '');
-  if (els.alunoEditId) els.alunoEditId.value = String(aluno.AlunoID || '');
-  if (els.alunoEditNome) els.alunoEditNome.value = parsed.nomeBase || aluno.NomeBase || aluno.Nome || '';
-  if (els.alunoEditNumero) els.alunoEditNumero.value = `#${parsed.numero || aluno.Numero || ''}`.trim();
-  if (els.alunoEditComplemento) els.alunoEditComplemento.value = parsed.complemento || aluno.Complemento || '';
-  if (els.alunoEditCelular) els.alunoEditCelular.value = formatToBrPhone(aluno.CELULAR || '');
-  if (els.alunoEditTurma) els.alunoEditTurma.value = aluno.TurmaID || '';
-  updateEditorPreview();
-  return true;
-}
-
-function openStudentEditor(alunoId) {
-  if (isRestrictedMode()) {
-    showError('Ação indisponível neste modo.');
-    return;
-  }
-
-  if (!fillStudentEditor(alunoId)) return;
-  setRegistrationTab('manage');
-  els.alunoEditNome?.focus();
-}
-
-function clearStudentEditor() {
-  if (els.alunoEditId) els.alunoEditId.value = '';
-  if (els.alunoEditNome) els.alunoEditNome.value = '';
-  if (els.alunoEditNumero) els.alunoEditNumero.value = '';
-  if (els.alunoEditComplemento) els.alunoEditComplemento.value = '';
-  if (els.alunoEditCelular) els.alunoEditCelular.value = '';
-  if (els.alunoEditTurma) els.alunoEditTurma.value = '';
-  if (els.alunoEditPreview) els.alunoEditPreview.textContent = 'Selecione um aluno para editar';
-}
-
-async function saveStudentEdit(event) {
-  if (isRestrictedMode()) {
-    showError('Ação indisponível neste modo.');
-    return;
-  }
-
-  event.preventDefault();
-  const alunoId = String(els.alunoEditId?.value || '').trim();
-  const nome = String(els.alunoEditNome?.value || '').trim();
-  const complemento = String(els.alunoEditComplemento?.value || '').trim();
-  const celular = formatToBrPhone(els.alunoEditCelular?.value || '');
-  const turmaId = String(els.alunoEditTurma?.value || '').trim();
-
-  if (!alunoId) {
-    showError('Selecione um aluno para editar.');
-    return;
-  }
-  if (!nome) {
-    showError('Informe o nome do aluno.');
-    return;
-  }
-  if (!turmaId) {
-    showError('Selecione uma turma.');
-    return;
-  }
-
-  showBusy('Salvando edição...');
-  const result = await apiPost({
-    action: 'editAluno',
-    alunoId,
-    nome,
-    complemento,
-    celular,
-    turmaId,
-  });
-
-  showSuccess(result.message || 'Aluno atualizado.');
-  if (window.ProjectMemory) {
-    window.ProjectMemory.recordFromEvent('edit-aluno', {
-      alunoId,
-      nome,
-      turmaId,
-      numero: result.aluno?.numero || '',
-    });
-  }
-
-  await refreshFromBackend(false);
-  clearStudentEditor();
-  setRegistrationTab('add');
-  renderAll();
-}
-
-async function deleteSelectedStudent() {
-  if (isRestrictedMode()) {
-    showError('Ação indisponível neste modo.');
-    return;
-  }
-
-  const alunoId = String(els.alunoEditId?.value || '').trim();
-  if (!alunoId) {
-    showError('Selecione um aluno para excluir.');
-    return;
-  }
-
-  const aluno = getEditorStudent();
-  const confirmText = aluno
-    ? `Excluir ${aluno.Nome}? O aluno sairá do cadastro do site e da planilha.`
-    : 'Excluir este aluno?';
-
-  if (!window.confirm(confirmText)) return;
-
-  showBusy('Excluindo aluno...');
-  const result = await apiPost({
-    action: 'deleteAluno',
-    alunoId,
-  });
-
-  showSuccess(result.message || 'Aluno removido.');
-  if (window.ProjectMemory && aluno) {
-    window.ProjectMemory.recordFromEvent('delete-aluno', {
-      alunoId,
-      nome: aluno.Nome,
-      turmaId: aluno.TurmaID,
-      numero: aluno.Numero || '',
-    });
-  }
-
-  await refreshFromBackend(false);
-  clearStudentEditor();
-  setRegistrationTab('add');
-  renderAll();
-}
-
-function manualEditStudentOnWhatsApp() {
-  const aluno = getEditorStudent();
-  if (!aluno) {
-    showError('Selecione um aluno para abrir o WhatsApp.');
-    return;
-  }
-
-  const url = buildWhatsAppEditUrl(aluno.Nome, aluno.TurmaNome || aluno.TurmaID || '');
-  window.open(url, '_blank', 'noopener,noreferrer');
-}
-
-
-async function deleteStudent(alunoId) {
-  if (isRestrictedMode()) {
-    showError('Ação indisponível neste modo.');
-    return;
-  }
-
-  if (!fillStudentEditor(alunoId)) return;
-
-  try {
-    await deleteSelectedStudent();
-  } catch (err) {
-    showError(err.message || 'Falha ao excluir aluno.');
-  }
-}
-
 function moveStudent(alunoId) {
   if (isRestrictedMode()) {
     showError('Ação indisponível neste modo.');
@@ -276,6 +70,120 @@ function toggleStudentStatus(alunoId) {
     .catch((err) => showError(err.message || 'Falha ao atualizar status.'));
 }
 
+function renderStudentEditTurmaOptions(selectedTurmaId = '') {
+  if (!els.studentEditTurma) return;
+
+  const options = getTurmasSorted()
+    .map((turma) => `<option value="${escapeHtml(turma.TurmaID)}">${escapeHtml(turma.Nome)}</option>`)
+    .join('');
+
+  els.studentEditTurma.innerHTML = options || '<option value="">Cadastre uma turma primeiro</option>';
+  if (selectedTurmaId && getTurmasSorted().some((turma) => String(turma.TurmaID || '') === String(selectedTurmaId))) {
+    els.studentEditTurma.value = selectedTurmaId;
+  } else {
+    els.studentEditTurma.value = state.selectedTurmaId || getTurmasSorted()[0]?.TurmaID || '';
+  }
+}
+
+function setStudentEditModalOpen(isOpen) {
+  if (!els.studentEditModal) return;
+  els.studentEditModal.classList.toggle('is-open', !!isOpen);
+  els.studentEditModal.setAttribute('aria-hidden', String(!isOpen));
+}
+
+function closeStudentEditModal() {
+  state.editingAlunoId = '';
+  setStudentEditModalOpen(false);
+}
+
+function openStudentEditModal(alunoId) {
+  if (isRestrictedMode()) {
+    showError('Ação indisponível neste modo.');
+    return;
+  }
+
+  const aluno = state.alunos.find((item) => String(item.AlunoID || '') === String(alunoId || '')) || null;
+  if (!aluno) {
+    showError('Aluno não encontrado para edição.');
+    return;
+  }
+
+  state.editingAlunoId = aluno.AlunoID;
+  renderStudentEditTurmaOptions(aluno.TurmaID);
+
+  if (els.studentEditTitle) {
+    els.studentEditTitle.textContent = `Editar ${aluno.Nome || 'aluno'}`;
+  }
+  if (els.studentEditCode) {
+    els.studentEditCode.textContent = String(aluno.OrdemCadastro || '—');
+  }
+  if (els.studentEditName) {
+    els.studentEditName.value = aluno.Nome || '';
+  }
+  if (els.studentEditCelular) {
+    els.studentEditCelular.value = formatToBrPhone(aluno.CELULAR || '');
+  }
+  if (els.studentEditStatus) {
+    els.studentEditStatus.value = String(aluno.Status || 'ativo').trim().toLowerCase() === 'inativo' ? 'inativo' : 'ativo';
+  }
+
+  setStudentEditModalOpen(true);
+  requestAnimationFrame(() => els.studentEditName?.focus?.());
+}
+
+async function submitStudentEditForm(event) {
+  if (isRestrictedMode()) {
+    showError('Ação indisponível neste modo.');
+    return;
+  }
+
+  event.preventDefault();
+
+  const alunoId = String(state.editingAlunoId || '').trim();
+  if (!alunoId) {
+    showError('Selecione um aluno para edição.');
+    return;
+  }
+
+  const nome = String(els.studentEditName?.value || '').trim();
+  const celular = formatToBrPhone(els.studentEditCelular?.value || '');
+  const turmaId = String(els.studentEditTurma?.value || '').trim();
+  const status = String(els.studentEditStatus?.value || 'ativo').trim().toLowerCase();
+
+  if (!nome) {
+    showError('Informe o nome do aluno.');
+    return;
+  }
+  if (!turmaId) {
+    showError('Selecione uma turma.');
+    return;
+  }
+
+  showBusy('Salvando alterações...');
+  const result = await apiPost({
+    action: 'updateAluno',
+    alunoId,
+    nome,
+    celular,
+    turmaId,
+    status,
+  });
+
+  showSuccess(result.message || 'Aluno atualizado com sucesso.');
+  if (window.ProjectMemory) {
+    window.ProjectMemory.recordFromEvent('update-aluno', {
+      alunoId,
+      nome,
+      turmaId,
+      turmaNome: getTurmasSorted().find((t) => String(t.TurmaID || '') === String(turmaId || ''))?.Nome || turmaId,
+      status,
+    });
+  }
+
+  closeStudentEditModal();
+  await refreshFromBackend(false);
+  renderAll();
+}
 async function addTurma(event) {
   if (isRestrictedMode()) {
     showError('Ação indisponível neste modo.');
@@ -342,7 +250,6 @@ async function addAluno(event) {
       nome,
       turmaId,
       turmaNome: getTurmasSorted().find((t) => String(t.TurmaID || '') === String(turmaId || ''))?.Nome || turmaId,
-      numero: result.aluno?.numero || '',
     });
   }
   els.alunoNome.value = '';
@@ -378,6 +285,7 @@ function clearCurrentCall() {
   call.visitantes = 0;
   call.biblias = 0;
   call.revistas = 0;
+  //call.visitantesTexto = '';
   state.dirty = true;
   persistDraft(call);
   if (window.ProjectMemory) {
@@ -389,7 +297,6 @@ function clearCurrentCall() {
   }
   renderAll();
 }
-
 async function saveAndAdvance() {
   if (isRestrictedMode()) {
     showError('Ação indisponível neste modo.');
@@ -427,7 +334,6 @@ function renderAll() {
   renderStudents();
   renderReports();
   bindCallFieldValues();
-  refreshCadastroPreview();
 }
 
 function bindCallFieldValues() {
@@ -455,6 +361,8 @@ function bindCallFieldValues() {
   if (revistasInput) {
     revistasInput.value = normalizeNumericInputValue_(call.revistas ?? 0);
   }
+
+  //if (visitantesTextoInput) visitantesTextoInput.value = call.visitantesTexto || '';
 
   if (ofertaInput && !ofertaInput.dataset.bound) {
     ofertaInput.dataset.bound = '1';
@@ -540,4 +448,380 @@ function bindCallFieldValues() {
       renderReports();
     });
   }
+
+  /*
+  if (visitantesTextoInput && !visitantesTextoInput.dataset.bound) {
+    visitantesTextoInput.dataset.bound = '1';
+    visitantesTextoInput.addEventListener('input', (event) => {
+      const current = getCurrentCall();
+      if (!current) return;
+      current.visitantesTexto = event.target.value;
+      persistDraft(current);
+      markDirty();
+      renderReports();
+    });
+  }
+  */
 }
+
+
+
+async function refreshFromBackend(showMessage = false, { silent = false } = {}) {
+  clearAutosaveTimer();
+  state.loading = true;
+
+  if (!silent) {
+    showLoading('Carregando dados...');
+  }
+
+  try {
+    // =========================================
+    // DEBUG BOX
+    // =========================================
+    if (showDebugBox) {
+      let debugBox = document.getElementById('debugBackendJson');
+
+      if (!debugBox) {
+        debugBox = document.createElement('pre');
+        debugBox.id = 'debugBackendJson';
+
+        debugBox.style.cssText = `
+          position:fixed;
+          left:10px;
+          right:10px;
+          bottom:10px;
+          max-height:45vh;
+          overflow:auto;
+          z-index:999999999;
+          background:#000;
+          color:#00ff88;
+          padding:14px;
+          border-radius:12px;
+          font-size:11px;
+          line-height:1.4;
+          border:2px solid #333;
+          white-space:pre-wrap;
+          word-break:break-word;
+          box-shadow:0 0 30px rgba(0,0,0,.5);
+        `;
+
+        document.body.appendChild(debugBox);
+      }
+
+      debugBox.textContent = '⏳ Iniciando carregamento do backend...\n';
+    }
+
+    // =========================================
+    // CHAMADA API
+    // =========================================
+
+    const urlFinal = apiUrl({
+      action: 'init',
+      date: state.dateKey,
+    });
+
+    if (showDebugBox) {
+      const debugBox = document.getElementById('debugBackendJson');
+      if (debugBox) {
+        debugBox.textContent += '\n🌐 URL:\n' + urlFinal + '\n';
+      }
+    }
+
+    const response = await fetch(urlFinal, {
+      method: 'GET',
+      mode: 'cors',
+      cache: 'no-store',
+    });
+
+    if (showDebugBox) {
+      const debugBox = document.getElementById('debugBackendJson');
+      if (debugBox) {
+        debugBox.textContent +=
+          '\n📡 STATUS HTTP:\n' +
+          response.status + ' ' + response.statusText + '\n';
+      }
+    }
+
+    const rawText = await response.text();
+
+    if (showDebugBox) {
+      const debugBox = document.getElementById('debugBackendJson');
+      if (debugBox) {
+        debugBox.textContent +=
+          '\n📦 RAW RESPONSE:\n' +
+          rawText.slice(0, 15000) + '\n';
+      }
+    }
+
+    let data = null;
+
+    try {
+      data = JSON.parse(rawText);
+
+      if (showDebugBox) {
+        const debugBox = document.getElementById('debugBackendJson');
+        if (debugBox) {
+          debugBox.textContent += '\n✅ JSON PARSEADO COM SUCESSO\n';
+        }
+      }
+    } catch (jsonErr) {
+      if (showDebugBox) {
+        const debugBox = document.getElementById('debugBackendJson');
+        if (debugBox) {
+          debugBox.textContent +=
+            '\n❌ ERRO AO PARSEAR JSON:\n' +
+            jsonErr.message + '\n';
+        }
+      }
+
+      throw jsonErr;
+    }
+
+    // =========================================
+    // INSPEÇÃO DO JSON
+    // =========================================
+
+    if (showDebugBox) {
+      const debugBox = document.getElementById('debugBackendJson');
+      if (debugBox) {
+        debugBox.textContent +=
+          '\n============================\n' +
+          '📊 ESTRUTURA DO JSON\n' +
+          '============================\n';
+
+        debugBox.textContent +=
+          '\nTurmas: ' +
+          (Array.isArray(data.turmas)
+            ? data.turmas.length
+            : 'NÃO É ARRAY');
+
+        debugBox.textContent +=
+          '\nAlunos: ' +
+          (Array.isArray(data.alunos)
+            ? data.alunos.length
+            : 'NÃO É ARRAY');
+
+        debugBox.textContent +=
+          '\nCallsByTurma keys: ' +
+          Object.keys(data.callsByTurma || {}).length;
+
+        debugBox.textContent +=
+          '\nResumo geral existe: ' +
+          (!!data.resumoGeral);
+
+        debugBox.textContent +=
+          '\nBaseRowsCount: ' +
+          data.baseRowsCount;
+      }
+    }
+
+    // =========================================
+    // PRIMEIRA CHAMADA
+    // =========================================
+
+    const firstCall =
+      Object.values(data.callsByTurma || {})[0];
+
+    if (showDebugBox) {
+      const debugBox = document.getElementById('debugBackendJson');
+      if (debugBox) {
+        debugBox.textContent +=
+          '\n\n============================\n' +
+          '📞 PRIMEIRA CALL\n' +
+          '============================\n';
+
+        debugBox.textContent += JSON.stringify({
+          chamadaId: firstCall?.chamadaId,
+          turmaId: firstCall?.turmaId,
+          turmaNome: firstCall?.turmaNome,
+          oferta: firstCall?.oferta,
+          visitantes: firstCall?.visitantes,
+          biblias: firstCall?.biblias,
+          revistas: firstCall?.revistas,
+          //visitantesTexto: firstCall?.visitantesTexto,
+          totalRows: firstCall?.rows?.length,
+          firstRow: firstCall?.rows?.[0],
+        }, null, 2);
+      }
+    }
+
+    // =========================================
+    // APLICAÇÃO NO STATE
+    // =========================================
+
+    state.turmas =
+      Array.isArray(data.turmas)
+        ? data.turmas
+        : [];
+
+    state.alunos =
+      Array.isArray(data.alunos)
+        ? data.alunos
+        : [];
+
+    state.chamadasByTurma =
+      data.callsByTurma || {};
+
+    state.resumoGeral =
+      data.resumoGeral || null;
+
+    state.baseRowsCount =
+      Number(
+        data.baseRowsCount ||
+        state.baseRowsCount ||
+        0
+      );
+
+    if (window.ProjectMemory && data.memory) {
+      try {
+        window.ProjectMemory.ingestSeed(data.memory);
+      } catch (memErr) {
+        console.warn('Falha ao consolidar memória do projeto:', memErr);
+      }
+    }
+
+    if (showDebugBox) {
+      const debugBox = document.getElementById('debugBackendJson');
+      if (debugBox) {
+        debugBox.textContent += '\n\n✅ STATE ATUALIZADO';
+
+        debugBox.textContent +=
+          '\nstate.turmas: ' +
+          state.turmas.length;
+
+        debugBox.textContent +=
+          '\nstate.alunos: ' +
+          state.alunos.length;
+
+        debugBox.textContent +=
+          '\nstate.calls: ' +
+          Object.keys(state.chamadasByTurma).length;
+      }
+    }
+
+    // =========================================
+    // TURMA SELECIONADA
+    // =========================================
+
+    if (
+      !state.selectedTurmaId ||
+      !state.turmas.some(
+        (t) => t.TurmaID === state.selectedTurmaId
+      )
+    ) {
+      state.selectedTurmaId =
+        state.turmas[0]?.TurmaID || '';
+    }
+
+    if (showDebugBox) {
+      const debugBox = document.getElementById('debugBackendJson');
+      if (debugBox) {
+        debugBox.textContent +=
+          '\n\n🎯 selectedTurmaId:\n' +
+          state.selectedTurmaId;
+      }
+    }
+
+    // =========================================
+    // TESTE getCurrentCall()
+    // =========================================
+
+    try {
+      const testCall = getCurrentCall();
+
+      if (showDebugBox) {
+        const debugBox = document.getElementById('debugBackendJson');
+        if (debugBox) {
+          debugBox.textContent +=
+            '\n\n============================\n' +
+            '🧪 TESTE getCurrentCall()\n' +
+            '============================\n';
+
+          debugBox.textContent += JSON.stringify({
+            exists: !!testCall,
+            turmaId: testCall?.turmaId,
+            chamadaId: testCall?.chamadaId,
+            rows: testCall?.rows?.length,
+            oferta: testCall?.oferta,
+            visitantes: testCall?.visitantes,
+            biblias: testCall?.biblias,
+            revistas: testCall?.revistas,
+          }, null, 2);
+        }
+      }
+    } catch (err) {
+      if (showDebugBox) {
+        const debugBox = document.getElementById('debugBackendJson');
+        if (debugBox) {
+          debugBox.textContent +=
+            '\n\n❌ ERRO getCurrentCall():\n' +
+            err.message;
+        }
+      }
+    }
+
+    // =========================================
+    // RENDER
+    // =========================================
+
+    try {
+      renderAll();
+
+      if (showDebugBox) {
+        const debugBox = document.getElementById('debugBackendJson');
+        if (debugBox) {
+          debugBox.textContent +=
+            '\n\n✅ renderAll() executado';
+        }
+      }
+    } catch (renderErr) {
+      if (showDebugBox) {
+        const debugBox = document.getElementById('debugBackendJson');
+        if (debugBox) {
+          debugBox.textContent +=
+            '\n\n❌ ERRO NO RENDER:\n' +
+            renderErr.message +
+            '\n\nSTACK:\n' +
+            renderErr.stack;
+        }
+      }
+    }
+
+    if (showMessage) {
+      showSuccess('Dados atualizados.');
+    }
+  } catch (err) {
+    console.error(err);
+
+    const showDebugBox = false;
+
+    if (showDebugBox) {
+      const debugBox =
+        document.getElementById('debugBackendJson');
+
+      if (debugBox) {
+        debugBox.textContent +=
+          '\n\n============================\n' +
+          '❌ ERRO GERAL\n' +
+          '============================\n' +
+          err.message +
+          '\n\nSTACK:\n' +
+          (err.stack || '');
+      }
+    }
+
+    showError(
+      err?.message ||
+      'Erro ao carregar dados.'
+    );
+  } finally {
+    state.loading = false;
+
+    if (!silent) {
+      hideLoading();
+    }
+  }
+}
+
+
+

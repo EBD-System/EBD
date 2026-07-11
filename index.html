@@ -194,95 +194,49 @@
       </div>
     </section>
 
-    
     <section class="panel card" id="registrationPanel">
       <div class="panel__head">
         <div>
           <h2>Cadastro rápido</h2>
-          <p>Crie, edite e remova turmas e alunos sem sair da página.</p>
+          <p>Crie turmas e alunos sem sair da página.</p>
         </div>
       </div>
 
-      <div class="registration-tabs" role="tablist" aria-label="Cadastro de alunos">
-        <button id="registrationAddTabBtn" class="registration-tab is-active" type="button" data-registration-tab="add">Adicionar</button>
-        <button id="registrationManageTabBtn" class="registration-tab" type="button" data-registration-tab="manage">Editar / excluir</button>
-      </div>
-
-      <div class="registration-view" id="registrationAddView" data-registration-view="add">
-        <div class="forms-grid">
-          <form id="turmaForm" class="mini-form">
-            <h3>Nova turma</h3>
-            <div class="field">
-              <label for="turmaNome">Nome da turma</label>
-              <input id="turmaNome" type="text" placeholder="Ex.: Crianças menores" />
-            </div>
-            <div class="field">
-              <label for="turmaOrdem">Ordem</label>
-              <input id="turmaOrdem" type="number" min="0" step="1" placeholder="Ex.: 1" />
-            </div>
-            <button class="btn btn--primary" type="submit">Cadastrar turma</button>
-          </form>
-
-          <form id="alunoForm" class="mini-form">
-            <h3>Novo aluno</h3>
-            <div class="field">
-              <label for="alunoNome">Nome do aluno</label>
-              <input id="alunoNome" type="text" placeholder="Ex.: Maria Silva" />
-            </div>
-            <div class="field">
-              <label for="alunoCelular">Celular (opcional)</label>
-              <input id="alunoCelular" type="text" inputmode="numeric" placeholder="(XX) X XXXX-XXXX" />
-            </div>
-            <div class="field">
-              <label for="alunoTurma">Turma</label>
-              <select id="alunoTurma"></select>
-            </div>
-            <div class="field field--preview">
-              <span>Número automático</span>
-              <strong id="alunoNumeroPreview">Será gerado automaticamente</strong>
-            </div>
-            <button class="btn btn--primary" type="submit">Cadastrar aluno</button>
-          </form>
-        </div>
-      </div>
-
-      <div class="registration-view" id="registrationManageView" data-registration-view="manage" hidden>
-        <form id="alunoEditForm" class="mini-form">
-          <h3>Editar aluno</h3>
+      <div class="forms-grid">
+        <form id="turmaForm" class="mini-form">
+          <h3>Nova turma</h3>
           <div class="field">
-            <label for="alunoEditNome">Nome do aluno</label>
-            <input id="alunoEditNome" type="text" placeholder="Clique em um aluno para editar" />
-          </div>
-          <div class="field field--locked">
-            <label for="alunoEditNumero">Número do aluno</label>
-            <input id="alunoEditNumero" type="text" readonly />
+            <label for="turmaNome">Nome da turma</label>
+            <input id="turmaNome" type="text" placeholder="Ex.: Crianças menores" />
           </div>
           <div class="field">
-            <label for="alunoEditCelular">Celular</label>
-            <input id="alunoEditCelular" type="text" inputmode="numeric" placeholder="(XX) X XXXX-XXXX" />
+            <label for="turmaOrdem">Ordem</label>
+            <input id="turmaOrdem" type="number" min="0" step="1" placeholder="Ex.: 1" />
+          </div>
+          <button class="btn btn--primary" type="submit">Cadastrar turma</button>
+        </form>
+
+        <form id="alunoForm" class="mini-form">
+          <h3>Novo aluno</h3>
+          <div class="field">
+            <label for="alunoNome">Nome do aluno</label>
+            <input id="alunoNome" type="text" placeholder="Ex.: Maria Silva" />
           </div>
           <div class="field">
-            <label for="alunoEditTurma">Turma</label>
-            <select id="alunoEditTurma"></select>
+            <label for="alunoCelular">Celular (opcional)</label>
+            <input id="alunoCelular" type="text" inputmode="numeric" placeholder="(XX) X XXXX-XXXX" />
           </div>
-          <input id="alunoEditId" type="hidden" />
-          <input id="alunoEditComplemento" type="hidden" />
-          <div class="field field--preview">
-            <span>Pré-visualização</span>
-            <strong id="alunoEditPreview">Selecione um aluno para editar</strong>
+          <div class="field">
+            <label for="alunoTurma">Turma</label>
+            <select id="alunoTurma"></select>
           </div>
-          <div class="panel__actions">
-            <button class="btn btn--primary" id="alunoEditSubmitBtn" type="submit">Salvar edição</button>
-            <button class="btn btn--soft" id="alunoManualEditBtn" type="button">Editar manualmente no WhatsApp</button>
-            <button class="btn btn--absent" id="alunoDeleteBtn" type="button">Excluir aluno</button>
-            <button class="btn btn--ghost" id="alunoEditCancelBtn" type="button">Limpar seleção</button>
-          </div>
+          <button class="btn btn--primary" type="submit">Cadastrar aluno</button>
         </form>
       </div>
     </section>
 
+    
     <section class="panel card charts-panel">
-
       <div class="panel__head">
         <div>
           <h2>Gráfico geral</h2>
@@ -308,11 +262,9 @@
         <div class="student__identity">
           <div class="student__titleRow">
             <strong class="student-name"></strong>
-            <div class="student__titleActions">
-              <button class="btn btn--soft btn--edit" data-action="edit" type="button">Editar</button>
-              <button class="btn btn--soft btn--danger" data-action="delete" type="button">Excluir</button>
-            </div>
+            <button class="btn btn--soft btn--edit" data-action="edit" type="button">Editar</button>
           </div>
+          <div class="student-code"></div>
           <div class="student-badges"></div>
         </div>
         <div class="student__stats">
@@ -335,6 +287,60 @@
       </label>
     </article>
   </template>
+
+  <div id="studentEditModal" class="student-edit-modal" aria-hidden="true">
+    <div class="student-edit-modal__backdrop" data-action="close"></div>
+    <div class="student-edit-modal__dialog card" role="dialog" aria-modal="true" aria-labelledby="studentEditTitle">
+      <div class="student-edit-modal__head">
+        <div>
+          <span class="badge">Editar cadastro</span>
+          <h2 id="studentEditTitle">Editar aluno</h2>
+          <p>O código interno permanece fixo. Altere apenas os dados de cadastro.</p>
+        </div>
+        <button id="studentEditCancel" class="btn btn--ghost" type="button" data-action="close">Fechar</button>
+      </div>
+
+      <form id="studentEditForm" class="student-edit-form">
+        <div class="field">
+          <label>Código do aluno</label>
+          <div class="student-edit-code">
+            <span>#</span>
+            <strong id="studentEditCode">—</strong>
+          </div>
+          <small>Esse número continua visível, mas não pode ser alterado.</small>
+        </div>
+
+        <div class="field">
+          <label for="studentEditName">Nome do aluno</label>
+          <input id="studentEditName" type="text" autocomplete="off" />
+        </div>
+
+        <div class="field">
+          <label for="studentEditCelular">Celular (opcional)</label>
+          <input id="studentEditCelular" type="text" inputmode="numeric" placeholder="(XX) X XXXX-XXXX" autocomplete="off" />
+        </div>
+
+        <div class="field">
+          <label for="studentEditTurma">Turma</label>
+          <select id="studentEditTurma"></select>
+        </div>
+
+        <div class="field">
+          <label for="studentEditStatus">Status</label>
+          <select id="studentEditStatus">
+            <option value="ativo">Ativo</option>
+            <option value="inativo">Inativo</option>
+          </select>
+        </div>
+
+        <div class="student-edit-form__actions">
+          <button class="btn btn--soft" type="button" data-action="close">Cancelar</button>
+          <button class="btn btn--primary" type="submit">Salvar alterações</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
 
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="src/js/config/app.config.js"></script>
