@@ -430,7 +430,6 @@ function renderStudents() {
       const percentEl = fragment.querySelector('.student-percent');
       const absenceEl = fragment.querySelector('.student-absence');
       const runEl = fragment.querySelector('.student-run');
-      const codeEl = fragment.querySelector('.student-code');
       const presentBtn = fragment.querySelector('[data-action="present"]');
       const absentBtn = fragment.querySelector('[data-action="absent"]');
       const delayBtn = fragment.querySelector('[data-action="delay"]');
@@ -438,7 +437,7 @@ function renderStudents() {
       const toggleBtn = fragment.querySelector('[data-action="toggle"]');
       const noteInput = fragment.querySelector('.student-observacao');
 
-      if (!article || !nameEl || !badgesEl || !percentEl || !absenceEl || !runEl || !codeEl || !presentBtn || !absentBtn || !delayBtn || !editBtn || !toggleBtn || !noteInput) {
+      if (!article || !nameEl || !badgesEl || !percentEl || !absenceEl || !runEl || !presentBtn || !absentBtn || !delayBtn || !editBtn || !toggleBtn || !noteInput) {
         console.warn('Template do aluno incompleto:', row);
         return;
       }
@@ -456,8 +455,6 @@ function renderStudents() {
 
       const statusLabel = isInactive ? 'Inativo' : 'Ativo';
       nameEl.innerHTML = `<span class="student-status ${isInactive ? 'student-status--inactive' : 'student-status--active'}">${statusLabel}</span> - ${escapeHtml(row.nome || '')}`;
-      codeEl.textContent = `#${String(aluno.OrdemCadastro || row.codigo || '').trim() || '—'}`;
-
 const isAuto = (v) => {
   if (v === true || v === 1) return true;
   const s = String(v ?? '').trim().toLowerCase();

@@ -188,16 +188,22 @@ els.markAllPresentBtn.addEventListener('click', () => setAllPresence('sim'));
 els.markAllAbsentBtn.addEventListener('click', () => setAllPresence('nao'));
 els.copyTurmaBtn.addEventListener('click', () => copyText(buildTurmaReportText()));
 els.copyGeralBtn.addEventListener('click', () => copyText(buildGeneralReportText()));
-els.turmaForm.addEventListener('submit', (event) => {
-  event.preventDefault();
-  addTurma(event).catch((err) => showError(err.message || 'Falha ao cadastrar turma.'));
-});
-els.alunoForm.addEventListener('submit', (event) => {
-  event.preventDefault();
-  addAluno(event).catch((err) => showError(err.message || 'Falha ao cadastrar aluno.'));
-});
+if (els.turmaForm) {
+  els.turmaForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    addTurma(event).catch((err) => showError(err.message || 'Falha ao cadastrar turma.'));
+  });
+}
+if (els.alunoForm) {
+  els.alunoForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    addAluno(event).catch((err) => showError(err.message || 'Falha ao cadastrar aluno.'));
+  });
+}
 
-els.alunoCelular.addEventListener('input', normalizeCelularInput);
-els.alunoCelular.addEventListener('blur', normalizeCelularInput);
+if (els.alunoCelular) {
+  els.alunoCelular.addEventListener('input', normalizeCelularInput);
+  els.alunoCelular.addEventListener('blur', normalizeCelularInput);
+}
 
 document.addEventListener('DOMContentLoaded', bootstrap);

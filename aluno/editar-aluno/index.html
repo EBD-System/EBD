@@ -24,13 +24,18 @@
       <div class="hero-copy">
         <span class="badge">Editar cadastro</span>
         <h1 id="studentEditTitle">Editar aluno</h1>
-        <p id="studentEditSubtitle">Carregando informações do aluno...</p>
+        <p id="studentEditSubtitle">Cadastro carregado. Faça as alterações e salve.</p>
       </div>
 
       <div class="hero-panel">
-        <div class="hero-panel__item">
-          <span>Código</span>
-          <strong id="studentEditCode">#—</strong>
+        <div class="hero-panel__item hero-panel__item--wide">
+          <div class="student-edit-code-row">
+            <div class="hero-panel__item">
+              <span>Código</span>
+              <strong id="studentEditCode">#—</strong>
+            </div>
+            <button id="studentEditDelete" class="btn btn--absent btn--delete-inline" type="button">Excluir aluno</button>
+          </div>
         </div>
         <div class="hero-panel__item">
           <span>Turma atual</span>
@@ -43,7 +48,7 @@
       <div class="panel__head">
         <div>
           <h2>Dados do aluno</h2>
-          <p>Edite nome, celular, turma e status. O código interno continua visível apenas como referência.</p>
+          <p>Cadastro carregado. Faça as alterações e salve.</p>
         </div>
 
         <div class="panel__actions">
@@ -56,15 +61,6 @@
       <div id="studentEditLoading" class="empty-state">Carregando aluno...</div>
 
       <form id="studentEditForm" class="student-edit-form hidden">
-        <div class="field">
-          <label>Código do aluno</label>
-          <div class="student-edit-code">
-            <span>#</span>
-            <strong id="studentEditCodeValue">—</strong>
-          </div>
-          <small>Esse número não pode ser alterado.</small>
-        </div>
-
         <div class="field">
           <label for="studentEditName">Nome do aluno</label>
           <input id="studentEditName" type="text" autocomplete="off" />
@@ -97,7 +93,6 @@
 
         <div class="student-edit-form__actions">
           <a class="btn btn--ghost" href="../../index.html">Cancelar</a>
-          <button id="studentEditDelete" class="btn btn--absent" type="button">Excluir aluno</button>
           <button class="btn btn--primary" type="submit">Salvar alterações</button>
         </div>
       </form>

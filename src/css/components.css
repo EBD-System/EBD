@@ -150,9 +150,9 @@
   gap:12px;
 }
 .student{
-  padding:14px;
+  padding:12px;
   display:grid;
-  gap:14px;
+  gap:10px;
 }
 .student.is-inactive{
   background:linear-gradient(180deg, #fbfcff, #f5f8ff);
@@ -160,12 +160,12 @@
 }
 .student__main{
   display:grid;
-  gap:12px;
+  gap:8px;
 }
 .student__identity{
   display:flex;
   flex-direction:column;
-  gap:8px;
+  gap:6px;
 }
 .student__titleRow{
   display:flex;
@@ -457,6 +457,17 @@
 .student-edit-form{
   display:grid;
   gap:14px;
+}
+.student-edit-code-row{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  align-items:center;
+  flex-wrap:wrap;
+}
+.btn--delete-inline{
+  padding:10px 14px;
+  border-radius:14px;
 }
 .student-edit-code{
   display:inline-flex;
