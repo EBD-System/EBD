@@ -15,3 +15,4 @@
 - Quando a turma ou o status não vierem no payload de edição, o backend deve preservar os valores atuais do aluno.
 - A ação `addAluno` deve existir para incluir novos alunos diretamente na aba `Cadastro`.
 - A aba de cadastro é resolvida de forma case-insensitive; `Cadastro` e `cadastro` são tratados como o mesmo destino quando a planilha já existir.
+- Quando o `POST` para `addAluno`, `addTurma` ou `updateAluno` falhar com `Failed to fetch` ou `Ação inválida`, o cliente pode repetir a mesma requisição via `GET` na URL publicada do Apps Script.

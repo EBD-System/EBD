@@ -8,3 +8,7 @@ O navegador segue o redirecionamento e a etapa final pode executar `doGet`, não
 
 ## Solução
 Enviar `action` e demais parâmetros também na query string, aceitar as mesmas rotas em `doGet` e `doPost`, repetir `acao` como alias de compatibilidade, e repetir como GET quando o POST de atualização de aluno retornar `Ação inválida`.
+
+
+## Observação adicional
+Se o navegador exibir `Failed to fetch` ao cadastrar aluno ou turma, o cliente deve repetir a requisição como GET na mesma URL publicada do Apps Script, porque alguns deploys respondem melhor à rota publicada do que ao POST feito via `fetch`.

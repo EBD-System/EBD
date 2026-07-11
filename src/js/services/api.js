@@ -154,7 +154,20 @@ async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
 
   const shouldRetryAsGet = (err) => {
     const message = String(err?.message || err || '');
-    return actionName === 'updatealuno' && /ação inválida|acao inválida|action invalid|aç[aã]o inválida/i.test(message);
+    return (
+      ['addaluno', 'addturma', 'updatealuno'].includes(actionName) &&
+      /failed to fetch|networkerror|fetch failed|ação inválida|acao inválida|action invalid|aç[aã]o inválida/i.test(message)
+    );
+  };
+
+  const sendGetFallback = async () => {
+    const fallbackResponse = await fetch(apiUrl(queryParams), {
+      method: 'GET',
+      mode: 'cors',
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+    return parseJsonResponse(fallbackResponse);
   };
 
   try {
@@ -173,13 +186,7 @@ async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
       return await parseJsonResponse(response);
     } catch (err) {
       if (shouldRetryAsGet(err)) {
-        const fallbackResponse = await fetch(apiUrl(queryParams), {
-          method: 'GET',
-          mode: 'cors',
-          cache: 'no-store',
-          signal: controller.signal,
-        });
-        return await parseJsonResponse(fallbackResponse);
+        return await sendGetFallback();
       }
       throw err;
     }
@@ -187,6 +194,11 @@ async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
     if (err?.name === 'AbortError') {
       throw new Error('O salvamento demorou demais. Verifique sua conexão e tente novamente.');
     }
+
+    if (shouldRetryAsGet(err)) {
+      return await sendGetFallback();
+    }
+
     throw err;
   } finally {
     clearTimeout(timer);

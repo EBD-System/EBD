@@ -27,3 +27,4 @@ Pontos centrais:
 - O cadastro de aluno usa a ação `addAluno` e grava diretamente na aba `Cadastro` da planilha.
 - Para testes manuais no Apps Script, existe `adicionarAlunoManual()` como helper editável.
 - O backend resolve a aba de cadastro de forma case-insensitive, então `Cadastro` e `cadastro` passam a apontar para a mesma planilha quando já existir uma delas.
+- O cliente passou a repetir como `GET` as ações `addAluno`, `addTurma` e `updatealuno` quando o `POST` falha com `Failed to fetch` ou `Ação inválida`, porque o Web App do Apps Script responde melhor nesse fallback.
