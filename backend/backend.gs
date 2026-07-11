@@ -71,14 +71,14 @@ function normalizeStudentStatus_(value) {
 }
 
 function doGet(e) {
-  return routeRequest_(e?.parameter || {}, 'get');
+  return routeRequest_(e?.parameter || {}, true);
 }
 
 function doPost(e) {
-  return routeRequest_(e?.parameter || {}, 'post');
+  return routeRequest_(e?.parameter || {}, false);
 }
 
-function routeRequest_(params, method) {
+function routeRequest_(params, allowReadActions = false) {
   const p = params || {};
   const action = String(p.action || p.acao || 'init').trim().toLowerCase();
 
@@ -105,15 +105,11 @@ function routeRequest_(params, method) {
       case 'updatealuno':
       case 'updatealuno_':
       case 'updatealunoform':
-      case 'updatealuno-page':
-      case 'editaraluno':
-      case 'editaralunoform':
-      case 'salvaraluno':
         return json_(updateAluno_(p));
       case 'sendreport':
         return json_(sendReport_(p));
       default:
-        return json_({ ok: false, message: `Ação inválida. (${action || 'vazia'}${method ? ` • ${method}` : ''})` });
+        return json_({ ok: false, message: `Ação inválida. (${action || 'vazia'})` });
     }
   } catch (err) {
     return json_({ ok: false, message: err?.message || String(err) });

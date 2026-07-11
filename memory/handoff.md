@@ -9,11 +9,8 @@ Pontos centrais:
 - A chamada do dia exige marcação completa antes do salvamento.
 - O endpoint `health` existe para checagem rápida do backend.
 - Decisões arquiteturais devem ficar em arquivos curtos dentro de `memory/`.
-
 - A edição de aluno acontece em uma página dedicada em `aluno/editar-aluno/`.
 - O botão **Editar** leva para essa rota com o `alunoId` do cadastro e o código após `#` continua somente leitura.
 - O fluxo de edição grava alterações diretamente na aba `cadastro` da planilha.
-- O envio de edição usa `updatealuno` em minúsculas e também repete a ação na query string para contornar redirecionamento do Web App.
-
 - As ações enviadas ao Apps Script são normalizadas para minúsculas no cliente.
-- Quando uma mutação retornar `Ação inválida`, conferir primeiro se a URL publicada do Apps Script recebeu a versão mais recente do backend.
+- O Web App do Apps Script pode redirecionar POST para GET; por isso, salvamentos precisam ter `action` também na query string e o backend deve aceitar a mesma rota em `doGet`.

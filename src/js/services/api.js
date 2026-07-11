@@ -91,18 +91,6 @@ function apiUrl(params = {}) {
   return url.toString();
 }
 
-function appendParamsToUrl(baseUrl, params = {}) {
-  const url = new URL(baseUrl);
-  Object.entries(params).forEach(([key, value]) => {
-    if (value === undefined || value === null) return;
-    const normalizedValue = key === 'action' && typeof value === 'string'
-      ? value.trim().toLowerCase()
-      : value;
-    url.searchParams.set(key, normalizedValue);
-  });
-  return url.toString();
-}
-
 async function parseJsonResponse(response) {
   const text = await response.text();
   let data;
@@ -142,18 +130,21 @@ async function apiGet(params = {}, { timeoutMs = 30000 } = {}) {
 
 async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
   const formData = new FormData();
+  const queryParams = {};
+
   Object.entries(params).forEach(([key, value]) => {
     if (value === undefined || value === null) return;
     const normalizedValue = key === 'action' && typeof value === 'string'
       ? value.trim().toLowerCase()
       : value;
     formData.append(key, normalizedValue);
+    queryParams[key] = normalizedValue;
   });
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.max(5000, Number(timeoutMs) || 30000));
   try {
-    const response = await fetch(appendParamsToUrl(APPS_SCRIPT_URL, params), {
+    const response = await fetch(apiUrl(queryParams), {
       method: 'POST',
       mode: 'cors',
       cache: 'no-store',
