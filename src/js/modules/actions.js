@@ -125,7 +125,8 @@ function openStudentEditModal(alunoId) {
     return;
   }
 
-  window.location.href = buildStudentEditPageUrl(aluno.AlunoID);
+  // A rota dedicada trabalha melhor quando recebe o nome atual do aluno como chave.
+  window.location.href = buildStudentEditPageUrl(aluno.Nome || aluno.AlunoID);
 }
 
 async function submitStudentEditForm(event) {

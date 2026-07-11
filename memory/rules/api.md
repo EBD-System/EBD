@@ -7,4 +7,5 @@
 - A ação `updateAluno` deve existir para editar o cadastro de alunos no backend.
 - O código exibido após `#` na edição do aluno é somente leitura na interface e não pode ser alterado pelo usuário.
 - As ações enviadas ao Apps Script devem ser normalizadas para minúsculas no cliente.
-- Em Web Apps do Google Apps Script, requisições POST podem cair em um redirecionamento GET; por isso, ações de escrita também precisam ser aceitas por `doGet` quando a ação vier na query string.
+- O cliente deve enviar POST como `application/x-www-form-urlencoded` para o Apps Script, repetindo os parâmetros na query string para melhorar a compatibilidade com `doGet`/`doPost`.
+- A chave usada na edição do aluno é o nome atual do cadastro, não um ID separado em planilha.

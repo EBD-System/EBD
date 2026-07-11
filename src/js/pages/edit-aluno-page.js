@@ -1,6 +1,6 @@
 (function () {
   const params = new URLSearchParams(window.location.search);
-  const alunoId = String(params.get('alunoId') || '').trim();
+  const alunoKey = String(params.get('alunoId') || '').trim();
   const accessCode = String(params.get('code') || '').trim();
 
   const els = {
@@ -21,6 +21,7 @@
 
   let turmas = [];
   let alunoAtual = null;
+  let alunoOriginalKey = alunoKey;
 
   function resolveAccessMode(code) {
     const normalized = String(code || '').trim().toLowerCase();
@@ -125,7 +126,7 @@
   }
 
   async function loadAluno() {
-    if (!alunoId) {
+    if (!alunoKey) {
       setFeedback('error', 'Informe o alunoId na URL para abrir a edição.');
       if (els.loading) {
         els.loading.textContent = 'Aluno não informado na URL.';
@@ -145,13 +146,14 @@
       const data = await apiGet({ action: 'init', date: todayKey() });
       turmas = Array.isArray(data.turmas) ? data.turmas : [];
       const alunos = Array.isArray(data.alunos) ? data.alunos : [];
-      const found = alunos.find((item) => String(item.AlunoID || '') === String(alunoId));
+      const found = alunos.find((item) => String(item.AlunoID || '') === String(alunoKey) || String(item.Nome || '') === String(alunoKey));
 
       if (!found) {
         throw new Error('Aluno não encontrado no Cadastro.');
       }
 
       alunoAtual = found;
+      alunoOriginalKey = alunoKey || found.Nome || found.AlunoID;
       populateForm(found, data);
       setFeedback('info', 'Cadastro carregado. Faça as alterações e salve.');
     } catch (err) {
@@ -193,7 +195,7 @@
     try {
       const result = await apiPost({
         action: 'updatealuno',
-        alunoId: alunoAtual.AlunoID || alunoId,
+        alunoId: alunoOriginalKey || alunoKey || alunoAtual.Nome || alunoAtual.AlunoID,
         nome,
         celular,
         turmaId,
@@ -204,7 +206,7 @@
 
       if (window.ProjectMemory) {
         window.ProjectMemory.recordFromEvent('update-aluno-page', {
-          alunoId: alunoAtual.AlunoID || alunoId,
+          alunoId: alunoOriginalKey || alunoKey || alunoAtual.Nome || alunoAtual.AlunoID,
           nome,
           turmaId,
           status,

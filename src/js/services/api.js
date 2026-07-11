@@ -129,7 +129,7 @@ async function apiGet(params = {}, { timeoutMs = 30000 } = {}) {
 }
 
 async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
-  const formData = new FormData();
+  const bodyParams = new URLSearchParams();
   const queryParams = {};
 
   Object.entries(params).forEach(([key, value]) => {
@@ -137,7 +137,7 @@ async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
     const normalizedValue = key === 'action' && typeof value === 'string'
       ? value.trim().toLowerCase()
       : value;
-    formData.append(key, normalizedValue);
+    bodyParams.set(key, String(normalizedValue));
     queryParams[key] = normalizedValue;
   });
 
@@ -148,7 +148,10 @@ async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
       method: 'POST',
       mode: 'cors',
       cache: 'no-store',
-      body: formData,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+      },
+      body: bodyParams.toString(),
       signal: controller.signal,
     });
     return await parseJsonResponse(response);
