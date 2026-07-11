@@ -62,7 +62,7 @@ const LEGACY_SHEETS = [
 ];
 
 const AUTO_CUTOFF_MINUTES = 9 * 60 + 25;
-const BACKEND_VERSION = '2026.07.11-2';
+const BACKEND_VERSION = '2026.07.11-3';
 const BACKEND_DEPLOYED_AT = '2026-07-11T00:00:00-03:00';
 
 function normalizeStudentStatus_(value) {
@@ -99,6 +99,9 @@ function routeRequest_(params, allowReadActions = false) {
       case 'addturma':
         return json_(addTurma_(p));
       case 'addaluno':
+      case 'adicionaraluno':
+      case 'cadastraraluno':
+      case 'novoaluno':
         return json_(addAluno_(p));
       case 'movealuno':
         return json_(moveAluno_(p));
@@ -449,9 +452,9 @@ function addTurma_(p) {
 function addAluno_(p) {
   ensureSheets_();
 
-  const nome = String(p.nome || '').trim();
+  const nome = String(p.nome || p.aluno || '').trim();
   const celular = digitsOnly_(p.celular || '').slice(0, 11);
-  const turmaId = String(p.turmaId || '').trim();
+  const turmaId = String(p.turmaId || p.classe || '').trim();
 
   if (!nome) throw new Error('Informe o nome do aluno.');
   if (!turmaId) throw new Error('Selecione uma classe.');
@@ -477,6 +480,25 @@ function addAluno_(p) {
   }]);
 
   return { ok: true, message: 'Aluno cadastrado com sucesso.' };
+}
+
+function addAluno(nome, celular, turmaId) {
+  return addAluno_({
+    nome,
+    celular,
+    turmaId,
+  });
+}
+
+function adicionarAlunoManual() {
+  const nome = 'ALUNO TESTE';
+  const celular = '';
+  const turmaId = 'SUA TURMA AQUI';
+  return addAluno_({
+    nome,
+    celular,
+    turmaId,
+  });
 }
 
 function updateAluno(alunoId, nome, celular, turmaId, status) {
@@ -1145,16 +1167,29 @@ function ensureSheets_() {
 
   // Remove os caches antigos, caso ainda existam.
   for (const legacyName of LEGACY_SHEETS) {
-    const sh = ss.getSheetByName(legacyName);
+    const sh = getSheetByNameInsensitive_(ss, legacyName);
     if (sh) {
       ss.deleteSheet(sh);
     }
   }
 }
 
+
+function getSheetByNameInsensitive_(ss, name) {
+  if (!ss || !name) return null;
+  const target = normalizeKey_(name);
+  const sheets = ss.getSheets ? ss.getSheets() : [];
+  for (const sheet of sheets) {
+    if (normalizeKey_(sheet.getName()) === target) {
+      return sheet;
+    }
+  }
+  return null;
+}
+
 function getOrCreateSheet_(name, headers) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  let sheet = ss.getSheetByName(name);
+  let sheet = getSheetByNameInsensitive_(ss, name);
   if (!sheet) {
     sheet = ss.insertSheet(name);
   }
@@ -1175,7 +1210,7 @@ function ensureHeaders_(sheet, headers) {
 
 function loadSheetObjects_(sheetName, headers) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName(sheetName);
+  const sheet = getSheetByNameInsensitive_(ss, sheetName);
   if (!sheet) return [];
 
   const values = sheet.getDataRange().getValues();
@@ -1244,7 +1279,7 @@ function buildChamadaRowKey_(row) {
 
 function upsertRowsInPlace_(sheetName, headers, existingRows, newRows, keyFn, options = {}) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
+  const sheet = getSheetByNameInsensitive_(ss, sheetName) || ss.insertSheet(sheetName);
   ensureHeaders_(sheet, headers);
 
   const currentRows = Array.isArray(existingRows) && existingRows.length
@@ -1314,7 +1349,7 @@ function replaceRowsForDateClass_(sheetName, headers, existingRows, dateKey, cla
 
 function countDataRows_(sheetName) {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  const sh = ss.getSheetByName(sheetName);
+  const sh = getSheetByNameInsensitive_(ss, sheetName);
   if (!sh) return 0;
   return Math.max(0, sh.getLastRow() - 1);
 }

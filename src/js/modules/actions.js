@@ -236,7 +236,7 @@ async function addAluno(event) {
 
   showBusy('Cadastrando aluno...');
   const result = await apiPost({
-    action: 'addAluno',
+    action: 'addaluno',
     nome,
     celular,
     turmaId,

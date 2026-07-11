@@ -23,3 +23,7 @@ Pontos centrais:
 - O carregamento inicial do frontend usa `apiGet` com timeout, para evitar overlay infinito quando o Apps Script demora ou falha.
 - O envio de atualização de aluno só faz fallback automático para GET quando o POST retorna explicitamente `Ação inválida`; outros erros precisam aparecer sem mascaramento.
 - A edição de aluno agora pode preservar turma e status atuais quando esses campos não vierem preenchidos no payload.
+
+- O cadastro de aluno usa a ação `addAluno` e grava diretamente na aba `Cadastro` da planilha.
+- Para testes manuais no Apps Script, existe `adicionarAlunoManual()` como helper editável.
+- O backend resolve a aba de cadastro de forma case-insensitive, então `Cadastro` e `cadastro` passam a apontar para a mesma planilha quando já existir uma delas.

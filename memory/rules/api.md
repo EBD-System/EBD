@@ -13,3 +13,5 @@
 - O cliente também envia `acao` junto com `action` para aumentar a compatibilidade com deploys do Apps Script.
 - A chave usada na edição do aluno é o nome atual do cadastro, não um ID separado em planilha.
 - Quando a turma ou o status não vierem no payload de edição, o backend deve preservar os valores atuais do aluno.
+- A ação `addAluno` deve existir para incluir novos alunos diretamente na aba `Cadastro`.
+- A aba de cadastro é resolvida de forma case-insensitive; `Cadastro` e `cadastro` são tratados como o mesmo destino quando a planilha já existir.
