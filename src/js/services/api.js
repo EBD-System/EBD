@@ -122,10 +122,17 @@ async function apiGet(params = {}, { timeoutMs = 30000 } = {}) {
     });
     return await parseJsonResponse(response);
   } catch (err) {
-    if (err?.name === 'AbortError') {
-      throw new Error('A requisição demorou demais. Verifique sua conexão e tente novamente.');
+    const message = String(err?.message || err || '');
+    console.warn('GET falhou ao buscar dados; tentando POST como fallback.', message);
+
+    try {
+      return await apiPost(params, { timeoutMs });
+    } catch (fallbackErr) {
+      if (err?.name === 'AbortError' || fallbackErr?.name === 'AbortError') {
+        throw new Error('A requisição demorou demais. Verifique sua conexão e tente novamente.');
+      }
+      throw fallbackErr;
     }
-    throw err;
   } finally {
     clearTimeout(timer);
   }

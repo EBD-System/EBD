@@ -22,3 +22,5 @@ Pontos centrais:
 - O carregamento inicial do frontend usa `apiGet` com timeout, para evitar overlay infinito quando o Apps Script demora ou falha.
 - O envio de atualização de aluno só faz fallback automático para GET quando o POST retorna explicitamente `Ação inválida`; outros erros precisam aparecer sem mascaramento.
 - A edição de aluno agora pode preservar turma e status atuais quando esses campos não vierem preenchidos no payload.
+- O carregamento inicial e a edição de aluno usam fallback de POST quando o GET do Apps Script falha; isso ajuda quando o Web App muda de comportamento após novo deploy.
+
