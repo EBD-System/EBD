@@ -1,7 +1,8 @@
 # Como editar um aluno
 
+## Passos
 1. Na lista da turma, clicar em **Editar** no cartão do aluno.
-2. Conferir o código exibido após `#`, que fica visível apenas como referência.
-3. Alterar apenas os campos editáveis: nome, celular, turma e status.
-4. Salvar as alterações.
-5. A tela deve recarregar os dados da planilha após a confirmação do backend.
+2. O site abre a rota `aluno/editar-aluno/` com o `alunoId` do cadastro.
+3. Conferir o código exibido após `#`, que continua apenas como referência.
+4. Alterar apenas os campos editáveis: nome, celular, turma e status.
+5. Salvar as alterações e aguardar o retorno para a tela principal após a confirmação do backend.

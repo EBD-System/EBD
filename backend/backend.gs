@@ -471,6 +471,8 @@ function addAluno_(p) {
 function updateAluno_(p) {
   ensureSheets_();
 
+  // Atualiza diretamente a aba "cadastro" da planilha.
+
   const alunoId = String(p.alunoId || p.nome || '').trim();
   const nome = String(p.nome || '').trim();
   const celular = digitsOnly_(p.celular || '').slice(0, 11);

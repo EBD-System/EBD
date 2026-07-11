@@ -1,12 +1,12 @@
-# Edição de aluno em modal
+# Edição de aluno em página dedicada
 
 ## Decisão
 
-A edição de aluno passa a acontecer em um modal interno no site. O identificador exibido após `#` fica visível, mas somente leitura.
+A edição de aluno passa a acontecer em uma página própria em `aluno/editar-aluno/`, aberta a partir do botão **Editar**. O identificador exibido após `#` permanece visível e somente leitura.
 
 ## Motivo
 
-O fluxo reduz dependência de contato externo, centraliza a manutenção no próprio sistema e evita que o código interno do cadastro seja alterado por engano.
+O fluxo funciona melhor no GitHub Pages, evita depender de modal em tela pequena e deixa a edição mais estável em uma rota direta.
 
 ## Data
 2026-07-11

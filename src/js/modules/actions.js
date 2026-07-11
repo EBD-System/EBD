@@ -96,6 +96,23 @@ function closeStudentEditModal() {
   setStudentEditModalOpen(false);
 }
 
+function buildStudentEditPageUrl(alunoId) {
+  const route = 'aluno/editar-aluno/';
+  const params = new URLSearchParams();
+
+  if (alunoId) {
+    params.set('alunoId', String(alunoId).trim());
+  }
+
+  const accessCode = String(state.accessCode || '').trim();
+  if (accessCode) {
+    params.set('code', accessCode);
+  }
+
+  const query = params.toString();
+  return query ? `${route}?${query}` : route;
+}
+
 function openStudentEditModal(alunoId) {
   if (isRestrictedMode()) {
     showError('Ação indisponível neste modo.');
@@ -108,27 +125,7 @@ function openStudentEditModal(alunoId) {
     return;
   }
 
-  state.editingAlunoId = aluno.AlunoID;
-  renderStudentEditTurmaOptions(aluno.TurmaID);
-
-  if (els.studentEditTitle) {
-    els.studentEditTitle.textContent = `Editar ${aluno.Nome || 'aluno'}`;
-  }
-  if (els.studentEditCode) {
-    els.studentEditCode.textContent = String(aluno.OrdemCadastro || '—');
-  }
-  if (els.studentEditName) {
-    els.studentEditName.value = aluno.Nome || '';
-  }
-  if (els.studentEditCelular) {
-    els.studentEditCelular.value = formatToBrPhone(aluno.CELULAR || '');
-  }
-  if (els.studentEditStatus) {
-    els.studentEditStatus.value = String(aluno.Status || 'ativo').trim().toLowerCase() === 'inativo' ? 'inativo' : 'ativo';
-  }
-
-  setStudentEditModalOpen(true);
-  requestAnimationFrame(() => els.studentEditName?.focus?.());
+  window.location.href = buildStudentEditPageUrl(aluno.AlunoID);
 }
 
 async function submitStudentEditForm(event) {

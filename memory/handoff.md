@@ -10,6 +10,6 @@ Pontos centrais:
 - O endpoint `health` existe para checagem rápida do backend.
 - Decisões arquiteturais devem ficar em arquivos curtos dentro de `memory/`.
 
-- A edição de aluno agora acontece dentro do site, em um modal próprio.
-- O código do aluno mostrado após `#` é somente leitura; a edição altera apenas nome, celular, turma e status.
-- O backend ganhou a ação `updateAluno` para gravar essas alterações no Cadastro sem criar uma segunda fonte de verdade.
+- A edição de aluno agora acontece em uma página dedicada em `aluno/editar-aluno/`.
+- O botão **Editar** leva para essa rota com o `alunoId` do cadastro e o código após `#` continua somente leitura.
+- O backend usa a ação `updateAluno` para gravar alterações diretamente na aba `cadastro` da planilha.
