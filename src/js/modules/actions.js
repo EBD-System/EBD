@@ -1,0 +1,543 @@
+function setRegistrationTab(mode = 'add') {
+  const isManage = mode === 'manage';
+
+  if (els.registrationAddTabBtn) {
+    els.registrationAddTabBtn.classList.toggle('is-active', !isManage);
+  }
+  if (els.registrationManageTabBtn) {
+    els.registrationManageTabBtn.classList.toggle('is-active', isManage);
+  }
+  if (els.registrationAddView) {
+    els.registrationAddView.hidden = isManage;
+  }
+  if (els.registrationManageView) {
+    els.registrationManageView.hidden = !isManage;
+  }
+}
+
+function refreshCadastroPreview() {
+  if (els.alunoNumeroPreview) {
+    const nextNumber = getNextStudentNumber(state.alunos || []);
+    els.alunoNumeroPreview.textContent = `Será gerado automaticamente: #${nextNumber}`;
+  }
+
+  if (els.alunoEditId?.value) {
+    updateEditorPreview();
+  } else if (els.alunoEditPreview) {
+    els.alunoEditPreview.textContent = 'Selecione um aluno para editar';
+  }
+}
+
+function getEditorStudent() {
+  const alunoId = String(els.alunoEditId?.value || '').trim();
+  if (!alunoId) return null;
+  return (state.alunos || []).find((aluno) => String(aluno.AlunoID || '') === alunoId) || null;
+}
+
+function updateEditorPreview() {
+  if (!els.alunoEditPreview) return;
+
+  const numero = String(els.alunoEditNumero?.value || '').trim();
+  const nome = String(els.alunoEditNome?.value || '').trim();
+  const complemento = String(els.alunoEditComplemento?.value || '').trim();
+  const preview = composeStudentLabel(nome, numero, complemento);
+
+  els.alunoEditPreview.textContent = preview || 'Selecione um aluno para editar';
+}
+
+function fillStudentEditor(alunoId) {
+  const aluno = (state.alunos || []).find((item) => String(item.AlunoID || '') === String(alunoId || ''));
+  if (!aluno) {
+    showError('Aluno não encontrado.');
+    return false;
+  }
+
+  const parsed = splitStudentLabel(aluno.Nome || '');
+  if (els.alunoEditId) els.alunoEditId.value = String(aluno.AlunoID || '');
+  if (els.alunoEditNome) els.alunoEditNome.value = parsed.nomeBase || aluno.NomeBase || aluno.Nome || '';
+  if (els.alunoEditNumero) els.alunoEditNumero.value = `#${parsed.numero || aluno.Numero || ''}`.trim();
+  if (els.alunoEditComplemento) els.alunoEditComplemento.value = parsed.complemento || aluno.Complemento || '';
+  if (els.alunoEditCelular) els.alunoEditCelular.value = formatToBrPhone(aluno.CELULAR || '');
+  if (els.alunoEditTurma) els.alunoEditTurma.value = aluno.TurmaID || '';
+  updateEditorPreview();
+  return true;
+}
+
+function openStudentEditor(alunoId) {
+  if (isRestrictedMode()) {
+    showError('Ação indisponível neste modo.');
+    return;
+  }
+
+  if (!fillStudentEditor(alunoId)) return;
+  setRegistrationTab('manage');
+  els.alunoEditNome?.focus();
+}
+
+function clearStudentEditor() {
+  if (els.alunoEditId) els.alunoEditId.value = '';
+  if (els.alunoEditNome) els.alunoEditNome.value = '';
+  if (els.alunoEditNumero) els.alunoEditNumero.value = '';
+  if (els.alunoEditComplemento) els.alunoEditComplemento.value = '';
+  if (els.alunoEditCelular) els.alunoEditCelular.value = '';
+  if (els.alunoEditTurma) els.alunoEditTurma.value = '';
+  if (els.alunoEditPreview) els.alunoEditPreview.textContent = 'Selecione um aluno para editar';
+}
+
+async function saveStudentEdit(event) {
+  if (isRestrictedMode()) {
+    showError('Ação indisponível neste modo.');
+    return;
+  }
+
+  event.preventDefault();
+  const alunoId = String(els.alunoEditId?.value || '').trim();
+  const nome = String(els.alunoEditNome?.value || '').trim();
+  const complemento = String(els.alunoEditComplemento?.value || '').trim();
+  const celular = formatToBrPhone(els.alunoEditCelular?.value || '');
+  const turmaId = String(els.alunoEditTurma?.value || '').trim();
+
+  if (!alunoId) {
+    showError('Selecione um aluno para editar.');
+    return;
+  }
+  if (!nome) {
+    showError('Informe o nome do aluno.');
+    return;
+  }
+  if (!turmaId) {
+    showError('Selecione uma turma.');
+    return;
+  }
+
+  showBusy('Salvando edição...');
+  const result = await apiPost({
+    action: 'editAluno',
+    alunoId,
+    nome,
+    complemento,
+    celular,
+    turmaId,
+  });
+
+  showSuccess(result.message || 'Aluno atualizado.');
+  if (window.ProjectMemory) {
+    window.ProjectMemory.recordFromEvent('edit-aluno', {
+      alunoId,
+      nome,
+      turmaId,
+      numero: result.aluno?.numero || '',
+    });
+  }
+
+  await refreshFromBackend(false);
+  clearStudentEditor();
+  setRegistrationTab('add');
+  renderAll();
+}
+
+async function deleteSelectedStudent() {
+  if (isRestrictedMode()) {
+    showError('Ação indisponível neste modo.');
+    return;
+  }
+
+  const alunoId = String(els.alunoEditId?.value || '').trim();
+  if (!alunoId) {
+    showError('Selecione um aluno para excluir.');
+    return;
+  }
+
+  const aluno = getEditorStudent();
+  const confirmText = aluno
+    ? `Excluir ${aluno.Nome}? O aluno sairá do cadastro do site e da planilha.`
+    : 'Excluir este aluno?';
+
+  if (!window.confirm(confirmText)) return;
+
+  showBusy('Excluindo aluno...');
+  const result = await apiPost({
+    action: 'deleteAluno',
+    alunoId,
+  });
+
+  showSuccess(result.message || 'Aluno removido.');
+  if (window.ProjectMemory && aluno) {
+    window.ProjectMemory.recordFromEvent('delete-aluno', {
+      alunoId,
+      nome: aluno.Nome,
+      turmaId: aluno.TurmaID,
+      numero: aluno.Numero || '',
+    });
+  }
+
+  await refreshFromBackend(false);
+  clearStudentEditor();
+  setRegistrationTab('add');
+  renderAll();
+}
+
+function manualEditStudentOnWhatsApp() {
+  const aluno = getEditorStudent();
+  if (!aluno) {
+    showError('Selecione um aluno para abrir o WhatsApp.');
+    return;
+  }
+
+  const url = buildWhatsAppEditUrl(aluno.Nome, aluno.TurmaNome || aluno.TurmaID || '');
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+
+async function deleteStudent(alunoId) {
+  if (isRestrictedMode()) {
+    showError('Ação indisponível neste modo.');
+    return;
+  }
+
+  if (!fillStudentEditor(alunoId)) return;
+
+  try {
+    await deleteSelectedStudent();
+  } catch (err) {
+    showError(err.message || 'Falha ao excluir aluno.');
+  }
+}
+
+function moveStudent(alunoId) {
+  if (isRestrictedMode()) {
+    showError('Ação indisponível neste modo.');
+    return;
+  }
+  const turmaAtual = getCurrentTurma();
+  const turmas = getTurmasSorted().filter((t) => !turmaAtual || t.TurmaID !== turmaAtual.TurmaID);
+  if (!turmas.length) {
+    showError('Cadastre outra turma antes de mover aluno.');
+    return;
+  }
+
+  const destino = window.prompt(
+    `Digite o ID da turma destino:\n\n${turmas.map((t) => `${t.Nome} → ${t.TurmaID}`).join('\n')}`
+  );
+
+  if (!destino) return;
+  const turmaDestino = turmas.find((t) => t.TurmaID === destino.trim()) || null;
+  if (!turmaDestino) {
+    showError('Turma destino inválida.');
+    return;
+  }
+
+  apiPost({
+    action: 'moveAluno',
+    alunoId,
+    turmaId: turmaDestino.TurmaID,
+  })
+    .then(async (res) => {
+      showSuccess(res.message || 'Aluno movido com sucesso.');
+      if (window.ProjectMemory) {
+        window.ProjectMemory.recordFromEvent('move-student', {
+          alunoNome: String(alunoId || ''),
+          turmaDestino: turmaDestino.Nome,
+          turmaId: turmaDestino.TurmaID,
+        });
+      }
+      await refreshFromBackend(false);
+      renderAll();
+    })
+    .catch((err) => showError(err.message || 'Falha ao mover aluno.'));
+}
+
+function toggleStudentStatus(alunoId) {
+  if (isRestrictedMode()) {
+    showError('Ação indisponível neste modo.');
+    return;
+  }
+  const aluno = state.alunos.find((a) => a.AlunoID === alunoId);
+  if (!aluno) return;
+  const ativo = String(aluno.Ativo || 'sim').toLowerCase() === 'nao';
+  const novoAtivo = ativo ? 'sim' : 'nao';
+
+  apiPost({
+    action: 'toggleAluno',
+    alunoId,
+    ativo: novoAtivo,
+  })
+    .then(async (res) => {
+      showSuccess(res.message || 'Status atualizado.');
+      if (window.ProjectMemory) {
+        window.ProjectMemory.recordFromEvent('toggle-student-status', {
+          alunoNome: aluno.Nome,
+          status: novoAtivo === 'sim' ? 'ativo' : 'inativo',
+        });
+      }
+      await refreshFromBackend(false);
+      renderAll();
+    })
+    .catch((err) => showError(err.message || 'Falha ao atualizar status.'));
+}
+
+async function addTurma(event) {
+  if (isRestrictedMode()) {
+    showError('Ação indisponível neste modo.');
+    return;
+  }
+  event.preventDefault();
+  const nome = els.turmaNome.value.trim();
+  const ordem = els.turmaOrdem.value.trim() || '0';
+  if (!nome) {
+    showError('Informe o nome da turma.');
+    return;
+  }
+
+  showBusy('Cadastrando turma...');
+  const result = await apiPost({
+    action: 'addTurma',
+    nome,
+    ordem,
+  });
+
+  showSuccess(result.message || 'Turma cadastrada.');
+  if (window.ProjectMemory) {
+    window.ProjectMemory.recordFromEvent('add-turma', {
+      nome,
+      ordem,
+    });
+  }
+  els.turmaNome.value = '';
+  els.turmaOrdem.value = '';
+  await refreshFromBackend(false);
+  state.selectedTurmaId = result.turmaId || state.selectedTurmaId;
+  renderAll();
+}
+
+async function addAluno(event) {
+  if (isRestrictedMode()) {
+    showError('Ação indisponível neste modo.');
+    return;
+  }
+  event.preventDefault();
+  const nome = els.alunoNome.value.trim();
+  const celular = formatToBrPhone(els.alunoCelular.value);
+  const turmaId = els.alunoTurma.value;
+  if (!nome) {
+    showError('Informe o nome do aluno.');
+    return;
+  }
+  if (!turmaId) {
+    showError('Selecione uma turma.');
+    return;
+  }
+
+  showBusy('Cadastrando aluno...');
+  const result = await apiPost({
+    action: 'addAluno',
+    nome,
+    celular,
+    turmaId,
+  });
+
+  showSuccess(result.message || 'Aluno cadastrado.');
+  if (window.ProjectMemory) {
+    window.ProjectMemory.recordFromEvent('add-aluno', {
+      nome,
+      turmaId,
+      turmaNome: getTurmasSorted().find((t) => String(t.TurmaID || '') === String(turmaId || ''))?.Nome || turmaId,
+      numero: result.aluno?.numero || '',
+    });
+  }
+  els.alunoNome.value = '';
+  els.alunoCelular.value = '';
+  await refreshFromBackend(false);
+  renderAll();
+}
+
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(
+    () => showSuccess('Texto copiado para a área de transferência.'),
+    () => showError('Não foi possível copiar o texto.')
+  );
+}
+
+function clearCurrentCall() {
+  if (isRestrictedMode()) {
+    showError('Ação indisponível neste modo.');
+    return;
+  }
+  const call = getCurrentCall();
+  if (!call) return;
+  const ok = window.confirm('Limpar a chamada desta turma nesta data? Isso só altera a tela atual até salvar novamente.');
+  if (!ok) return;
+  call.rows.forEach((row) => {
+    row.presenca = 'nao';
+    row.atraso = false;
+    row.salvo = 0;
+    row.SALVO = 0;
+    row.observacao = '';
+  });
+  call.oferta = '';
+  call.visitantes = 0;
+  call.biblias = 0;
+  call.revistas = 0;
+  state.dirty = true;
+  persistDraft(call);
+  if (window.ProjectMemory) {
+    window.ProjectMemory.recordFromEvent('clear-call', {
+      dateKey: state.dateKey,
+      turmaNome: getCurrentTurma()?.Nome || '',
+      turmaId: getCurrentTurma()?.TurmaID || '',
+    });
+  }
+  renderAll();
+}
+
+async function saveAndAdvance() {
+  if (isRestrictedMode()) {
+    showError('Ação indisponível neste modo.');
+    return;
+  }
+  const currentIndex = getTurmasSorted().findIndex((t) => t.TurmaID === state.selectedTurmaId);
+  await saveCurrentCall();
+  const next = getTurmasSorted()[(currentIndex + 1) % getTurmasSorted().length];
+  if (next) {
+    state.selectedTurmaId = next.TurmaID;
+    loadSelectedTurma();
+    renderAll();
+  }
+}
+
+function loadSelectedTurma() {
+  const turma = getCurrentTurma();
+  if (!turma) return;
+  let call = state.chamadasByTurma[turma.TurmaID];
+  if (!call) {
+    call = blankCallForTurma(turma);
+    call = restoreDraft(call);
+    state.chamadasByTurma[turma.TurmaID] = call;
+  }
+}
+
+function renderAll() {
+  applyAccessMode();
+  renderResponsavelLabel();
+  updateSaveButtonVisibility();
+  updateActionNotice();
+  renderTurmaSelects();
+  loadSelectedTurma();
+  renderSummary();
+  renderStudents();
+  renderReports();
+  bindCallFieldValues();
+  refreshCadastroPreview();
+}
+
+function bindCallFieldValues() {
+  const call = getCurrentCall();
+  if (!call) return;
+
+  const ofertaInput = document.getElementById('ofertaInput');
+  const visitantesInput = document.getElementById('visitantesInput');
+  const bibliasInput = document.getElementById('bibliasInput');
+  const revistasInput = document.getElementById('revistasInput');
+  //const visitantesTextoInput = document.getElementById('visitantesTextoInput');
+
+  if (ofertaInput) {
+    ofertaInput.value = formatCurrencyBR(call.oferta ?? 0);
+  }
+
+  if (visitantesInput) {
+    visitantesInput.value = normalizeNumericInputValue_(call.visitantes ?? 0);
+  }
+
+  if (bibliasInput) {
+    bibliasInput.value = normalizeNumericInputValue_(call.biblias ?? 0);
+  }
+
+  if (revistasInput) {
+    revistasInput.value = normalizeNumericInputValue_(call.revistas ?? 0);
+  }
+
+  if (ofertaInput && !ofertaInput.dataset.bound) {
+    ofertaInput.dataset.bound = '1';
+    ofertaInput.addEventListener('input', (event) => {
+      formatTensToBRL(event);
+
+      const current = getCurrentCall();
+      if (!current) return;
+
+      current.oferta = parseCurrencyBR(event.target.value);
+      persistDraft(current);
+      markDirty();
+      renderSummary();
+      renderReports();
+    });
+  }
+
+  if (visitantesInput && !visitantesInput.dataset.bound) {
+    visitantesInput.dataset.bound = '1';
+    visitantesInput.addEventListener('input', (event) => {
+      const current = getCurrentCall();
+      if (!current) return;
+
+      const sanitized = syncNumericInputField(event.target, {
+        max: 50,
+        alertOnClamp: true,
+        alertLabel: 'O número máximo permitido para visitantes',
+      });
+
+      current.visitantes = sanitized;
+      updateCallFromInputs();
+      persistDraft(current);
+      markDirty();
+      renderSummary();
+      renderReports();
+    });
+  }
+
+  if (bibliasInput && !bibliasInput.dataset.bound) {
+    bibliasInput.dataset.bound = '1';
+    bibliasInput.addEventListener('input', (event) => {
+      const current = getCurrentCall();
+      if (!current) return;
+
+      const presentes = getCurrentPresentCount();
+      const visitantes = clampWholeNumber(document.getElementById('visitantesInput')?.value ?? current.visitantes ?? 0, 50);
+      const maxAllowed = presentes + visitantes;
+
+      const sanitized = syncNumericInputField(event.target, {
+        max: maxAllowed,
+        alertOnClamp: true,
+      });
+
+      current.visitantes = visitantes;
+      current.biblias = sanitized;
+      persistDraft(current);
+      markDirty();
+      renderSummary();
+      renderReports();
+    });
+  }
+
+  if (revistasInput && !revistasInput.dataset.bound) {
+    revistasInput.dataset.bound = '1';
+    revistasInput.addEventListener('input', (event) => {
+      const current = getCurrentCall();
+      if (!current) return;
+
+      const presentes = getCurrentPresentCount();
+      const visitantes = clampWholeNumber(document.getElementById('visitantesInput')?.value ?? current.visitantes ?? 0, 50);
+      const maxAllowed = presentes + visitantes;
+
+      const sanitized = syncNumericInputField(event.target, {
+        max: maxAllowed,
+        alertOnClamp: true,
+      });
+
+      current.visitantes = visitantes;
+      current.revistas = sanitized;
+      persistDraft(current);
+      markDirty();
+      renderSummary();
+      renderReports();
+    });
+  }
+}

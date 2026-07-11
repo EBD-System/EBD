@@ -1,0 +1,131 @@
+input[type="text"],
+input[type="search"],
+input[type="number"],
+input[type="date"],
+select,
+textarea{
+  width:100%;
+  border:1px solid var(--line);
+  background:#fff;
+  color:var(--text);
+  border-radius:16px;
+  padding:13px 14px;
+  outline:none;
+  transition:border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+textarea{
+  min-height:220px;
+  resize:vertical;
+}
+input:focus,
+select:focus,
+textarea:focus{
+  border-color:var(--accent);
+  box-shadow:0 0 0 4px rgba(79,134,255,.14);
+}
+.check{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  cursor:pointer;
+  user-select:none;
+  margin-top:28px;
+}
+.check input{
+  width:18px;
+  height:18px;
+  accent-color:var(--accent);
+}
+.call-data{
+  padding:16px;
+  margin-bottom:16px;
+}
+.call-data__grid{
+  display:grid;
+  gap:12px;
+}
+.call-data__wide{
+  grid-column:1/-1;
+}
+.summary-grid{
+  display:grid;
+  gap:12px;
+  grid-template-columns:repeat(2, minmax(0,1fr));
+  margin-bottom:16px;
+@media (min-width: 720px){
+  .hero{
+    grid-template-columns:1.45fr .95fr;
+    align-items:stretch;
+  }
+  .toolbar{
+    grid-template-columns:repeat(2, minmax(0,1fr));
+    align-items:end;
+  }
+  .toolbar__group--wide{
+    grid-column:1/-1;
+  }
+  .call-data{
+  padding:16px;
+  margin-bottom:16px;
+}
+.call-data__grid{
+  display:grid;
+  gap:12px;
+}
+.call-data__wide{
+  grid-column:1/-1;
+}
+.summary-grid{
+    grid-template-columns:repeat(3, minmax(0,1fr));
+  }
+  .panel__head{
+    flex-direction:row;
+    justify-content:space-between;
+    align-items:flex-start;
+  }
+  .forms-grid{
+    grid-template-columns:repeat(2, minmax(0,1fr));
+  }
+  .report-grid{
+    grid-template-columns:repeat(2, minmax(0,1fr));
+  }
+  .student__main{
+    grid-template-columns:1.35fr .9fr;
+    align-items:center;
+  }
+  .student__actions{
+    grid-template-columns:repeat(4, minmax(0,1fr));
+  }
+}
+
+@media (min-width: 1080px){
+  .call-data{
+  padding:16px;
+  margin-bottom:16px;
+}
+.call-data__grid{
+  display:grid;
+  gap:12px;
+}
+.call-data__wide{
+  grid-column:1/-1;
+}
+.summary-grid{
+    grid-template-columns:repeat(6, minmax(0,1fr));
+  }
+}
+
+@media (max-width: 420px){
+  .app{
+    width:min(100% - 12px, 1280px);
+  }
+  .hero-copy,
+  .hero-panel,
+  .toolbar,
+  .panel,
+  .stat,
+  .student,
+  .mini-form{
+    border-radius:20px;
+  }
+}
