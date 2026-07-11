@@ -16,6 +16,8 @@ Pontos centrais:
 - O cliente agora envia POST como `application/x-www-form-urlencoded`, além de repetir a query string e o alias `acao`, para melhorar a compatibilidade com o Apps Script.
 - O Web App do Apps Script pode redirecionar POST para GET; por isso, salvamentos precisam ter `action` também na query string e o backend deve aceitar a mesma rota em `doGet`.
 - O modo `restricted` também pode editar alunos; apenas o modo `self` segue bloqueado para edição.
+- Na edição de aluno, o campo `Status` está visível, mas fica desativado temporariamente na interface.
+- A página de edição também ganhou ação de exclusão do aluno, confirmada antes do envio ao backend.
 
 
 - O carregamento inicial do frontend usa `apiGet` com timeout, para evitar overlay infinito quando o Apps Script demora ou falha.

@@ -62,7 +62,7 @@ const LEGACY_SHEETS = [
 ];
 
 const AUTO_CUTOFF_MINUTES = 9 * 60 + 25;
-const BACKEND_VERSION = '2026.07.11-1';
+const BACKEND_VERSION = '2026.07.11-2';
 const BACKEND_DEPLOYED_AT = '2026-07-11T00:00:00-03:00';
 
 function normalizeStudentStatus_(value) {
@@ -104,6 +104,10 @@ function routeRequest_(params, allowReadActions = false) {
         return json_(moveAluno_(p));
       case 'togglealuno':
         return json_(toggleAluno_(p));
+      case 'deletealuno':
+      case 'excluiraluno':
+      case 'removealuno':
+        return json_(deleteAluno_(p));
       case 'updatealuno':
       case 'updatealuno_':
       case 'updatealunoform':
@@ -572,6 +576,26 @@ function toggleAluno_(p) {
   return {
     ok: true,
     message: 'Status atualizado com sucesso.',
+  };
+}
+
+function deleteAluno_(p) {
+  ensureSheets_();
+
+  const alunoId = String(p.alunoId || p.nome || '').trim();
+  if (!alunoId) throw new Error('Aluno inválido.');
+
+  const sheet = getOrCreateSheet_(SHEETS.CADASTRO, CADASTRO_HEADERS);
+  const rows = loadSheetObjects_(SHEETS.CADASTRO, CADASTRO_HEADERS);
+  const row = findCadastroAlunoByIdentifier_(rows, alunoId);
+  if (!row) throw new Error('Aluno não encontrado no Cadastro.');
+
+  if (!row._rowNumber) throw new Error('Não foi possível localizar a linha do aluno.');
+
+  sheet.deleteRow(row._rowNumber);
+  return {
+    ok: true,
+    message: 'Aluno excluído com sucesso.',
   };
 }
 

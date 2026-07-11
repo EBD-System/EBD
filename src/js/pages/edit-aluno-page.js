@@ -15,6 +15,7 @@
     celular: document.getElementById('studentEditCelular'),
     turma: document.getElementById('studentEditTurma'),
     status: document.getElementById('studentEditStatus'),
+    deleteBtn: document.getElementById('studentEditDelete'),
     cancel: document.getElementById('studentEditCancel'),
     feedback: document.getElementById('feedback'),
   };
@@ -103,12 +104,19 @@
     }
     if (els.status) {
       els.status.value = String(aluno.Status || 'ativo').trim().toLowerCase() === 'inativo' ? 'inativo' : 'ativo';
+      els.status.disabled = true;
+      els.status.title = 'Campo temporariamente bloqueado';
     }
 
     renderTurmaOptions(aluno.TurmaID);
 
     if (els.cancel) {
       els.cancel.href = buildBackUrl();
+    }
+
+    if (els.deleteBtn) {
+      els.deleteBtn.disabled = false;
+      els.deleteBtn.title = '';
     }
 
     setLoadingVisible(false);
@@ -190,7 +198,8 @@
       return;
     }
 
-    showBusy('Salvando alterações...');
+    showLoading('Salvando...', 25000);
+    setFeedback('info', 'Salvando...');
 
     try {
       const result = await apiPost({
@@ -219,7 +228,46 @@
       }, 900);
     } catch (err) {
       showError(err.message || 'Falha ao salvar aluno.');
+    } finally {
+      hideLoading();
     }
+  }
+
+  async function deleteAluno() {
+    if (!alunoAtual) {
+      setFeedback('error', 'Carregue um aluno antes de excluir.');
+      return;
+    }
+
+    const confirmed = window.confirm('Excluir este aluno? Esta ação não pode ser desfeita.');
+    if (!confirmed) return;
+
+    showLoading('Excluindo...', 25000);
+
+    try {
+      const result = await apiPost({
+        action: 'deletealuno',
+        alunoId: alunoOriginalKey || alunoKey || alunoAtual.Nome || alunoAtual.AlunoID,
+        nome: alunoAtual.Nome || '',
+      });
+
+      showSuccess(result.message || 'Aluno excluído com sucesso.');
+
+      const backUrl = buildBackUrl();
+      setTimeout(() => {
+        window.location.href = backUrl;
+      }, 900);
+    } catch (err) {
+      showError(err.message || 'Falha ao excluir aluno.');
+    } finally {
+      hideLoading();
+    }
+  }
+
+  if (els.deleteBtn) {
+    els.deleteBtn.addEventListener('click', () => {
+      deleteAluno().catch((err) => showError(err.message || 'Falha ao excluir aluno.'));
+    });
   }
 
   if (els.form) {
