@@ -473,202 +473,19 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
   }
 
   try {
-    // =========================================
-    // DEBUG BOX
-    // =========================================
-    if (showDebugBox) {
-      let debugBox = document.getElementById('debugBackendJson');
+    const data = await apiGet(
+      {
+        action: 'init',
+        date: state.dateKey,
+      },
+      { timeoutMs: 30000 }
+    );
 
-      if (!debugBox) {
-        debugBox = document.createElement('pre');
-        debugBox.id = 'debugBackendJson';
-
-        debugBox.style.cssText = `
-          position:fixed;
-          left:10px;
-          right:10px;
-          bottom:10px;
-          max-height:45vh;
-          overflow:auto;
-          z-index:999999999;
-          background:#000;
-          color:#00ff88;
-          padding:14px;
-          border-radius:12px;
-          font-size:11px;
-          line-height:1.4;
-          border:2px solid #333;
-          white-space:pre-wrap;
-          word-break:break-word;
-          box-shadow:0 0 30px rgba(0,0,0,.5);
-        `;
-
-        document.body.appendChild(debugBox);
-      }
-
-      debugBox.textContent = '⏳ Iniciando carregamento do backend...\n';
-    }
-
-    // =========================================
-    // CHAMADA API
-    // =========================================
-
-    const urlFinal = apiUrl({
-      action: 'init',
-      date: state.dateKey,
-    });
-
-    if (showDebugBox) {
-      const debugBox = document.getElementById('debugBackendJson');
-      if (debugBox) {
-        debugBox.textContent += '\n🌐 URL:\n' + urlFinal + '\n';
-      }
-    }
-
-    const response = await fetch(urlFinal, {
-      method: 'GET',
-      mode: 'cors',
-      cache: 'no-store',
-    });
-
-    if (showDebugBox) {
-      const debugBox = document.getElementById('debugBackendJson');
-      if (debugBox) {
-        debugBox.textContent +=
-          '\n📡 STATUS HTTP:\n' +
-          response.status + ' ' + response.statusText + '\n';
-      }
-    }
-
-    const rawText = await response.text();
-
-    if (showDebugBox) {
-      const debugBox = document.getElementById('debugBackendJson');
-      if (debugBox) {
-        debugBox.textContent +=
-          '\n📦 RAW RESPONSE:\n' +
-          rawText.slice(0, 15000) + '\n';
-      }
-    }
-
-    let data = null;
-
-    try {
-      data = JSON.parse(rawText);
-
-      if (showDebugBox) {
-        const debugBox = document.getElementById('debugBackendJson');
-        if (debugBox) {
-          debugBox.textContent += '\n✅ JSON PARSEADO COM SUCESSO\n';
-        }
-      }
-    } catch (jsonErr) {
-      if (showDebugBox) {
-        const debugBox = document.getElementById('debugBackendJson');
-        if (debugBox) {
-          debugBox.textContent +=
-            '\n❌ ERRO AO PARSEAR JSON:\n' +
-            jsonErr.message + '\n';
-        }
-      }
-
-      throw jsonErr;
-    }
-
-    // =========================================
-    // INSPEÇÃO DO JSON
-    // =========================================
-
-    if (showDebugBox) {
-      const debugBox = document.getElementById('debugBackendJson');
-      if (debugBox) {
-        debugBox.textContent +=
-          '\n============================\n' +
-          '📊 ESTRUTURA DO JSON\n' +
-          '============================\n';
-
-        debugBox.textContent +=
-          '\nTurmas: ' +
-          (Array.isArray(data.turmas)
-            ? data.turmas.length
-            : 'NÃO É ARRAY');
-
-        debugBox.textContent +=
-          '\nAlunos: ' +
-          (Array.isArray(data.alunos)
-            ? data.alunos.length
-            : 'NÃO É ARRAY');
-
-        debugBox.textContent +=
-          '\nCallsByTurma keys: ' +
-          Object.keys(data.callsByTurma || {}).length;
-
-        debugBox.textContent +=
-          '\nResumo geral existe: ' +
-          (!!data.resumoGeral);
-
-        debugBox.textContent +=
-          '\nBaseRowsCount: ' +
-          data.baseRowsCount;
-      }
-    }
-
-    // =========================================
-    // PRIMEIRA CHAMADA
-    // =========================================
-
-    const firstCall =
-      Object.values(data.callsByTurma || {})[0];
-
-    if (showDebugBox) {
-      const debugBox = document.getElementById('debugBackendJson');
-      if (debugBox) {
-        debugBox.textContent +=
-          '\n\n============================\n' +
-          '📞 PRIMEIRA CALL\n' +
-          '============================\n';
-
-        debugBox.textContent += JSON.stringify({
-          chamadaId: firstCall?.chamadaId,
-          turmaId: firstCall?.turmaId,
-          turmaNome: firstCall?.turmaNome,
-          oferta: firstCall?.oferta,
-          visitantes: firstCall?.visitantes,
-          biblias: firstCall?.biblias,
-          revistas: firstCall?.revistas,
-          //visitantesTexto: firstCall?.visitantesTexto,
-          totalRows: firstCall?.rows?.length,
-          firstRow: firstCall?.rows?.[0],
-        }, null, 2);
-      }
-    }
-
-    // =========================================
-    // APLICAÇÃO NO STATE
-    // =========================================
-
-    state.turmas =
-      Array.isArray(data.turmas)
-        ? data.turmas
-        : [];
-
-    state.alunos =
-      Array.isArray(data.alunos)
-        ? data.alunos
-        : [];
-
-    state.chamadasByTurma =
-      data.callsByTurma || {};
-
-    state.resumoGeral =
-      data.resumoGeral || null;
-
-    state.baseRowsCount =
-      Number(
-        data.baseRowsCount ||
-        state.baseRowsCount ||
-        0
-      );
+    state.turmas = Array.isArray(data.turmas) ? data.turmas : [];
+    state.alunos = Array.isArray(data.alunos) ? data.alunos : [];
+    state.chamadasByTurma = data.callsByTurma || {};
+    state.resumoGeral = data.resumoGeral || null;
+    state.baseRowsCount = Number(data.baseRowsCount || state.baseRowsCount || 0);
 
     if (window.ProjectMemory && data.memory) {
       try {
@@ -678,111 +495,11 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
       }
     }
 
-    if (showDebugBox) {
-      const debugBox = document.getElementById('debugBackendJson');
-      if (debugBox) {
-        debugBox.textContent += '\n\n✅ STATE ATUALIZADO';
-
-        debugBox.textContent +=
-          '\nstate.turmas: ' +
-          state.turmas.length;
-
-        debugBox.textContent +=
-          '\nstate.alunos: ' +
-          state.alunos.length;
-
-        debugBox.textContent +=
-          '\nstate.calls: ' +
-          Object.keys(state.chamadasByTurma).length;
-      }
-    }
-
-    // =========================================
-    // TURMA SELECIONADA
-    // =========================================
-
     if (
       !state.selectedTurmaId ||
-      !state.turmas.some(
-        (t) => t.TurmaID === state.selectedTurmaId
-      )
+      !state.turmas.some((t) => String(t.TurmaID) === String(state.selectedTurmaId))
     ) {
-      state.selectedTurmaId =
-        state.turmas[0]?.TurmaID || '';
-    }
-
-    if (showDebugBox) {
-      const debugBox = document.getElementById('debugBackendJson');
-      if (debugBox) {
-        debugBox.textContent +=
-          '\n\n🎯 selectedTurmaId:\n' +
-          state.selectedTurmaId;
-      }
-    }
-
-    // =========================================
-    // TESTE getCurrentCall()
-    // =========================================
-
-    try {
-      const testCall = getCurrentCall();
-
-      if (showDebugBox) {
-        const debugBox = document.getElementById('debugBackendJson');
-        if (debugBox) {
-          debugBox.textContent +=
-            '\n\n============================\n' +
-            '🧪 TESTE getCurrentCall()\n' +
-            '============================\n';
-
-          debugBox.textContent += JSON.stringify({
-            exists: !!testCall,
-            turmaId: testCall?.turmaId,
-            chamadaId: testCall?.chamadaId,
-            rows: testCall?.rows?.length,
-            oferta: testCall?.oferta,
-            visitantes: testCall?.visitantes,
-            biblias: testCall?.biblias,
-            revistas: testCall?.revistas,
-          }, null, 2);
-        }
-      }
-    } catch (err) {
-      if (showDebugBox) {
-        const debugBox = document.getElementById('debugBackendJson');
-        if (debugBox) {
-          debugBox.textContent +=
-            '\n\n❌ ERRO getCurrentCall():\n' +
-            err.message;
-        }
-      }
-    }
-
-    // =========================================
-    // RENDER
-    // =========================================
-
-    try {
-      renderAll();
-
-      if (showDebugBox) {
-        const debugBox = document.getElementById('debugBackendJson');
-        if (debugBox) {
-          debugBox.textContent +=
-            '\n\n✅ renderAll() executado';
-        }
-      }
-    } catch (renderErr) {
-      if (showDebugBox) {
-        const debugBox = document.getElementById('debugBackendJson');
-        if (debugBox) {
-          debugBox.textContent +=
-            '\n\n❌ ERRO NO RENDER:\n' +
-            renderErr.message +
-            '\n\nSTACK:\n' +
-            renderErr.stack;
-        }
-      }
+      state.selectedTurmaId = state.turmas[0]?.TurmaID || '';
     }
 
     if (showMessage) {
@@ -790,36 +507,11 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
     }
   } catch (err) {
     console.error(err);
-
-    const showDebugBox = false;
-
-    if (showDebugBox) {
-      const debugBox =
-        document.getElementById('debugBackendJson');
-
-      if (debugBox) {
-        debugBox.textContent +=
-          '\n\n============================\n' +
-          '❌ ERRO GERAL\n' +
-          '============================\n' +
-          err.message +
-          '\n\nSTACK:\n' +
-          (err.stack || '');
-      }
-    }
-
-    showError(
-      err?.message ||
-      'Erro ao carregar dados.'
-    );
+    showError(err?.message || 'Erro ao carregar dados.');
   } finally {
     state.loading = false;
-
     if (!silent) {
       hideLoading();
     }
   }
 }
-
-
-

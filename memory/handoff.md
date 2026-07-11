@@ -16,3 +16,7 @@ Pontos centrais:
 - O cliente agora envia POST como `application/x-www-form-urlencoded`, além de repetir a query string, para melhorar a compatibilidade com o Apps Script.
 - O Web App do Apps Script pode redirecionar POST para GET; por isso, salvamentos precisam ter `action` também na query string e o backend deve aceitar a mesma rota em `doGet`.
 
+
+- O carregamento inicial do frontend usa `apiGet` com timeout, para evitar overlay infinito quando o Apps Script demora ou falha.
+- O envio de atualização de aluno faz fallback automático para GET quando o POST retorna `Ação inválida`, para contornar inconsistências de roteamento no Apps Script.
+- A edição de aluno agora pode preservar turma e status atuais quando esses campos não vierem preenchidos no payload.

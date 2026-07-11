@@ -143,6 +143,12 @@ async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.max(5000, Number(timeoutMs) || 30000));
+
+  const shouldRetryAsGet = (err) => {
+    const message = String(err?.message || err || '');
+    return /ação inválida|acao inválida|action invalid|aç[aã]o inválida/i.test(message);
+  };
+
   try {
     const response = await fetch(apiUrl(queryParams), {
       method: 'POST',
@@ -154,7 +160,21 @@ async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
       body: bodyParams.toString(),
       signal: controller.signal,
     });
-    return await parseJsonResponse(response);
+
+    try {
+      return await parseJsonResponse(response);
+    } catch (err) {
+      if (shouldRetryAsGet(err)) {
+        const fallbackResponse = await fetch(apiUrl(queryParams), {
+          method: 'GET',
+          mode: 'cors',
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        return await parseJsonResponse(fallbackResponse);
+      }
+      throw err;
+    }
   } catch (err) {
     if (err?.name === 'AbortError') {
       throw new Error('O salvamento demorou demais. Verifique sua conexão e tente novamente.');

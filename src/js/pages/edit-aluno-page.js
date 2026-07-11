@@ -177,8 +177,8 @@
 
     const nome = String(els.name?.value || '').trim();
     const celular = formatToBrPhone(els.celular?.value || '');
-    const turmaId = String(els.turma?.value || '').trim();
-    const status = String(els.status?.value || 'ativo').trim().toLowerCase();
+    const turmaId = String(els.turma?.value || alunoAtual.TurmaID || '').trim();
+    const status = String(els.status?.value || alunoAtual.Status || 'ativo').trim().toLowerCase();
 
     if (!nome) {
       setFeedback('error', 'Informe o nome do aluno.');

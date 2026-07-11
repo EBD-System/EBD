@@ -80,7 +80,7 @@ function doPost(e) {
 
 function routeRequest_(params, allowReadActions = false) {
   const p = params || {};
-  const action = String(p.action || p.acao || 'init').trim().toLowerCase();
+  const action = String(p.action || p.acao || '').trim().toLowerCase();
 
   try {
     switch (action) {
@@ -105,10 +105,17 @@ function routeRequest_(params, allowReadActions = false) {
       case 'updatealuno':
       case 'updatealuno_':
       case 'updatealunoform':
+      case 'updatealunopayload':
+      case 'updatealunoedit':
+      case 'editaluno':
+      case 'editalunoform':
         return json_(updateAluno_(p));
       case 'sendreport':
         return json_(sendReport_(p));
       default:
+        if (looksLikeAlunoUpdate_(p)) {
+          return json_(updateAluno_(p));
+        }
         return json_({ ok: false, message: `Ação inválida. (${action || 'vazia'})` });
     }
   } catch (err) {
@@ -466,25 +473,40 @@ function addAluno_(p) {
   return { ok: true, message: 'Aluno cadastrado com sucesso.' };
 }
 
+function updateAluno(alunoId, nome, celular, turmaId, status) {
+  return updateAluno_({
+    alunoId,
+    nome,
+    celular,
+    turmaId,
+    status,
+  });
+}
+
 function updateAluno_(p) {
   ensureSheets_();
 
-  // Atualiza diretamente a aba "cadastro" da planilha.
+  const sheet = getOrCreateSheet_(SHEETS.CADASTRO, CADASTRO_HEADERS);
+  const rows = readAllRows_(sheet, CADASTRO_HEADERS);
 
   const alunoId = String(p.alunoId || p.nome || '').trim();
   const nome = String(p.nome || '').trim();
-  const celular = digitsOnly_(p.celular || '').slice(0, 11);
-  const turmaId = String(p.turmaId || '').trim();
-  const status = normalizeStudentStatus_(p.status || p.ativo || 'ativo');
+  const desiredStatus = String(p.status ?? p.ativo ?? '').trim();
 
   if (!alunoId) throw new Error('Aluno inválido.');
   if (!nome) throw new Error('Informe o nome do aluno.');
-  if (!turmaId) throw new Error('Selecione uma classe.');
 
-  const sheet = getOrCreateSheet_(SHEETS.CADASTRO, CADASTRO_HEADERS);
-  const rows = readAllRows_(sheet, CADASTRO_HEADERS);
   const row = findCadastroAlunoByIdentifier_(rows, alunoId);
   if (!row) throw new Error('Aluno não encontrado no Cadastro.');
+
+  const turmaId = String(p.turmaId || row.CLASSE || '').trim();
+  if (!turmaId) throw new Error('Selecione uma classe.');
+
+  const celular = digitsOnly_(
+    Object.prototype.hasOwnProperty.call(p, 'celular')
+      ? p.celular
+      : row.CELULAR || ''
+  ).slice(0, 11);
 
   const duplicate = rows.some(other =>
     other !== row &&
@@ -498,7 +520,7 @@ function updateAluno_(p) {
   row.ALUNO = nome;
   row.CLASSE = turmaId;
   row.CELULAR = celular;
-  row.STATUS = status;
+  row.STATUS = desiredStatus ? normalizeStudentStatus_(desiredStatus) : normalizeStudentStatus_(row.STATUS || 'ativo');
 
   writeAllRows_(sheet, CADASTRO_HEADERS, rows);
   return { ok: true, message: 'Aluno atualizado com sucesso.' };
@@ -1573,6 +1595,16 @@ function findCadastroAlunoByIdentifier_(cadastroRows, identifier) {
   }
 
   return null;
+}
+
+
+function looksLikeAlunoUpdate_(p) {
+  if (!p) return false;
+  const hasAlunoId = Object.prototype.hasOwnProperty.call(p, 'alunoId') && String(p.alunoId || '').trim() !== '';
+  if (hasAlunoId) return true;
+  const hasNome = Object.prototype.hasOwnProperty.call(p, 'nome') && String(p.nome || '').trim() !== '';
+  const hasTurma = Object.prototype.hasOwnProperty.call(p, 'turmaId') && String(p.turmaId || '').trim() !== '';
+  return hasNome && hasTurma;
 }
 
 function getCallLevelValue_(rows, field, asNumber = false) {
