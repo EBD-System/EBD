@@ -10,9 +10,10 @@ Pontos centrais:
 - O endpoint `health` existe para checagem rápida do backend.
 - Decisões arquiteturais devem ficar em arquivos curtos dentro de `memory/`.
 
-- A edição de aluno agora acontece em uma página dedicada em `aluno/editar-aluno/`.
+- A edição de aluno acontece em uma página dedicada em `aluno/editar-aluno/`.
 - O botão **Editar** leva para essa rota com o `alunoId` do cadastro e o código após `#` continua somente leitura.
 - O fluxo de edição grava alterações diretamente na aba `cadastro` da planilha.
-- O cliente normaliza a ação de edição para `updatealuno` antes do POST, e o backend aceita a variação em minúsculas e a forma histórica.
+- O envio de edição usa `updatealuno` em minúsculas e também repete a ação na query string para contornar redirecionamento do Web App.
 
-- As ações enviadas ao Apps Script são normalizadas para minúsculas no cliente; isso evita erro de rota em deploys sensíveis a caixa.
+- As ações enviadas ao Apps Script são normalizadas para minúsculas no cliente.
+- Quando uma mutação retornar `Ação inválida`, conferir primeiro se a URL publicada do Apps Script recebeu a versão mais recente do backend.

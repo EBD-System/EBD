@@ -71,29 +71,25 @@ function normalizeStudentStatus_(value) {
 }
 
 function doGet(e) {
-  const action = String(e?.parameter?.action || e?.parameter?.acao || 'init').trim().toLowerCase();
-  try {
-    switch (action) {
-      case 'init':
-        return json_(init_(e?.parameter || {}));
-      case 'health':
-        return json_({ ok: true, message: 'ok' });
-      case 'reporttext':
-        return json_(getReportText_(e?.parameter || {}));
-      default:
-        return json_({ ok: false, message: 'Ação inválida.' });
-    }
-  } catch (err) {
-    return json_({ ok: false, message: err?.message || String(err) });
-  }
+  return routeRequest_(e?.parameter || {}, 'get');
 }
 
 function doPost(e) {
-  const p = e?.parameter || {};
-  const action = String(p.action || p.acao || '').trim().toLowerCase();
+  return routeRequest_(e?.parameter || {}, 'post');
+}
+
+function routeRequest_(params, method) {
+  const p = params || {};
+  const action = String(p.action || p.acao || 'init').trim().toLowerCase();
 
   try {
     switch (action) {
+      case 'init':
+        return json_(init_(p));
+      case 'health':
+        return json_({ ok: true, message: 'ok' });
+      case 'reporttext':
+        return json_(getReportText_(p));
       case 'savecall':
         return json_(saveCall_(p));
       case 'selfpresence':
@@ -109,11 +105,15 @@ function doPost(e) {
       case 'updatealuno':
       case 'updatealuno_':
       case 'updatealunoform':
+      case 'updatealuno-page':
+      case 'editaraluno':
+      case 'editaralunoform':
+      case 'salvaraluno':
         return json_(updateAluno_(p));
       case 'sendreport':
         return json_(sendReport_(p));
       default:
-        return json_({ ok: false, message: `Ação inválida. (${action || 'vazia'})` });
+        return json_({ ok: false, message: `Ação inválida. (${action || 'vazia'}${method ? ` • ${method}` : ''})` });
     }
   } catch (err) {
     return json_({ ok: false, message: err?.message || String(err) });
