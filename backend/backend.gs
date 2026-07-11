@@ -71,7 +71,7 @@ function normalizeStudentStatus_(value) {
 }
 
 function doGet(e) {
-  const action = String(e?.parameter?.action || 'init').trim().toLowerCase();
+  const action = String(e?.parameter?.action || e?.parameter?.acao || 'init').trim().toLowerCase();
   try {
     switch (action) {
       case 'init':
@@ -90,7 +90,7 @@ function doGet(e) {
 
 function doPost(e) {
   const p = e?.parameter || {};
-  const action = String(p.action || '').trim().toLowerCase();
+  const action = String(p.action || p.acao || '').trim().toLowerCase();
 
   try {
     switch (action) {
@@ -107,11 +107,13 @@ function doPost(e) {
       case 'togglealuno':
         return json_(toggleAluno_(p));
       case 'updatealuno':
+      case 'updatealuno_':
+      case 'updatealunoform':
         return json_(updateAluno_(p));
       case 'sendreport':
         return json_(sendReport_(p));
       default:
-        return json_({ ok: false, message: 'Ação inválida.' });
+        return json_({ ok: false, message: `Ação inválida. (${action || 'vazia'})` });
     }
   } catch (err) {
     return json_({ ok: false, message: err?.message || String(err) });

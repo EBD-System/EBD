@@ -12,4 +12,7 @@ Pontos centrais:
 
 - A edição de aluno agora acontece em uma página dedicada em `aluno/editar-aluno/`.
 - O botão **Editar** leva para essa rota com o `alunoId` do cadastro e o código após `#` continua somente leitura.
-- O backend usa a ação `updateAluno` para gravar alterações diretamente na aba `cadastro` da planilha.
+- O fluxo de edição grava alterações diretamente na aba `cadastro` da planilha.
+- O cliente normaliza a ação de edição para `updatealuno` antes do POST, e o backend aceita a variação em minúsculas e a forma histórica.
+
+- As ações enviadas ao Apps Script são normalizadas para minúsculas no cliente; isso evita erro de rota em deploys sensíveis a caixa.

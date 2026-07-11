@@ -82,7 +82,12 @@ function showError(message) {
 
 function apiUrl(params = {}) {
   const url = new URL(APPS_SCRIPT_URL);
-  Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
+  Object.entries(params).forEach(([key, value]) => {
+    const normalizedValue = key === 'action' && typeof value === 'string'
+      ? value.trim().toLowerCase()
+      : value;
+    url.searchParams.set(key, normalizedValue);
+  });
   return url.toString();
 }
 
@@ -126,7 +131,11 @@ async function apiGet(params = {}, { timeoutMs = 30000 } = {}) {
 async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
   const formData = new FormData();
   Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null) formData.append(key, value);
+    if (value === undefined || value === null) return;
+    const normalizedValue = key === 'action' && typeof value === 'string'
+      ? value.trim().toLowerCase()
+      : value;
+    formData.append(key, normalizedValue);
   });
 
   const controller = new AbortController();

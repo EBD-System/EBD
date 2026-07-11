@@ -192,7 +192,7 @@
 
     try {
       const result = await apiPost({
-        action: 'updateAluno',
+        action: 'updatealuno',
         alunoId: alunoAtual.AlunoID || alunoId,
         nome,
         celular,

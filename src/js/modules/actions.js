@@ -158,7 +158,7 @@ async function submitStudentEditForm(event) {
 
   showBusy('Salvando alterações...');
   const result = await apiPost({
-    action: 'updateAluno',
+    action: 'updatealuno',
     alunoId,
     nome,
     celular,
