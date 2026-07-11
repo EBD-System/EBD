@@ -87,6 +87,9 @@ function apiUrl(params = {}) {
       ? value.trim().toLowerCase()
       : value;
     url.searchParams.set(key, normalizedValue);
+    if (key === 'action' && normalizedValue !== undefined && normalizedValue !== null) {
+      url.searchParams.set('acao', normalizedValue);
+    }
   });
   return url.toString();
 }
@@ -131,6 +134,8 @@ async function apiGet(params = {}, { timeoutMs = 30000 } = {}) {
 async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
   const bodyParams = new URLSearchParams();
   const queryParams = {};
+  const actionName = String(params.action || params.acao || '').trim().toLowerCase();
+  const canFallbackToGet = ['updatealuno'].includes(actionName);
 
   Object.entries(params).forEach(([key, value]) => {
     if (value === undefined || value === null) return;
@@ -139,6 +144,10 @@ async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
       : value;
     bodyParams.set(key, String(normalizedValue));
     queryParams[key] = normalizedValue;
+    if (key === 'action') {
+      bodyParams.set('acao', String(normalizedValue));
+      queryParams.acao = normalizedValue;
+    }
   });
 
   const controller = new AbortController();
@@ -164,7 +173,7 @@ async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
     try {
       return await parseJsonResponse(response);
     } catch (err) {
-      if (shouldRetryAsGet(err)) {
+      if (shouldRetryAsGet(err) || canFallbackToGet) {
         const fallbackResponse = await fetch(apiUrl(queryParams), {
           method: 'GET',
           mode: 'cors',

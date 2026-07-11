@@ -114,7 +114,7 @@ function buildStudentEditPageUrl(alunoId) {
 }
 
 function openStudentEditModal(alunoId) {
-  if (isRestrictedMode()) {
+  if (isSelfAccessMode()) {
     showError('Ação indisponível neste modo.');
     return;
   }
@@ -130,7 +130,7 @@ function openStudentEditModal(alunoId) {
 }
 
 async function submitStudentEditForm(event) {
-  if (isRestrictedMode()) {
+  if (isSelfAccessMode()) {
     showError('Ação indisponível neste modo.');
     return;
   }

@@ -28,6 +28,10 @@ function isSelfAccessMode() {
   return state.accessMode === 'self';
 }
 
+function canEditStudentRecords() {
+  return state.accessMode === 'full' || state.accessMode === 'restricted';
+}
+
 function applyAccessMode() {
   document.body.classList.toggle('access-restricted', isRestrictedMode());
   document.body.classList.toggle('access-full', state.accessMode === 'full');

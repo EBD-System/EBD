@@ -13,8 +13,9 @@ Pontos centrais:
 - O botão **Editar** leva para essa rota com a chave de edição baseada no nome atual do aluno.
 - O fluxo de edição grava alterações diretamente na aba `cadastro` da planilha.
 - As ações enviadas ao Apps Script são normalizadas para minúsculas no cliente.
-- O cliente agora envia POST como `application/x-www-form-urlencoded`, além de repetir a query string, para melhorar a compatibilidade com o Apps Script.
+- O cliente agora envia POST como `application/x-www-form-urlencoded`, além de repetir a query string e o alias `acao`, para melhorar a compatibilidade com o Apps Script.
 - O Web App do Apps Script pode redirecionar POST para GET; por isso, salvamentos precisam ter `action` também na query string e o backend deve aceitar a mesma rota em `doGet`.
+- O modo `restricted` também pode editar alunos; apenas o modo `self` segue bloqueado para edição.
 
 
 - O carregamento inicial do frontend usa `apiGet` com timeout, para evitar overlay infinito quando o Apps Script demora ou falha.
