@@ -7,6 +7,7 @@
     title: document.getElementById('studentEditTitle'),
     subtitle: document.getElementById('studentEditSubtitle'),
     code: document.getElementById('studentEditCode'),
+    codeValue: document.getElementById('studentEditCodeValue'),
     turmaLabel: document.getElementById('studentEditTurmaLabel'),
     form: document.getElementById('studentEditForm'),
     loading: document.getElementById('studentEditLoading'),
@@ -83,10 +84,13 @@
       els.title.textContent = `Editar ${aluno.Nome || 'aluno'}`;
     }
     if (els.subtitle) {
-      els.subtitle.textContent = 'Cadastro carregado. Faça as alterações e salve.';
+      els.subtitle.textContent = `Atualize o cadastro de ${aluno.Nome || 'este aluno'} e salve as alterações diretamente no Google Sheets.`;
     }
     if (els.code) {
       els.code.textContent = `#${codeValue}`;
+    }
+    if (els.codeValue) {
+      els.codeValue.textContent = codeValue;
     }
     if (els.turmaLabel) {
       els.turmaLabel.textContent = turmaNome;

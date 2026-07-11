@@ -193,7 +193,68 @@
         </label>
       </div>
     </section>
-</main>
+
+    <section class="panel card" id="registrationPanel">
+      <div class="panel__head">
+        <div>
+          <h2>Cadastro rápido</h2>
+          <p>Crie turmas e alunos sem sair da página.</p>
+        </div>
+      </div>
+
+      <div class="forms-grid">
+        <form id="turmaForm" class="mini-form">
+          <h3>Nova turma</h3>
+          <div class="field">
+            <label for="turmaNome">Nome da turma</label>
+            <input id="turmaNome" type="text" placeholder="Ex.: Crianças menores" />
+          </div>
+          <div class="field">
+            <label for="turmaOrdem">Ordem</label>
+            <input id="turmaOrdem" type="number" min="0" step="1" placeholder="Ex.: 1" />
+          </div>
+          <button class="btn btn--primary" type="submit">Cadastrar turma</button>
+        </form>
+
+        <form id="alunoForm" class="mini-form">
+          <h3>Novo aluno</h3>
+          <div class="field">
+            <label for="alunoNome">Nome do aluno</label>
+            <input id="alunoNome" type="text" placeholder="Ex.: Maria Silva" />
+          </div>
+          <div class="field">
+            <label for="alunoCelular">Celular (opcional)</label>
+            <input id="alunoCelular" type="text" inputmode="numeric" placeholder="(XX) X XXXX-XXXX" />
+          </div>
+          <div class="field">
+            <label for="alunoTurma">Turma</label>
+            <select id="alunoTurma"></select>
+          </div>
+          <button class="btn btn--primary" type="submit">Cadastrar aluno</button>
+        </form>
+      </div>
+    </section>
+
+    
+    <section class="panel card charts-panel">
+      <div class="panel__head">
+        <div>
+          <h2>Gráfico geral</h2>
+          <p>Visualização incorporada diretamente do Google Sheets.</p>
+        </div>
+      </div>
+
+      <div class="charts-panel__frame">
+        <iframe
+          src="https://docs.google.com/spreadsheets/d/e/2PACX-1vRQZbpzLA4FSk_WKUP9AmS-QZ4Lu_OZRpPSw1e_IhOyu662YuK0azbTTq7HrHO-nMcfPPVgEyRAhP-V/pubchart?oid=112810421&format=interactive"
+          loading="lazy"
+          title="Gráfico geral do Google Sheets"
+          referrerpolicy="no-referrer"
+        ></iframe>
+      </div>
+    </section>
+
+  </main>
 
   <template id="studentTemplate">
     <article class="student card">
@@ -203,6 +264,7 @@
             <strong class="student-name"></strong>
             <button class="btn btn--soft btn--edit" data-action="edit" type="button">Editar</button>
           </div>
+          <div class="student-code"></div>
           <div class="student-badges"></div>
         </div>
         <div class="student__stats">
