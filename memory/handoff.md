@@ -7,7 +7,7 @@ Pontos centrais:
 - A fonte oficial continua sendo o Google Sheets via Apps Script.
 - O navegador usa localStorage apenas para rascunhos e para a camada de memória consolidada.
 - A chamada do dia exige marcação completa antes do salvamento.
-- O endpoint `health` existe para checagem rápida do backend.
+- O endpoint `health` existe para checagem rápida do backend e deve expor `version` e `deployedAt`.
 - Decisões arquiteturais devem ficar em arquivos curtos dentro de `memory/`.
 - A edição de aluno acontece em uma página dedicada em `aluno/editar-aluno/`.
 - O botão **Editar** leva para essa rota com a chave de edição baseada no nome atual do aluno.
@@ -19,5 +19,5 @@ Pontos centrais:
 
 
 - O carregamento inicial do frontend usa `apiGet` com timeout, para evitar overlay infinito quando o Apps Script demora ou falha.
-- O envio de atualização de aluno faz fallback automático para GET quando o POST retorna `Ação inválida`, para contornar inconsistências de roteamento no Apps Script.
+- O envio de atualização de aluno só faz fallback automático para GET quando o POST retorna explicitamente `Ação inválida`; outros erros precisam aparecer sem mascaramento.
 - A edição de aluno agora pode preservar turma e status atuais quando esses campos não vierem preenchidos no payload.

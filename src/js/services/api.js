@@ -135,7 +135,6 @@ async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
   const bodyParams = new URLSearchParams();
   const queryParams = {};
   const actionName = String(params.action || params.acao || '').trim().toLowerCase();
-  const canFallbackToGet = ['updatealuno'].includes(actionName);
 
   Object.entries(params).forEach(([key, value]) => {
     if (value === undefined || value === null) return;
@@ -155,7 +154,7 @@ async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
 
   const shouldRetryAsGet = (err) => {
     const message = String(err?.message || err || '');
-    return /ação inválida|acao inválida|action invalid|aç[aã]o inválida/i.test(message);
+    return actionName === 'updatealuno' && /ação inválida|acao inválida|action invalid|aç[aã]o inválida/i.test(message);
   };
 
   try {
@@ -173,7 +172,7 @@ async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
     try {
       return await parseJsonResponse(response);
     } catch (err) {
-      if (shouldRetryAsGet(err) || canFallbackToGet) {
+      if (shouldRetryAsGet(err)) {
         const fallbackResponse = await fetch(apiUrl(queryParams), {
           method: 'GET',
           mode: 'cors',

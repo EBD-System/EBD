@@ -62,6 +62,8 @@ const LEGACY_SHEETS = [
 ];
 
 const AUTO_CUTOFF_MINUTES = 9 * 60 + 25;
+const BACKEND_VERSION = '2026.07.11-1';
+const BACKEND_DEPLOYED_AT = '2026-07-11T00:00:00-03:00';
 
 function normalizeStudentStatus_(value) {
   const v = String(value || '').trim().toLowerCase();
@@ -87,7 +89,7 @@ function routeRequest_(params, allowReadActions = false) {
       case 'init':
         return json_(init_(p));
       case 'health':
-        return json_({ ok: true, message: 'ok' });
+        return json_(backendHealth_());
       case 'reporttext':
         return json_(getReportText_(p));
       case 'savecall':
@@ -1537,6 +1539,15 @@ function buildMemorySeed_(dateKey, turmas, alunos, callsByTurma, resumoGeral) {
     ],
   };
 }
+function backendHealth_() {
+  return {
+    ok: true,
+    message: 'ok',
+    version: BACKEND_VERSION,
+    deployedAt: BACKEND_DEPLOYED_AT,
+  };
+}
+
 function json_(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
