@@ -3,9 +3,6 @@
   const accessCode = String(params.get('code') || '').trim();
 
   const els = {
-    title: document.getElementById('studentAddTitle'),
-    subtitle: document.getElementById('studentAddSubtitle'),
-    turmaCount: document.getElementById('studentAddTurmaCount'),
     back: document.getElementById('addAlunoBackBtn'),
     form: document.getElementById('studentAddForm'),
     loading: document.getElementById('studentAddLoading'),
@@ -14,6 +11,7 @@
     nascimento: document.getElementById('studentAddNascimento'),
     turma: document.getElementById('studentAddTurma'),
     feedback: document.getElementById('feedback'),
+    submit: document.querySelector('#studentAddForm button[type="submit"]'),
   };
 
   let turmas = [];
@@ -43,6 +41,8 @@
     const placeholder = document.createElement('option');
     placeholder.value = '';
     placeholder.textContent = turmas.length ? 'Selecione uma turma' : 'Cadastre uma turma primeiro';
+    placeholder.disabled = true;
+    placeholder.hidden = turmas.length > 0;
     els.turma.appendChild(placeholder);
 
     (turmas || []).forEach((turma) => {
@@ -52,17 +52,17 @@
       els.turma.appendChild(option);
     });
 
-    els.turma.value = selectedTurmaId || '';
-  }
-
-  function syncHero() {
-    if (els.turmaCount) {
-      els.turmaCount.textContent = String(turmas.length || 0);
-    }
-    if (els.subtitle) {
-      els.subtitle.textContent = turmas.length
-        ? 'Cadastre um novo aluno com celular e data de nascimento opcionais.'
-        : 'Cadastre uma turma primeiro para liberar o cadastro de alunos.';
+    if (turmas.length) {
+      const fallback = selectedTurmaId && turmas.some((turma) => String(turma.TurmaID || '') === String(selectedTurmaId || ''))
+        ? selectedTurmaId
+        : String(turmas[0]?.TurmaID || '');
+      els.turma.value = fallback;
+      els.turma.disabled = false;
+      if (els.submit) els.submit.disabled = false;
+    } else {
+      els.turma.value = '';
+      els.turma.disabled = true;
+      if (els.submit) els.submit.disabled = true;
     }
   }
 
@@ -74,7 +74,6 @@
       const data = await apiGet({ action: 'init', date: todayKey() });
       turmas = Array.isArray(data.turmas) ? data.turmas : [];
       renderTurmaOptions(turmas[0]?.TurmaID || '');
-      syncHero();
 
       if (window.ProjectMemory && data?.memory) {
         try {
@@ -86,8 +85,9 @@
 
       if (!turmas.length) {
         setFeedback('warning', 'Nenhuma turma cadastrada. Crie uma turma antes de adicionar alunos.');
-      } else {
-        setFeedback('info', 'Preencha os dados do aluno e confirme o cadastro.');
+      } else if (els.feedback) {
+        els.feedback.className = 'feedback';
+        els.feedback.textContent = '';
       }
     } catch (err) {
       if (els.loading) {
@@ -142,6 +142,9 @@
       els.name.value = '';
       els.celular.value = '';
       els.nascimento.value = '';
+      if (turmas.length && els.turma) {
+        els.turma.value = String(turmas[0]?.TurmaID || els.turma.value || '');
+      }
       if (els.name) els.name.focus();
     } catch (err) {
       showError(err.message || 'Falha ao cadastrar aluno.');

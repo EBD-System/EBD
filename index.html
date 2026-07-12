@@ -159,11 +159,11 @@
           <p>Salve a turma, envie o relatório e avance para a próxima.</p>
         </div>
 
-        <div class="panel__actions">
+        <div class="panel__actions panel__actions--call">
           <button id="saveBtn" class="btn btn--primary" type="button">Salvar chamada</button>
-          <button id="sendTurmaBtn" class="btn btn--soft" type="button">Compartilhar Turma</button>
-          <button id="sendGeralBtn" class="btn btn--soft" type="button">Compartilhar Geral</button>
-          <button id="saveNextBtn" class="btn btn--ghost" type="button">Salvar e avançar</button>
+          <button id="sendTurmaBtn" class="btn btn--soft" type="button">Relatório Turma</button>
+          <button id="sendGeralBtn" class="btn btn--soft" type="button">Relatório Geral</button>
+          <button id="saveNextBtn" class="btn btn--ghost panel__actions--call-next" type="button">Salvar e avançar</button>
         </div>
       </div>
       <div id="feedback" class="feedback" aria-live="polite"></div>
@@ -233,25 +233,6 @@
           </div>
           <button class="btn btn--primary" type="submit">Cadastrar aluno</button>
         </form>
-      </div>
-    </section>
-
-    
-    <section class="panel card charts-panel">
-      <div class="panel__head">
-        <div>
-          <h2>Gráfico geral</h2>
-          <p>Visualização incorporada diretamente do Google Sheets.</p>
-        </div>
-      </div>
-
-      <div class="charts-panel__frame">
-        <iframe
-          src="https://docs.google.com/spreadsheets/d/e/2PACX-1vRQZbpzLA4FSk_WKUP9AmS-QZ4Lu_OZRpPSw1e_IhOyu662YuK0azbTTq7HrHO-nMcfPPVgEyRAhP-V/pubchart?oid=112810421&format=interactive"
-          loading="lazy"
-          title="Gráfico geral do Google Sheets"
-          referrerpolicy="no-referrer"
-        ></iframe>
       </div>
     </section>
 

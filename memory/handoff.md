@@ -34,3 +34,8 @@ Pontos centrais:
 - A inclusão de aluno não depende de um código de acesso específico; qualquer modo pode cadastrar aluno.
 - O backend de inclusão agora aceita `dataNascimento` opcional e grava também o mês na planilha.
 - O fluxo de inclusão de aluno continua gravando na aba `Cadastro` e mantém o helper `adicionarAlunoManual()` para testes no Apps Script.
+
+- O dashboard principal não exibe mais o gráfico incorporado do Google Sheets.
+- Na tela de ações da chamada, o botão de salvar ocupa a faixa inteira e os botões de relatório foram renomeados para `Relatório Turma` e `Relatório Geral`.
+- Na página dedicada de inclusão de aluno, a turma fica pré-selecionada quando houver opções e o envio fica bloqueado enquanto não existir turma cadastrada.
+
