@@ -138,7 +138,8 @@
   gap:10px;
 }
 .panel__actions--student-edit{
-  justify-content:flex-end;
+  width:100%;
+  justify-content:space-between;
 }
 .empty-state{
   display:none;

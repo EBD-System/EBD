@@ -18,7 +18,7 @@ Pontos centrais:
 - O modo `restricted` também pode editar alunos; apenas o modo `self` segue bloqueado para edição.
 - Na edição de aluno, o campo `Status` está visível, mas fica desativado temporariamente na interface.
 - A página de edição também ganhou ação de exclusão do aluno, confirmada antes do envio ao backend.
-
+- No layout mobile da edição, **Voltar** fica no canto esquerdo do cabeçalho e **Excluir Aluno** permanece à direita.
 
 - O carregamento inicial do frontend usa `apiGet` com timeout, para evitar overlay infinito quando o Apps Script demora ou falha.
 - O envio de atualização de aluno só faz fallback automático para GET quando o POST retorna explicitamente `Ação inválida`; outros erros precisam aparecer sem mascaramento.

@@ -83,6 +83,10 @@ textarea:focus{
     justify-content:space-between;
     align-items:flex-start;
   }
+  .panel__actions--student-edit{
+    width:auto;
+    justify-content:flex-end;
+  }
   .forms-grid{
     grid-template-columns:repeat(2, minmax(0,1fr));
   }
