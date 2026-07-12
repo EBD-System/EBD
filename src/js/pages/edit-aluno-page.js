@@ -5,16 +5,14 @@
 
   const els = {
     title: document.getElementById('studentEditTitle'),
-    subtitle: document.getElementById('studentEditSubtitle'),
-    code: document.getElementById('studentEditCode'),
     codeValue: document.getElementById('studentEditCodeValue'),
-    turmaLabel: document.getElementById('studentEditTurmaLabel'),
     form: document.getElementById('studentEditForm'),
     loading: document.getElementById('studentEditLoading'),
     name: document.getElementById('studentEditName'),
     celular: document.getElementById('studentEditCelular'),
     turma: document.getElementById('studentEditTurma'),
     status: document.getElementById('studentEditStatus'),
+    back: document.getElementById('studentEditBack'),
     deleteBtn: document.getElementById('studentEditDelete'),
     cancel: document.getElementById('studentEditCancel'),
     feedback: document.getElementById('feedback'),
@@ -39,6 +37,18 @@
     }
     const query = backParams.toString();
     return query ? `../../index.html?${query}` : '../../index.html';
+  }
+
+  function applyBackUrl() {
+    const backUrl = buildBackUrl();
+    if (els.back) els.back.href = backUrl;
+    if (els.cancel) els.cancel.href = backUrl;
+  }
+
+  function formatCellPhoneInput(event) {
+    const input = event?.target;
+    if (!input) return;
+    input.value = formatToBrPhone(input.value);
   }
 
   function setFeedback(type, message) {
@@ -83,17 +93,8 @@
     if (els.title) {
       els.title.textContent = `Editar ${aluno.Nome || 'aluno'}`;
     }
-    if (els.subtitle) {
-      els.subtitle.textContent = `Atualize o cadastro de ${aluno.Nome || 'este aluno'} e salve as alterações diretamente no Google Sheets.`;
-    }
-    if (els.code) {
-      els.code.textContent = `#${codeValue}`;
-    }
     if (els.codeValue) {
       els.codeValue.textContent = codeValue;
-    }
-    if (els.turmaLabel) {
-      els.turmaLabel.textContent = turmaNome;
     }
 
     if (els.name) {
@@ -110,9 +111,7 @@
 
     renderTurmaOptions(aluno.TurmaID);
 
-    if (els.cancel) {
-      els.cancel.href = buildBackUrl();
-    }
+    applyBackUrl();
 
     if (els.deleteBtn) {
       els.deleteBtn.disabled = false;
@@ -163,7 +162,10 @@
       alunoAtual = found;
       alunoOriginalKey = alunoKey || found.Nome || found.AlunoID;
       populateForm(found, data);
-      setFeedback('info', 'Cadastro carregado. Faça as alterações e salve.');
+      if (els.feedback) {
+        els.feedback.className = 'feedback';
+        els.feedback.textContent = '';
+      }
     } catch (err) {
       if (els.loading) {
         els.loading.textContent = err.message || 'Não foi possível carregar o aluno.';
@@ -262,6 +264,13 @@
     } finally {
       hideLoading();
     }
+  }
+
+  applyBackUrl();
+
+  if (els.celular) {
+    els.celular.addEventListener('input', formatCellPhoneInput);
+    els.celular.addEventListener('blur', formatCellPhoneInput);
   }
 
   if (els.deleteBtn) {

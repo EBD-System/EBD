@@ -25,18 +25,6 @@
       <div class="hero-copy">
         <span class="badge">Editar cadastro</span>
         <h1 id="studentEditTitle">Editar aluno</h1>
-        <p id="studentEditSubtitle">Carregando informações do aluno...</p>
-      </div>
-
-      <div class="hero-panel">
-        <div class="hero-panel__item">
-          <span>Código</span>
-          <strong id="studentEditCode">#—</strong>
-        </div>
-        <div class="hero-panel__item">
-          <span>Turma atual</span>
-          <strong id="studentEditTurmaLabel">—</strong>
-        </div>
       </div>
     </header>
 
@@ -44,11 +32,11 @@
       <div class="panel__head">
         <div>
           <h2>Dados do aluno</h2>
-          <p>Edite nome, celular, turma e status. O código interno continua visível apenas como referência.</p>
         </div>
 
-        <div class="panel__actions">
-          <a id="studentEditCancel" class="btn btn--ghost" href="../../index.html">Voltar</a>
+        <div class="panel__actions panel__actions--student-edit">
+          <a id="studentEditBack" class="btn btn--ghost" href="../../index.html">Voltar</a>
+          <button id="studentEditDelete" class="btn btn--absent" type="button">Excluir Aluno</button>
         </div>
       </div>
 
@@ -77,7 +65,7 @@
             id="studentEditCelular"
             type="text"
             inputmode="numeric"
-            placeholder="(XX) X XXXX-XXXX"
+            placeholder="(XX) 9XXXX-XXXX"
             autocomplete="off"
           />
         </div>
@@ -97,8 +85,7 @@
         </div>
 
         <div class="student-edit-form__actions">
-          <a class="btn btn--ghost" href="../../index.html">Cancelar</a>
-          <button id="studentEditDelete" class="btn btn--absent" type="button">Excluir aluno</button>
+          <a id="studentEditCancel" class="btn btn--ghost" href="../../index.html">Cancelar</a>
           <button class="btn btn--primary" type="submit">Salvar alterações</button>
         </div>
       </form>

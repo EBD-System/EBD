@@ -18,7 +18,11 @@ function formatToBrPhone(phone = '') {
     return `(${ddd}) ${rest.slice(0, 1)}${rest.slice(1)}`;
   }
 
-  return `(${ddd}) ${rest.slice(0, 1)}${rest.slice(1, 5)}-${rest.slice(5, 9)}`;
+  const firstBlock = rest.slice(0, 1);
+  const secondBlock = rest.slice(1, 5);
+  const thirdBlock = rest.slice(5, 9);
+
+  return `(${ddd}) ${firstBlock}${secondBlock}${thirdBlock ? `-${thirdBlock}` : ''}`;
 }
 
 function formatBrazilCellPhone(value) {

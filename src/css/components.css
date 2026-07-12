@@ -137,6 +137,9 @@
   flex-wrap:wrap;
   gap:10px;
 }
+.panel__actions--student-edit{
+  justify-content:flex-end;
+}
 .empty-state{
   display:none;
   padding:18px;

@@ -42,3 +42,8 @@ Pontos centrais:
 
 
 - A página dedicada de inclusão de aluno agora inicia a turma em `< SELECIONE >`, exige escolha explícita antes do envio, mantém **Cancelar** e **Voltar** apontando para a mesma navegação e usa a formatação brasileira de celular via `formatToBrPhone`.
+
+- Na edição de aluno, o topo perdeu o bloco de código/turma atual; o código interno continua visível apenas no formulário.
+- O botão destrutivo **Excluir Aluno** foi movido para o topo, ao lado de **Voltar**.
+- O campo de celular da edição agora usa `formatToBrPhone` também enquanto o usuário digita, e o botão **Cancelar** do formulário segue a mesma navegação de retorno do **Voltar**.
+
