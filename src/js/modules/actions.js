@@ -463,13 +463,15 @@ function bindCallFieldValues() {
 
 
 
-async function refreshFromBackend(showMessage = false, { silent = false } = {}) {
+async function refreshFromBackend(showMessage = false, { silent = false, preferLocal = true } = {}) {
   clearAutosaveTimer();
   state.loading = true;
 
   if (!silent) {
     showLoading('Carregando dados...');
   }
+
+  const localSnapshot = preferLocal ? loadLocalSavedCallsSnapshot(state.dateKey) : null;
 
   try {
     const data = await apiGet(
@@ -482,8 +484,11 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
 
     state.turmas = Array.isArray(data.turmas) ? data.turmas : [];
     state.alunos = Array.isArray(data.alunos) ? data.alunos : [];
-    state.chamadasByTurma = data.callsByTurma || {};
-    state.resumoGeral = data.resumoGeral || null;
+    const backendCalls = data.callsByTurma || {};
+    state.chamadasByTurma = localSnapshot
+      ? mergeCallsByTurma_(backendCalls, localSnapshot.callsByTurma || {})
+      : backendCalls;
+    state.resumoGeral = data.resumoGeral || state.resumoGeral || null;
     state.baseRowsCount = Number(data.baseRowsCount || state.baseRowsCount || 0);
 
     if (window.ProjectMemory && data.memory) {
@@ -502,10 +507,29 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
     }
 
     if (showMessage) {
-      showSuccess('Dados atualizados.');
+      showSuccess(localSnapshot ? 'Dados atualizados com o armazenamento local.' : 'Dados atualizados.');
     }
   } catch (err) {
     if (isDebugConsoleEnabled()) console.error(err);
+
+    if (localSnapshot) {
+      const rosterCache = loadRosterCache();
+      if ((!state.turmas.length || !state.alunos.length) && rosterCache) {
+        state.turmas = Array.isArray(rosterCache.turmas) ? rosterCache.turmas : state.turmas;
+        state.alunos = Array.isArray(rosterCache.alunos) ? rosterCache.alunos : state.alunos;
+      }
+
+      state.chamadasByTurma = mergeCallsByTurma_({}, localSnapshot.callsByTurma || {});
+      if (!state.selectedTurmaId) {
+        state.selectedTurmaId = Object.keys(localSnapshot.callsByTurma || {})[0] || state.turmas[0]?.TurmaID || state.selectedTurmaId;
+      }
+
+      if (showMessage) {
+        showSuccess('Dados carregados do armazenamento local.');
+      }
+      return;
+    }
+
     showError(formatAppError(err, 'Carregar dados'));
   } finally {
     state.loading = false;

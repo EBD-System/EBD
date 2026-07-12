@@ -22,3 +22,5 @@
 - Quando o `POST` para `addAluno`, `addTurma` ou `updateAluno` falhar com `Failed to fetch` ou `Ação inválida`, o cliente pode repetir a mesma requisição via `GET` na URL publicada do Apps Script.
 
 - As respostas de erro do backend devem incluir `source: backend` e, quando útil, `stage`; o frontend usa isso para exibir um console de diagnóstico com a origem do erro.
+
+- O botão **Salvar** deve persistir também uma snapshot local da chamada salva, com prioridade de leitura para buscas por data e relatórios.

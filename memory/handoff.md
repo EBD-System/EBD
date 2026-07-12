@@ -5,7 +5,7 @@ Antes de responder ou alterar o projeto, consulte primeiro a memória consolidad
 Pontos centrais:
 
 - A fonte oficial continua sendo o Google Sheets via Apps Script.
-- O navegador usa localStorage apenas para rascunhos e para a camada de memória consolidada.
+- O navegador usa localStorage para rascunhos e também para snapshots consolidadas de chamadas salvas por data/turma.
 - A chamada do dia exige marcação completa antes do salvamento.
 - O endpoint `health` existe para checagem rápida do backend e deve expor `version` e `deployedAt`.
 - Decisões arquiteturais devem ficar em arquivos curtos dentro de `memory/`.
@@ -21,7 +21,7 @@ Pontos centrais:
 - A página de edição também ganhou ação de exclusão do aluno, confirmada antes do envio ao backend.
 - No layout mobile da edição, **Voltar** fica no canto esquerdo do cabeçalho e **Excluir Aluno** permanece à direita.
 
-- O carregamento inicial do frontend usa `apiGet` com timeout, para evitar overlay infinito quando o Apps Script demora ou falha.
+- O carregamento inicial do frontend usa `apiGet` com timeout, e agora também consulta snapshots locais salvas antes de cair para a planilha quando a data já foi salva no navegador.
 - O envio de atualização de aluno só faz fallback automático para GET quando o POST retorna explicitamente `Ação inválida`; outros erros precisam aparecer sem mascaramento.
 - A edição de aluno agora pode preservar turma e status atuais quando esses campos não vierem preenchidos no payload.
 
@@ -49,3 +49,5 @@ Pontos centrais:
 - Foi adicionado um console de diagnóstico visível na chamada e nas páginas de aluno; ele distingue erros de `FRONTEND` e `BACKEND` para facilitar suporte e depuração.
 - O console de diagnóstico foi ajustado para ficar visível apenas no acesso `50292230`; em outros acessos, os erros continuam aparecendo só no feedback vermelho.
 - Erros sem prefixo no cliente devem ser registrados como `FRONTEND` no console de diagnóstico, enquanto respostas `ok: false` do backend continuam como `BACKEND`.
+
+- O botão **Salvar** grava uma snapshot local da chamada da turma/data; relatórios e busca por data devem priorizar esse armazenamento e usar a planilha apenas como fallback.

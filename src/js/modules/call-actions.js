@@ -68,6 +68,7 @@ async function saveCurrentCall({ silent = false } = {}) {
   }
 
   const beforeRows = Number(state.baseRowsCount || 0);
+  const localSnapshotSaved = !!saveLocalSavedCall(call, 'pending');
 
   const payload = {
     action: 'saveCall',
@@ -135,6 +136,7 @@ async function saveCurrentCall({ silent = false } = {}) {
 
       state.resumoGeral = result.resumoGeral || state.resumoGeral;
       state.chamadasByTurma[turma.TurmaID] = result.turmaCall || call;
+      saveLocalSavedCall(state.chamadasByTurma[turma.TurmaID] || call, 'synced');
       state.dirty = false;
       clearDraft(call.chamadaId);
       state.selectedTurmaId = turma.TurmaID;
@@ -197,6 +199,7 @@ async function saveCurrentCall({ silent = false } = {}) {
 
           state.resumoGeral = result.resumoGeral || state.resumoGeral;
           state.chamadasByTurma[turma.TurmaID] = result.turmaCall || call;
+          saveLocalSavedCall(state.chamadasByTurma[turma.TurmaID] || call, 'synced');
 
           refreshFromBackend(false, { silent: true }).catch((err) => {
             if (isDebugConsoleEnabled()) console.warn('Falha ao atualizar dados após salvar:', err);
@@ -215,6 +218,10 @@ async function saveCurrentCall({ silent = false } = {}) {
       : new Error('Erro ao salvar chamada.');
   } catch (err) {
     closeLoading();
+    if (localSnapshotSaved) {
+      state.dirty = false;
+      clearDraft(call.chamadaId);
+    }
     showError(formatAppError(err, 'Salvar chamada'));
     throw err;
   } finally {

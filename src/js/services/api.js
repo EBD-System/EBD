@@ -372,6 +372,137 @@ function writeJsonStorage(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
+
+function safeClone(value) {
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (err) {
+    return value;
+  }
+}
+
+function ensureStorageStateShape() {
+  const store = storageState();
+  if (!store.savedCallsByDate || typeof store.savedCallsByDate !== 'object') {
+    store.savedCallsByDate = {};
+  }
+  return store;
+}
+
+function cloneLocalRow(row = {}) {
+  const cloned = {
+    alunoId: row.alunoId ?? '',
+    nome: row.nome ?? '',
+    codigo: row.codigo ?? '',
+    ordemCadastro: row.ordemCadastro ?? '',
+    presenca: row.presenca ?? 'nao',
+    atraso: !!row.atraso,
+    salvo: normalizeSalvoValue(row.salvo ?? row.SALVO),
+    SALVO: normalizeSalvoValue(row.salvo ?? row.SALVO),
+    observacao: row.observacao ?? '',
+    statusAluno: row.statusAluno ?? 'ativo',
+  };
+
+  if (row.autoPresenca !== undefined) cloned.autoPresenca = row.autoPresenca;
+  if (row.autoAtraso !== undefined) cloned.autoAtraso = row.autoAtraso;
+  if (row.ausSeguidas !== undefined) cloned.ausSeguidas = row.ausSeguidas;
+
+  return syncRowPresenceFields(cloned);
+}
+
+function cloneLocalCall(call = {}, syncStatus = 'synced') {
+  const rows = Array.isArray(call.rows) ? call.rows.map((row) => cloneLocalRow(row)) : [];
+  const activeRows = rows.filter((row) => String(row.statusAluno || 'ativo').trim().toLowerCase() !== 'inativo');
+
+  return {
+    chamadaId: String(call.chamadaId || `${call.turmaId || ''}_${call.data || state.dateKey || todayKey()}`).trim(),
+    data: String(call.data || state.dateKey || todayKey()),
+    turmaId: String(call.turmaId || '').trim(),
+    turmaNome: String(call.turmaNome || '').trim(),
+    oferta: call.oferta ?? '',
+    visitantes: Number(call.visitantes ?? 0) || 0,
+    biblias: Number(call.biblias ?? 0) || 0,
+    revistas: Number(call.revistas ?? 0) || 0,
+    totalAlunos: Number(call.totalAlunos ?? activeRows.length) || 0,
+    presentes: Number(call.presentes ?? activeRows.filter((row) => isPresentLikeValue(row.presenca)).length) || 0,
+    atrasos: Number(call.atrasos ?? activeRows.filter((row) => isDelayedValue(row.presenca)).length) || 0,
+    ausentes: Number(call.ausentes ?? activeRows.filter((row) => normalizePresenceValue(row.presenca) === 'nao').length) || 0,
+    percentual: Number(call.percentual ?? 0) || 0,
+    enviadoTelegram: !!call.enviadoTelegram,
+    telegramEnviadoEm: call.telegramEnviadoEm || '',
+    rows,
+    isSaved: true,
+    savedAt: nowIso(),
+    syncStatus,
+  };
+}
+
+function saveLocalSavedCall(call, syncStatus = 'synced') {
+  const turmaId = String(call?.turmaId || '').trim();
+  const dateKey = String(call?.data || state.dateKey || todayKey()).trim();
+
+  if (!turmaId || !dateKey) {
+    return null;
+  }
+
+  const store = ensureStorageStateShape();
+  const snapshot = cloneLocalCall(call, syncStatus);
+  const dateBucket = store.savedCallsByDate[dateKey] || {
+    dateKey,
+    updatedAt: '',
+    callsByTurma: {},
+  };
+
+  dateBucket.dateKey = dateKey;
+  dateBucket.updatedAt = nowIso();
+  dateBucket.callsByTurma = dateBucket.callsByTurma && typeof dateBucket.callsByTurma === 'object'
+    ? dateBucket.callsByTurma
+    : {};
+  dateBucket.callsByTurma[turmaId] = snapshot;
+
+  store.savedCallsByDate[dateKey] = dateBucket;
+  saveStorageState(store);
+  return safeClone(snapshot);
+}
+
+function loadLocalSavedCallsSnapshot(dateKey = state.dateKey) {
+  const store = storageState();
+  const key = String(dateKey || '').trim();
+  const bucket = key && store.savedCallsByDate && store.savedCallsByDate[key];
+  if (!bucket || typeof bucket !== 'object') {
+    return null;
+  }
+
+  const callsByTurma = {};
+  Object.entries(bucket.callsByTurma || {}).forEach(([turmaId, call]) => {
+    if (!turmaId || !call) return;
+    callsByTurma[turmaId] = safeClone(call);
+  });
+
+  return {
+    dateKey: bucket.dateKey || key,
+    updatedAt: bucket.updatedAt || '',
+    callsByTurma,
+  };
+}
+
+function mergeCallsByTurma_(baseCalls = {}, overlayCalls = {}) {
+  const merged = { ...(baseCalls || {}) };
+  Object.entries(overlayCalls || {}).forEach(([turmaId, call]) => {
+    if (!turmaId || !call) return;
+    merged[turmaId] = safeClone(call);
+  });
+  return merged;
+}
+
+function hydrateLocalSavedCallsIntoState(dateKey = state.dateKey) {
+  const snapshot = loadLocalSavedCallsSnapshot(dateKey);
+  if (!snapshot) return null;
+
+  state.chamadasByTurma = mergeCallsByTurma_(state.chamadasByTurma || {}, snapshot.callsByTurma || {});
+  return snapshot;
+}
+
 function loadRosterCache() {
   const cache = readJsonStorage(ROSTER_CACHE_KEY, null);
   if (!cache || cache.version !== ROSTER_CACHE_VERSION) return null;

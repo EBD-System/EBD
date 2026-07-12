@@ -10,4 +10,4 @@ A interface web consome o backend em Apps Script, que centraliza a leitura e a e
 
 ## Observação
 
-O navegador não deve virar uma segunda fonte de verdade para turmas, alunos ou chamadas.
+O navegador não vira a fonte oficial, mas mantém snapshots locais das chamadas já salvas para recuperação rápida, busca por data e geração de relatórios quando o backend falha.
