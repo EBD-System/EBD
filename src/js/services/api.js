@@ -53,6 +53,85 @@ function normalizeBoolValue(value) {
   return v === 'sim' || v === 'true' || v === '1' || v === 'yes' || v === 'y';
 }
 
+function createAppError(message, meta = {}) {
+  const err = message instanceof Error ? message : new Error(String(message || 'Erro desconhecido.'));
+  err.source = String(meta.source || err.source || 'frontend').toLowerCase();
+  err.stage = String(meta.stage || err.stage || '').trim();
+  if (meta.status !== undefined) err.status = meta.status;
+  if (meta.details !== undefined) err.details = meta.details;
+  if (meta.raw !== undefined) err.raw = meta.raw;
+  return err;
+}
+
+function normalizeAppError(error, fallbackSource = 'frontend') {
+  if (error instanceof Error) {
+    return createAppError(error, {
+      source: error.source || fallbackSource,
+      stage: error.stage || '',
+      status: error.status,
+      details: error.details,
+      raw: error.raw,
+    });
+  }
+
+  if (typeof error === 'string') {
+    return createAppError(error, { source: fallbackSource });
+  }
+
+  const message = error?.message || error?.error || 'Erro desconhecido.';
+  return createAppError(message, {
+    source: error?.source || fallbackSource,
+    stage: error?.stage || '',
+    status: error?.status,
+    details: error?.details,
+    raw: error?.raw,
+  });
+}
+
+function formatAppError(error, context = '') {
+  const info = normalizeAppError(error);
+  const sourceLabel = info.source === 'backend' ? 'BACKEND' : 'FRONTEND';
+  const contextLabel = String(context || '').trim();
+  const stageLabel = info.stage ? ` (${info.stage})` : '';
+  const prefix = contextLabel ? `${contextLabel}: ` : '';
+  return `[${sourceLabel}]${stageLabel} ${prefix}${info.message}`.trim();
+}
+
+function appendDebugConsoleLine(text) {
+  const consoleBox = document.getElementById('debugConsole');
+  if (!consoleBox) return;
+
+  const line = String(text || '').trim();
+  if (!line) return;
+
+  const current = String(consoleBox.textContent || '').trim();
+  const next = current ? `${current}
+${line}` : line;
+  const lines = next.split('\n').filter(Boolean);
+  consoleBox.textContent = lines.slice(-12).join('\n');
+  consoleBox.scrollTop = consoleBox.scrollHeight;
+}
+
+function reportAppError(error, context = '', logToBrowserConsole = true) {
+  const info = normalizeAppError(error);
+  const message = formatAppError(info, context);
+  appendDebugConsoleLine(message);
+
+  if (logToBrowserConsole) {
+    const payload = {
+      source: info.source,
+      stage: info.stage || '',
+      status: info.status,
+      details: info.details,
+      raw: info.raw,
+      context: String(context || '').trim() || undefined,
+    };
+    console.error(message, payload);
+  }
+
+  return message;
+}
+
 function buildWhatsAppEditUrl(alunoNome, turmaNome) {
   const phone = '5571981768164';
   const message = `Olá, eu gostaria de editar o aluno [${String(alunoNome || '').trim()}], da classe [${String(turmaNome || '').trim()}].`;
@@ -77,7 +156,13 @@ function showSuccess(message) {
 }
 
 function showError(message) {
-  setFeedback('error', message);
+  const text = String(message || '');
+  setFeedback('error', text);
+
+  if (text && !/^\[(BACKEND|FRONTEND)\]/i.test(text)) {
+    appendDebugConsoleLine(`[FRONTEND] ${text}`);
+    console.error(`[FRONTEND] ${text}`);
+  }
 }
 
 function apiUrl(params = {}) {
@@ -100,11 +185,22 @@ async function parseJsonResponse(response) {
   try {
     data = text ? JSON.parse(text) : {};
   } catch (err) {
-    throw new Error(text || `HTTP ${response.status}`);
+    throw createAppError(text || `HTTP ${response.status}`, {
+      source: 'backend',
+      stage: 'parse-json',
+      status: response.status,
+      raw: text,
+    });
   }
 
   if (!response.ok || data.ok === false) {
-    throw new Error(data.message || `HTTP ${response.status}`);
+    throw createAppError(data.message || `HTTP ${response.status}`, {
+      source: data.source || 'backend',
+      stage: data.stage || 'backend-response',
+      status: response.status,
+      details: data.details,
+      raw: data,
+    });
   }
 
   return data;
@@ -123,9 +219,12 @@ async function apiGet(params = {}, { timeoutMs = 30000 } = {}) {
     return await parseJsonResponse(response);
   } catch (err) {
     if (err?.name === 'AbortError') {
-      throw new Error('A requisição demorou demais. Verifique sua conexão e tente novamente.');
+      throw createAppError('A requisição demorou demais. Verifique sua conexão e tente novamente.', {
+        source: 'frontend',
+        stage: 'timeout',
+      });
     }
-    throw err;
+    throw normalizeAppError(err, 'frontend');
   } finally {
     clearTimeout(timer);
   }
@@ -188,18 +287,21 @@ async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
       if (shouldRetryAsGet(err)) {
         return await sendGetFallback();
       }
-      throw err;
+      throw normalizeAppError(err, 'backend');
     }
   } catch (err) {
     if (err?.name === 'AbortError') {
-      throw new Error('O salvamento demorou demais. Verifique sua conexão e tente novamente.');
+      throw createAppError('O salvamento demorou demais. Verifique sua conexão e tente novamente.', {
+        source: 'frontend',
+        stage: 'timeout',
+      });
     }
 
     if (shouldRetryAsGet(err)) {
       return await sendGetFallback();
     }
 
-    throw err;
+    throw normalizeAppError(err, 'frontend');
   } finally {
     clearTimeout(timer);
   }

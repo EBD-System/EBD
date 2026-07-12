@@ -6,15 +6,12 @@ Pontos centrais:
 
 - A fonte oficial continua sendo o Google Sheets via Apps Script.
 - O navegador usa localStorage apenas para rascunhos e para a camada de memória consolidada.
-- A chamada do dia pode ser salva enviando apenas alunos com presença ou atraso; os ausentes ficam fora do payload da planilha.
+- A chamada do dia exige marcação completa antes do salvamento.
 - O endpoint `health` existe para checagem rápida do backend e deve expor `version` e `deployedAt`.
 - Decisões arquiteturais devem ficar em arquivos curtos dentro de `memory/`.
 - A edição de aluno acontece em uma página dedicada em `aluno/editar-aluno/`.
 - O botão **Editar** leva para essa rota com a chave de edição baseada no nome atual do aluno.
 - O fluxo de edição grava alterações diretamente na aba `cadastro` da planilha.
-- O salvamento da chamada passa apenas os alunos com presença ou atraso; os ausentes ficam fora do payload da planilha.
-- O backend reconstrói a chamada completa na UI a partir do retorno, sem exigir todas as linhas no POST.
-- O payload de salvamento ficou enxuto para evitar estouro de requisição.
 - As ações enviadas ao Apps Script são normalizadas para minúsculas no cliente.
 - O cliente agora envia POST como `application/x-www-form-urlencoded`, além de repetir a query string e o alias `acao`, para melhorar a compatibilidade com o Apps Script.
 - O Web App do Apps Script pode redirecionar POST para GET; por isso, salvamentos precisam ter `action` também na query string e o backend deve aceitar a mesma rota em `doGet`.
@@ -50,3 +47,5 @@ Pontos centrais:
 - O botão destrutivo **Excluir Aluno** foi movido para o topo, ao lado de **Voltar**.
 - O campo de celular da edição agora usa `formatToBrPhone` também enquanto o usuário digita, e o botão **Cancelar** do formulário segue a mesma navegação de retorno do **Voltar**.
 
+
+- Foi adicionado um console de diagnóstico visível na chamada e nas páginas de aluno; ele distingue erros de `FRONTEND` e `BACKEND` para facilitar suporte e depuração.

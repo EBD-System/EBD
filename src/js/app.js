@@ -153,34 +153,34 @@ els.saveBtn.addEventListener('click', async () => {
   try {
     await saveCurrentCall();
   } catch (err) {
-    showError(err.message || 'Falha ao salvar a chamada.');
+    showError(formatAppError(err, 'Salvar chamada'));
   }
 });
 els.sendTurmaBtn.addEventListener('click', async () => {
   try {
     await sendReport('turma');
   } catch (err) {
-    showError(err.message || 'Falha ao enviar relatório da turma.');
+    showError(formatAppError(err, 'Relatório da turma'));
   }
 });
 els.sendGeralBtn.addEventListener('click', async () => {
   try {
     await sendReport('geral');
   } catch (err) {
-    showError(err.message || 'Falha ao enviar relatório geral.');
+    showError(formatAppError(err, 'Relatório geral'));
   }
 });
 els.saveNextBtn.addEventListener('click', async () => {
   try {
     await saveAndAdvance();
   } catch (err) {
-    showError(err.message || 'Falha ao salvar e avançar.');
+    showError(formatAppError(err, 'Salvar e avançar'));
   }
 });
 
 if (els.studentEditForm) {
   els.studentEditForm.addEventListener('submit', (event) => {
-    submitStudentEditForm(event).catch((err) => showError(err.message || 'Falha ao atualizar aluno.'));
+    submitStudentEditForm(event).catch((err) => showError(formatAppError(err, 'Atualizar aluno')));
   });
 }
 
@@ -209,11 +209,11 @@ if (els.addAlunoPageBtn) {
 }
 els.turmaForm.addEventListener('submit', (event) => {
   event.preventDefault();
-  addTurma(event).catch((err) => showError(err.message || 'Falha ao cadastrar turma.'));
+  addTurma(event).catch((err) => showError(formatAppError(err, 'Cadastrar turma')));
 });
 els.alunoForm.addEventListener('submit', (event) => {
   event.preventDefault();
-  addAluno(event).catch((err) => showError(err.message || 'Falha ao cadastrar aluno.'));
+  addAluno(event).catch((err) => showError(formatAppError(err, 'Cadastrar aluno')));
 });
 
 els.alunoCelular.addEventListener('input', normalizeCelularInput);

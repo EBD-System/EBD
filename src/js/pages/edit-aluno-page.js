@@ -53,8 +53,14 @@
 
   function setFeedback(type, message) {
     if (!els.feedback) return;
+    const text = String(message || '');
     els.feedback.className = `feedback show ${type}`;
-    els.feedback.textContent = message;
+    els.feedback.textContent = text;
+
+    if (type === 'error' && text && !/^\[(BACKEND|FRONTEND)\]/i.test(text)) {
+      appendDebugConsoleLine(`[FRONTEND] ${text}`);
+      console.error(`[FRONTEND] ${text}`);
+    }
   }
 
   function setLoadingVisible(isVisible) {
@@ -167,10 +173,11 @@
         els.feedback.textContent = '';
       }
     } catch (err) {
+      const errorText = formatAppError(err, 'Carregar aluno');
       if (els.loading) {
-        els.loading.textContent = err.message || 'Não foi possível carregar o aluno.';
+        els.loading.textContent = errorText;
       }
-      setFeedback('error', err.message || 'Não foi possível carregar o aluno.');
+      setFeedback('error', errorText);
       setLoadingVisible(true);
     } finally {
       hideLoading();
@@ -229,7 +236,9 @@
         window.location.href = backUrl;
       }, 900);
     } catch (err) {
-      showError(err.message || 'Falha ao salvar aluno.');
+      const errorText = formatAppError(err, 'Salvar aluno');
+      showError(errorText);
+      setFeedback('error', errorText);
     } finally {
       hideLoading();
     }
@@ -260,7 +269,9 @@
         window.location.href = backUrl;
       }, 900);
     } catch (err) {
-      showError(err.message || 'Falha ao excluir aluno.');
+      const errorText = formatAppError(err, 'Excluir aluno');
+      showError(errorText);
+      setFeedback('error', errorText);
     } finally {
       hideLoading();
     }
@@ -275,18 +286,18 @@
 
   if (els.deleteBtn) {
     els.deleteBtn.addEventListener('click', () => {
-      deleteAluno().catch((err) => showError(err.message || 'Falha ao excluir aluno.'));
+      deleteAluno().catch((err) => showError(formatAppError(err, 'Excluir aluno')));
     });
   }
 
   if (els.form) {
     els.form.addEventListener('submit', (event) => {
-      submitForm(event).catch((err) => showError(err.message || 'Falha ao salvar aluno.'));
+      submitForm(event).catch((err) => showError(formatAppError(err, 'Salvar aluno')));
     });
   }
 
   loadAluno().catch((err) => {
     setFeedback('error', err.message || 'Falha ao carregar aluno.');
-    showError(err.message || 'Falha ao carregar aluno.');
+    showError(formatAppError(err, 'Carregar aluno'));
   });
 })();

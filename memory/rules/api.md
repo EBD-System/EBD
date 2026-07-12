@@ -2,7 +2,7 @@
 
 - Toda resposta do backend deve ser JSON.
 - A ação `health` deve continuar disponível para verificação de disponibilidade.
-- A chamada pode ser salva enviando apenas os alunos presentes/atrasados; os ausentes não precisam ir no payload para a planilha.
+- A chamada só deve ser salva com todos os alunos marcados.
 - Presentes e atrasados contam como presença.
 - A ação `updateAluno` deve existir para editar o cadastro de alunos no backend.
 - O código exibido após `#` na edição do aluno é somente leitura na interface e não pode ser alterado pelo usuário.
@@ -19,3 +19,5 @@
 - A página dedicada de inclusão de aluno fica em `aluno/adicionar-aluno/` e não inclui cadastro de nova turma.
 - A aba de cadastro é resolvida de forma case-insensitive; `Cadastro` e `cadastro` são tratados como o mesmo destino quando a planilha já existir.
 - Quando o `POST` para `addAluno`, `addTurma` ou `updateAluno` falhar com `Failed to fetch` ou `Ação inválida`, o cliente pode repetir a mesma requisição via `GET` na URL publicada do Apps Script.
+
+- As respostas de erro do backend devem incluir `source: backend` e, quando útil, `stage`; o frontend usa isso para exibir um console de diagnóstico com a origem do erro.

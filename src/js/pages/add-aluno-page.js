@@ -38,8 +38,14 @@
 
   function setFeedback(type, message) {
     if (!els.feedback) return;
+    const text = String(message || '');
     els.feedback.className = `feedback show ${type}`;
-    els.feedback.textContent = message;
+    els.feedback.textContent = text;
+
+    if (type === 'error' && text && !/^\[(BACKEND|FRONTEND)\]/i.test(text)) {
+      appendDebugConsoleLine(`[FRONTEND] ${text}`);
+      console.error(`[FRONTEND] ${text}`);
+    }
   }
 
   function setLoadingVisible(isVisible) {
@@ -104,10 +110,11 @@
         els.feedback.textContent = '';
       }
     } catch (err) {
+      const errorText = formatAppError(err, 'Carregar turmas');
       if (els.loading) {
-        els.loading.textContent = err.message || 'Não foi possível carregar as turmas.';
+        els.loading.textContent = errorText;
       }
-      setFeedback('error', err.message || 'Não foi possível carregar as turmas.');
+      setFeedback('error', errorText);
     } finally {
       hideLoading();
       setLoadingVisible(false);
@@ -153,16 +160,17 @@
         });
       }
 
-      els.name.value = '';
-      els.celular.value = '';
-      els.nascimento.value = '';
+      if (els.name) els.name.value = '';
+      if (els.celular) els.celular.value = '';
+      if (els.nascimento) els.nascimento.value = '';
       if (els.turma) {
         els.turma.value = '';
       }
       if (els.name) els.name.focus();
     } catch (err) {
-      showError(err.message || 'Falha ao cadastrar aluno.');
-      setFeedback('error', err.message || 'Falha ao cadastrar aluno.');
+      const errorText = formatAppError(err, 'Cadastrar aluno');
+      showError(errorText);
+      setFeedback('error', errorText);
     } finally {
       hideLoading();
     }
@@ -180,6 +188,6 @@
   }
 
   document.addEventListener('DOMContentLoaded', () => {
-    loadData().catch((err) => setFeedback('error', err.message || 'Falha ao carregar a página.'));
+    loadData().catch((err) => setFeedback('error', formatAppError(err, 'Carregar página')));
   });
 })();

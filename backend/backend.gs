@@ -94,6 +94,16 @@ function doPost(e) {
   return routeRequest_(e?.parameter || {}, false);
 }
 
+function createBackendError_(message, stage = 'route', extra = {}) {
+  return {
+    ok: false,
+    source: 'backend',
+    stage,
+    message: String(message || 'Erro no backend.'),
+    ...extra,
+  };
+}
+
 function routeRequest_(params, allowReadActions = false) {
   const p = params || {};
   const action = String(p.action || p.acao || '').trim().toLowerCase();
@@ -139,10 +149,11 @@ function routeRequest_(params, allowReadActions = false) {
         if (looksLikeAlunoUpdate_(p)) {
           return json_(updateAluno_(p));
         }
-        return json_({ ok: false, message: `Ação inválida. (${action || 'vazia'})` });
+        return json_(createBackendError_(`Ação inválida. (${action || 'vazia'})`, 'routeRequest_/default', { action }));
     }
   } catch (err) {
-    return json_({ ok: false, message: err?.message || String(err) });
+    console.error('backend route error:', err);
+    return json_(createBackendError_(err?.message || String(err), 'routeRequest_/catch', { action }));
   }
 }
 
@@ -209,6 +220,10 @@ function saveCall_(p) {
   const frontByAlunoId = new Map();
 
   const activeRows = rows.filter(row => String(row?.statusAluno || row?.STATUS || 'ativo').trim().toLowerCase() !== 'inativo');
+  const incompleteRows = activeRows.filter(row => toInt_(row?.salvo ?? row?.SALVO ?? 0) !== 1);
+  if (incompleteRows.length) {
+    throw new Error('Existe aluno sem registro de presença, ausência ou atraso. Marque todos antes de salvar.');
+  }
   const presentesCount = countPresentesFromRows_(activeRows);
   const visitantes = clampInt_(p.visitantes, 0, 50);
   const maxBibliasRevistas = Math.max(0, presentesCount + visitantes);
@@ -797,33 +812,11 @@ function buildCallForTurma_(dateKey, turma, alunos, chamadaRows, baseRows) {
     }
   }
 
-  const hasPartialCurrentSave = !useBaseForDate && classRows.length > 0;
-
   const effectiveRows = turmaAlunos.map(aluno => {
     const cached = byAluno.get(normalizeKey_(aluno.Nome)) || null;
-    if (useBaseForDate) {
-      return buildFrontRowFromBase_(cached, aluno, turmaNome);
-    }
-    if (cached) {
-      return buildFrontRowFromChamada_(cached, aluno, turmaNome);
-    }
-    if (hasPartialCurrentSave) {
-      return {
-        alunoId: aluno.AlunoID,
-        nome: aluno.Nome,
-        turmaId: aluno.TurmaID,
-        turmaNome,
-        presenca: 'nao',
-        atraso: false,
-        observacao: '',
-        statusAluno: aluno.Status || 'ativo',
-        autoPresenca: 0,
-        autoAtraso: 0,
-        salvo: 1,
-        ausSeguidas: 0,
-      };
-    }
-    return buildFrontRowFromChamada_(cached, aluno, turmaNome);
+    return useBaseForDate
+      ? buildFrontRowFromBase_(cached, aluno, turmaNome)
+      : buildFrontRowFromChamada_(cached, aluno, turmaNome);
   });
 
   const activeRows = effectiveRows.filter(r =>

@@ -38,7 +38,7 @@ function moveStudent(alunoId) {
       await refreshFromBackend(false);
       renderAll();
     })
-    .catch((err) => showError(err.message || 'Falha ao mover aluno.'));
+    .catch((err) => showError(formatAppError(err, 'Mover aluno')));
 }
 
 function toggleStudentStatus(alunoId) {
@@ -67,7 +67,7 @@ function toggleStudentStatus(alunoId) {
       await refreshFromBackend(false);
       renderAll();
     })
-    .catch((err) => showError(err.message || 'Falha ao atualizar status.'));
+    .catch((err) => showError(formatAppError(err, 'Atualizar status')));
 }
 
 function renderStudentEditTurmaOptions(selectedTurmaId = '') {
@@ -506,7 +506,7 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
     }
   } catch (err) {
     console.error(err);
-    showError(err?.message || 'Erro ao carregar dados.');
+    showError(formatAppError(err, 'Carregar dados'));
   } finally {
     state.loading = false;
     if (!silent) {
