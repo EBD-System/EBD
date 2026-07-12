@@ -44,6 +44,7 @@ async function bootstrap() {
     state.accessCode = getAccessCodeFromUrl();
     state.accessMode = resolveAccessMode(state.accessCode);
     applyAccessMode();
+    syncDebugConsoleVisibility();
 
     state.dateKey = todayKey();
     els.dateInput.value = state.dateKey;

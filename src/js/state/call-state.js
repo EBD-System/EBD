@@ -159,7 +159,7 @@ function updateCallFromInputs() {
   // TEXTO VISITANTES
   // ANTIGO // call.visitantesTexto = visitantesTextoInput?.value?.trim?.() ?? '';
 
-  console.log('[updateCallFromInputs]', {
+  if (isDebugConsoleEnabled()) console.log('[updateCallFromInputs]', {
     ofertaInput: ofertaInput?.value,
     ofertaFinal: call.oferta,
     visitantes: call.visitantes,
@@ -447,7 +447,7 @@ function renderStudents() {
       const noteInput = fragment.querySelector('.student-observacao');
 
       if (!article || !nameEl || !badgesEl || !percentEl || !absenceEl || !runEl || !codeEl || !presentBtn || !absentBtn || !delayBtn || !editBtn || !toggleBtn || !noteInput) {
-        console.warn('Template do aluno incompleto:', row);
+        if (isDebugConsoleEnabled()) console.warn('Template do aluno incompleto:', row);
         return;
       }
 
@@ -524,7 +524,7 @@ badgesEl.innerHTML = [
 
       container.appendChild(fragment);
     } catch (err) {
-      console.error('Falha ao renderizar aluno:', row, err);
+      if (isDebugConsoleEnabled()) console.error('Falha ao renderizar aluno:', row, err);
     }
   });
 }

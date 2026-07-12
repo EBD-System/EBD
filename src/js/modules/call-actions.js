@@ -154,7 +154,7 @@ async function saveCurrentCall({ silent = false } = {}) {
       renderAll();
 
       refreshFromBackend(false, { silent: true }).catch((err) => {
-        console.warn('Falha ao atualizar dados após salvar:', err);
+        if (isDebugConsoleEnabled()) console.warn('Falha ao atualizar dados após salvar:', err);
       });
 
       showSuccess(result.message || 'Chamada salva com sucesso.');
@@ -199,10 +199,10 @@ async function saveCurrentCall({ silent = false } = {}) {
           state.chamadasByTurma[turma.TurmaID] = result.turmaCall || call;
 
           refreshFromBackend(false, { silent: true }).catch((err) => {
-            console.warn('Falha ao atualizar dados após salvar:', err);
+            if (isDebugConsoleEnabled()) console.warn('Falha ao atualizar dados após salvar:', err);
           });
         } else if (settled?.type === 'error') {
-          console.warn('Resposta do Apps Script falhou depois dos 7s:', settled.error);
+          if (isDebugConsoleEnabled()) console.warn('Resposta do Apps Script falhou depois dos 7s:', settled.error);
         }
       });
 

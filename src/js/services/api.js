@@ -98,6 +98,8 @@ function formatAppError(error, context = '') {
 }
 
 function appendDebugConsoleLine(text) {
+  if (!isDebugConsoleEnabled()) return;
+
   const consoleBox = document.getElementById('debugConsole');
   if (!consoleBox) return;
 
@@ -117,7 +119,7 @@ function reportAppError(error, context = '', logToBrowserConsole = true) {
   const message = formatAppError(info, context);
   appendDebugConsoleLine(message);
 
-  if (logToBrowserConsole) {
+  if (logToBrowserConsole && isDebugConsoleEnabled()) {
     const payload = {
       source: info.source,
       stage: info.stage || '',
@@ -126,7 +128,7 @@ function reportAppError(error, context = '', logToBrowserConsole = true) {
       raw: info.raw,
       context: String(context || '').trim() || undefined,
     };
-    console.error(message, payload);
+    console.log(message, payload);
   }
 
   return message;
@@ -159,9 +161,12 @@ function showError(message) {
   const text = String(message || '');
   setFeedback('error', text);
 
-  if (text && !/^\[(BACKEND|FRONTEND)\]/i.test(text)) {
-    appendDebugConsoleLine(`[FRONTEND] ${text}`);
-    console.error(`[FRONTEND] ${text}`);
+  if (text) {
+    const debugText = /^\[(BACKEND|FRONTEND)\]/i.test(text) ? text : `[FRONTEND] ${text}`;
+    appendDebugConsoleLine(debugText);
+    if (isDebugConsoleEnabled()) {
+      console.log(debugText);
+    }
   }
 }
 
@@ -224,6 +229,16 @@ async function apiGet(params = {}, { timeoutMs = 30000 } = {}) {
         stage: 'timeout',
       });
     }
+
+    const message = String(err?.message || err || '');
+    if (/failed to fetch|networkerror|fetch failed/i.test(message)) {
+      throw createAppError(`Falha de comunicação com o Apps Script: ${message || 'Failed to fetch'}`, {
+        source: 'frontend',
+        stage: 'network',
+        raw: message || err,
+      });
+    }
+
     throw normalizeAppError(err, 'frontend');
   } finally {
     clearTimeout(timer);
@@ -294,6 +309,15 @@ async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
       throw createAppError('O salvamento demorou demais. Verifique sua conexão e tente novamente.', {
         source: 'frontend',
         stage: 'timeout',
+      });
+    }
+
+    const message = String(err?.message || err || '');
+    if (/failed to fetch|networkerror|fetch failed/i.test(message)) {
+      throw createAppError(`Falha de comunicação com o Apps Script: ${message || 'Failed to fetch'}`, {
+        source: 'frontend',
+        stage: 'network',
+        raw: message || err,
       });
     }
 

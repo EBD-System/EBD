@@ -49,3 +49,6 @@ Pontos centrais:
 
 
 - Foi adicionado um console de diagnóstico visível na chamada e nas páginas de aluno; ele distingue erros de `FRONTEND` e `BACKEND` para facilitar suporte e depuração.
+- O console de diagnóstico foi ajustado para ficar visível apenas no acesso `50292230`; em outros acessos, os erros continuam aparecendo só no feedback vermelho.
+- Erros sem prefixo no cliente devem ser registrados como `FRONTEND` no console de diagnóstico, enquanto respostas `ok: false` do backend continuam como `BACKEND`.
+

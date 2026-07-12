@@ -490,7 +490,7 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
       try {
         window.ProjectMemory.ingestSeed(data.memory);
       } catch (memErr) {
-        console.warn('Falha ao consolidar memória do projeto:', memErr);
+        if (isDebugConsoleEnabled()) console.warn('Falha ao consolidar memória do projeto:', memErr);
       }
     }
 
@@ -505,7 +505,7 @@ async function refreshFromBackend(showMessage = false, { silent = false } = {}) 
       showSuccess('Dados atualizados.');
     }
   } catch (err) {
-    console.error(err);
+    if (isDebugConsoleEnabled()) console.error(err);
     showError(formatAppError(err, 'Carregar dados'));
   } finally {
     state.loading = false;

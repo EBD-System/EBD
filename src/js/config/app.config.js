@@ -5,11 +5,27 @@ const APPS_SCRIPT_URL =
 const STORAGE_KEY = 'prb_presenca_turmas_v2';
 const ROSTER_CACHE_KEY = 'prb_roster_cache_v1';
 const ROSTER_CACHE_VERSION = 1;
-const showDebugBox = false;
+const DEBUG_CONSOLE_ACCESS_CODE = '50292230';
 
 // Se false, o carregamento inicial usa somente o que vem do backend.
 // Se true, o rascunho local pode voltar a ser aplicado quando existir.
 const APPLY_LOCAL_DRAFTS_ON_LOAD = false;
+
+function isDebugConsoleEnabled(accessCode = state.accessCode) {
+  return String(accessCode || '').trim() === DEBUG_CONSOLE_ACCESS_CODE;
+}
+
+function syncDebugConsoleVisibility() {
+  const enabled = isDebugConsoleEnabled();
+  if (document?.body) {
+    document.body.classList.toggle('debug-console-enabled', enabled);
+  }
+  const consoleBox = document.getElementById('debugConsole');
+  if (consoleBox) {
+    consoleBox.hidden = !enabled;
+  }
+  return enabled;
+}
 
 function todayKey() {
   const d = new Date();

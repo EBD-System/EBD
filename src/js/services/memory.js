@@ -132,7 +132,7 @@
     try {
       window.localStorage.setItem(MEMORY_STORAGE_KEY, JSON.stringify(next));
     } catch (err) {
-      console.warn('Falha ao persistir memória do projeto:', err);
+      if (isDebugConsoleEnabled()) console.warn('Falha ao persistir memória do projeto:', err);
     }
 
     return next;

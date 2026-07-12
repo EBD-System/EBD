@@ -170,6 +170,14 @@
   color:#94a3b8;
 }
 
+body:not(.debug-console-enabled) #debugConsole{
+  display:none;
+}
+body.debug-console-enabled #debugConsole{
+  display:block;
+}
+
+
 .students-list{
   display:grid;
   gap:12px;

@@ -1,6 +1,8 @@
 (function () {
   const params = new URLSearchParams(window.location.search);
   const accessCode = String(params.get('code') || '').trim();
+  state.accessCode = accessCode;
+  syncDebugConsoleVisibility();
 
   const els = {
     back: document.getElementById('addAlunoBackBtn'),
@@ -42,9 +44,12 @@
     els.feedback.className = `feedback show ${type}`;
     els.feedback.textContent = text;
 
-    if (type === 'error' && text && !/^\[(BACKEND|FRONTEND)\]/i.test(text)) {
-      appendDebugConsoleLine(`[FRONTEND] ${text}`);
-      console.error(`[FRONTEND] ${text}`);
+    if (type === 'error' && text) {
+      const debugText = /^\[(BACKEND|FRONTEND)\]/i.test(text) ? text : `[FRONTEND] ${text}`;
+      appendDebugConsoleLine(debugText);
+      if (isDebugConsoleEnabled()) {
+        console.log(debugText);
+      }
     }
   }
 
@@ -99,7 +104,7 @@
         try {
           window.ProjectMemory.ingestSeed(data.memory);
         } catch (err) {
-          console.warn('Falha ao consolidar memória no cadastro de aluno:', err);
+          if (isDebugConsoleEnabled()) console.warn('Falha ao consolidar memória no cadastro de aluno:', err);
         }
       }
 
@@ -188,6 +193,9 @@
   }
 
   document.addEventListener('DOMContentLoaded', () => {
-    loadData().catch((err) => setFeedback('error', formatAppError(err, 'Carregar página')));
+    loadData().catch((err) => {
+      const errorText = formatAppError(err, 'Carregar página');
+      setFeedback('error', errorText);
+    });
   });
 })();
