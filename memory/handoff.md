@@ -52,3 +52,4 @@ Pontos centrais:
 
 - O botão **Salvar** grava uma snapshot local da chamada da turma/data; relatórios e busca por data devem priorizar esse armazenamento e usar a planilha apenas como fallback.
 - O fluxo de salvar chamada depende do helper local `nowIso()` em `src/js/services/api.js`; sem ele, a snapshot local falha com erro de referência.
+- Na gravação da chamada, os campos `PRESENÇA`, `ATRASO` e `AUSÊNCIA` da base precisam ser reescritos como mutuamente exclusivos a cada salvamento; não é mais válido preservar 1 antigo ao mudar o status do aluno.

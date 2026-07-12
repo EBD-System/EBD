@@ -998,15 +998,19 @@ function buildBaseRow_(opts) {
   const effectiveStatus = String(opts.effectiveStatus || 'ausencia').trim().toLowerCase();
   const previousRow = opts.previousRow || null;
 
+  const isPresence = effectiveStatus === 'presenca';
+  const isDelay = effectiveStatus === 'atraso';
+  const isAbsence = effectiveStatus === 'ausencia';
+
   return {
     DATA: d,
     ANO: String(dt.getFullYear()),
     MÊS: String(dt.getMonth() + 1).padStart(2, '0'),
     ALUNO: String(opts.aluno?.Nome || previousRow?.ALUNO || '').trim(),
     CLASSE: String(opts.turmaNome || previousRow?.CLASSE || '').trim(),
-    PRESENÇA: effectiveStatus === 'presenca' ? 1 : toInt_(previousRow?.PRESENÇA ?? 0),
-    ATRASO: effectiveStatus === 'atraso' ? 1 : toInt_(previousRow?.ATRASO ?? 0),
-    AUSÊNCIA: effectiveStatus === 'ausencia' ? 1 : toInt_(previousRow?.AUSÊNCIA ?? 0),
+    PRESENÇA: isPresence ? 1 : 0,
+    ATRASO: isDelay ? 1 : 0,
+    AUSÊNCIA: isAbsence ? 1 : 0,
     OFERTA: parseMoney_(opts.oferta ?? previousRow?.OFERTA ?? 0),
     VISITANTES: toInt_(opts.visitantes ?? previousRow?.VISITANTES ?? 0),
     BÍBLIAS: toInt_(opts.biblias ?? previousRow?.BÍBLIAS ?? 0),

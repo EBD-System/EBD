@@ -35,3 +35,13 @@ O armazenamento local definitivo da chamada é criado somente quando o usuário 
 
 ### Solução
 Para recuperar uma chamada antiga ou gerar relatórios em modo resiliente, consultar primeiro `savedCallsByDate` e só depois cair para a planilha.
+
+## Armadilha: status da base não pode acumular flags
+### Problema
+Ao corrigir uma chamada já salva, um aluno podia ficar com `PRESENÇA = 1` e `AUSÊNCIA = 1` na mesma linha da base.
+
+### Causa
+O backend reaproveitava valores anteriores quando regravava a linha em vez de tratar os três campos como um estado único.
+
+### Solução
+Ao montar a linha da base, `PRESENÇA`, `ATRASO` e `AUSÊNCIA` precisam ser zerados ou ativados conforme o status efetivo atual, sem herdar 1 de um salvamento anterior.
