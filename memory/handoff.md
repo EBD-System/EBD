@@ -6,7 +6,7 @@ Pontos centrais:
 
 - A fonte oficial continua sendo o Google Sheets via Apps Script.
 - O navegador usa localStorage apenas para rascunhos e para a camada de memória consolidada.
-- A chamada do dia exige marcação completa antes do salvamento.
+- A chamada do dia aceita salvamento parcial: é obrigatório marcar ao menos 1 aluno, mas não todos.
 - O endpoint `health` existe para checagem rápida do backend e deve expor `version` e `deployedAt`.
 - Decisões arquiteturais devem ficar em arquivos curtos dentro de `memory/`.
 - A edição de aluno acontece em uma página dedicada em `aluno/editar-aluno/`.

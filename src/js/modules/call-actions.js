@@ -46,25 +46,21 @@ async function saveCurrentCall({ silent = false } = {}) {
     throw new Error('Selecione uma turma antes de salvar.');
   }
 
-  const pendingRows = (call.rows || []).filter(
-    (row) => !isInactiveStudent(row) && !isSavedRow(row)
+  const markedRows = (call.rows || []).filter(
+    (row) => !isInactiveStudent(row) && isSavedRow(row)
   );
 
-  if (pendingRows.length) {
-    const suffix = pendingRows.length === 1
-      ? '1 aluno está sem registro de presença, ausência ou atraso.'
-      : `${pendingRows.length} alunos estão sem registro de presença, ausência ou atraso.`;
-
-    showError(`Existe ${suffix} Marque todos os alunos antes de salvar.`);
+  if (!markedRows.length) {
+    showError('Marque ao menos 1 aluno antes de salvar.');
     if (window.ProjectMemory) {
       window.ProjectMemory.recordFromEvent('save-blocked', {
         dateKey: state.dateKey,
         turmaNome: turma.Nome,
         turmaId: turma.TurmaID,
-        message: suffix,
+        message: 'Nenhum aluno marcado para salvamento.',
       });
     }
-    throw new Error('Existe aluno sem registro de presença, ausência ou atraso.');
+    throw new Error('Marque ao menos 1 aluno antes de salvar.');
   }
 
   const beforeRows = Number(state.baseRowsCount || 0);

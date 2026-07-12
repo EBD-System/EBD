@@ -209,11 +209,11 @@ function saveCall_(p) {
   const frontByAlunoId = new Map();
 
   const activeRows = rows.filter(row => String(row?.statusAluno || row?.STATUS || 'ativo').trim().toLowerCase() !== 'inativo');
-  const incompleteRows = activeRows.filter(row => toInt_(row?.salvo ?? row?.SALVO ?? 0) !== 1);
-  if (incompleteRows.length) {
-    throw new Error('Existe aluno sem registro de presença, ausência ou atraso. Marque todos antes de salvar.');
+  const markedRows = activeRows.filter(row => toInt_(row?.salvo ?? row?.SALVO ?? 0) === 1);
+  if (!markedRows.length) {
+    throw new Error('Marque ao menos 1 aluno antes de salvar.');
   }
-  const presentesCount = countPresentesFromRows_(activeRows);
+  const presentesCount = countPresentesFromRows_(markedRows);
   const visitantes = clampInt_(p.visitantes, 0, 50);
   const maxBibliasRevistas = Math.max(0, presentesCount + visitantes);
   const biblias = clampInt_(p.biblias, 0, maxBibliasRevistas);
