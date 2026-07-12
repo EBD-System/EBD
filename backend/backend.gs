@@ -72,6 +72,20 @@ function normalizeStudentStatus_(value) {
   return 'ativo';
 }
 
+function normalizeBirthDate_(value) {
+  if (!value) return '';
+  if (value instanceof Date) {
+    return Utilities.formatDate(value, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+  const s = String(value || '').trim();
+  if (!s) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const br = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (br) return `${br[3]}-${br[2]}-${br[1]}`;
+  const d = parseIsoDate_(s);
+  return d ? Utilities.formatDate(d, Session.getScriptTimeZone(), 'yyyy-MM-dd') : '';
+}
+
 function doGet(e) {
   return routeRequest_(e?.parameter || {}, true);
 }
@@ -455,6 +469,8 @@ function addAluno_(p) {
   const nome = String(p.nome || p.aluno || '').trim();
   const celular = digitsOnly_(p.celular || '').slice(0, 11);
   const turmaId = String(p.turmaId || p.classe || '').trim();
+  const dataNascimento = normalizeBirthDate_(p.dataNascimento || p.data_nascimento || p.nascimento || '');
+  const mesNascimento = dataNascimento ? String(Number(dataNascimento.slice(5, 7)) || '').padStart(2, '0') : '';
 
   if (!nome) throw new Error('Informe o nome do aluno.');
   if (!turmaId) throw new Error('Selecione uma classe.');
@@ -471,8 +487,8 @@ function addAluno_(p) {
   }
 
   appendObjects_(cadastroSheet, CADASTRO_HEADERS, [{
-    DATA_NASCIMENTO: '',
-    MÊS: '',
+    DATA_NASCIMENTO: dataNascimento,
+    MÊS: mesNascimento,
     ALUNO: nome,
     CLASSE: turmaId,
     CELULAR: celular,
@@ -482,11 +498,12 @@ function addAluno_(p) {
   return { ok: true, message: 'Aluno cadastrado com sucesso.' };
 }
 
-function addAluno(nome, celular, turmaId) {
+function addAluno(nome, celular, turmaId, dataNascimento = '') {
   return addAluno_({
     nome,
     celular,
     turmaId,
+    dataNascimento,
   });
 }
 
@@ -494,10 +511,12 @@ function adicionarAlunoManual() {
   const nome = 'ALUNO TESTE';
   const celular = '';
   const turmaId = 'SUA TURMA AQUI';
+  const dataNascimento = '';
   return addAluno_({
     nome,
     celular,
     turmaId,
+    dataNascimento,
   });
 }
 

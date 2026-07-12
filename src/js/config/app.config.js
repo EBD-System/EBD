@@ -52,6 +52,7 @@ const els = {
   showInactive: document.getElementById('showInactive'),
   reloadBtn: document.getElementById('reloadBtn'),
   clearBtn: document.getElementById('clearBtn'),
+  addAlunoPageBtn: document.getElementById('addAlunoPageBtn'),
   saveBtn: document.getElementById('saveBtn'),
   sendTurmaBtn: document.getElementById('sendTurmaBtn'),
   sendGeralBtn: document.getElementById('sendGeralBtn'),

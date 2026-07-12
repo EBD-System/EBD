@@ -14,5 +14,8 @@
 - A chave usada na edição do aluno é o nome atual do cadastro, não um ID separado em planilha.
 - Quando a turma ou o status não vierem no payload de edição, o backend deve preservar os valores atuais do aluno.
 - A ação `addAluno` deve existir para incluir novos alunos diretamente na aba `Cadastro`.
+- O fluxo de inclusão de aluno aceita `dataNascimento` como campo opcional; quando informado, o backend grava `DATA_NASCIMENTO` e deriva o `MÊS` na mesma linha.
+- A inclusão de aluno não é bloqueada por código de acesso; qualquer modo pode cadastrar aluno.
+- A página dedicada de inclusão de aluno fica em `aluno/adicionar-aluno/` e não inclui cadastro de nova turma.
 - A aba de cadastro é resolvida de forma case-insensitive; `Cadastro` e `cadastro` são tratados como o mesmo destino quando a planilha já existir.
 - Quando o `POST` para `addAluno`, `addTurma` ou `updateAluno` falhar com `Failed to fetch` ou `Ação inválida`, o cliente pode repetir a mesma requisição via `GET` na URL publicada do Apps Script.

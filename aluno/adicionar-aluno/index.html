@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Adicionar aluno • EBD</title>
+  <meta
+    name="description"
+    content="Cadastrar novos alunos em uma página dedicada no GitHub Pages."
+  />
+  <link rel="stylesheet" href="../../src/css/base.css" />
+  <link rel="stylesheet" href="../../src/css/layout.css" />
+  <link rel="stylesheet" href="../../src/css/components.css" />
+  <link rel="stylesheet" href="../../src/css/pages.css" />
+  <link rel="stylesheet" href="../../src/css/utilities.css" />
+  <script defer src="../../src/js/config/app.config.js"></script>
+  <script defer src="../../src/js/utils/helpers.js"></script>
+  <script defer src="../../src/js/services/api.js"></script>
+  <script defer src="../../src/js/pages/add-aluno-page.js"></script>
+</head>
+<body>
+  <main class="app">
+    <header class="hero">
+      <div class="hero-copy">
+        <span class="badge">Adicionar aluno</span>
+        <h1 id="studentAddTitle">Adicionar aluno</h1>
+        <p id="studentAddSubtitle">Cadastre um novo aluno com celular e data de nascimento opcionais.</p>
+      </div>
+
+      <div class="hero-panel">
+        <div class="hero-panel__item">
+          <span>Turmas disponíveis</span>
+          <strong id="studentAddTurmaCount">—</strong>
+        </div>
+        <div class="hero-panel__item">
+          <span>Atalho</span>
+          <strong>Cadastro rápido</strong>
+        </div>
+      </div>
+    </header>
+
+    <section class="panel card">
+      <div class="panel__head">
+        <div>
+          <h2>Dados do aluno</h2>
+          <p>Preencha os campos e salve diretamente no cadastro. Não é necessário criar uma nova turma nesta tela.</p>
+        </div>
+
+        <div class="panel__actions">
+          <a id="addAlunoBackBtn" class="btn btn--ghost" href="../../index.html">Voltar</a>
+        </div>
+      </div>
+
+      <div id="feedback" class="feedback" aria-live="polite"></div>
+      <div id="studentAddLoading" class="empty-state">Carregando turmas...</div>
+
+      <form id="studentAddForm" class="student-edit-form hidden">
+        <div class="field">
+          <label for="studentAddName">Nome do aluno</label>
+          <input id="studentAddName" type="text" autocomplete="off" />
+        </div>
+
+        <div class="field">
+          <label for="studentAddCelular">Celular (opcional)</label>
+          <input id="studentAddCelular" type="text" inputmode="numeric" placeholder="(XX) X XXXX-XXXX" autocomplete="off" />
+        </div>
+
+        <div class="field">
+          <label for="studentAddNascimento">Data de nascimento (opcional)</label>
+          <input id="studentAddNascimento" type="date" autocomplete="off" />
+        </div>
+
+        <div class="field">
+          <label for="studentAddTurma">Turma</label>
+          <select id="studentAddTurma"></select>
+        </div>
+
+        <div class="student-edit-form__actions">
+          <a class="btn btn--ghost" href="../../index.html">Cancelar</a>
+          <button class="btn btn--primary" type="submit">Adicionar aluno</button>
+        </div>
+      </form>
+    </section>
+  </main>
+</body>
+</html>

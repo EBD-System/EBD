@@ -28,3 +28,9 @@ Pontos centrais:
 - Para testes manuais no Apps Script, existe `adicionarAlunoManual()` como helper editável.
 - O backend resolve a aba de cadastro de forma case-insensitive, então `Cadastro` e `cadastro` passam a apontar para a mesma planilha quando já existir uma delas.
 - O cliente passou a repetir como `GET` as ações `addAluno`, `addTurma` e `updatealuno` quando o `POST` falha com `Failed to fetch` ou `Ação inválida`, porque o Web App do Apps Script responde melhor nesse fallback.
+
+- O cadastro de aluno ganhou uma página dedicada em `aluno/adicionar-aluno/`, acessível por um botão na tela principal.
+- Essa tela de inclusão não exibe cadastro de nova turma; apenas nome, celular, data de nascimento opcional e turma.
+- A inclusão de aluno não depende de um código de acesso específico; qualquer modo pode cadastrar aluno.
+- O backend de inclusão agora aceita `dataNascimento` opcional e grava também o mês na planilha.
+- O fluxo de inclusão de aluno continua gravando na aba `Cadastro` e mantém o helper `adicionarAlunoManual()` para testes no Apps Script.

@@ -6,6 +6,16 @@ function validateApiUrl() {
   return true;
 }
 
+function buildAddAlunoPageUrl() {
+  const params = new URLSearchParams();
+  const accessCode = String(state.accessCode || '').trim();
+  if (accessCode) {
+    params.set('code', accessCode);
+  }
+  const query = params.toString();
+  return query ? `aluno/adicionar-aluno/?${query}` : 'aluno/adicionar-aluno/';
+}
+
 function normalizeCelularInput(event) {
   const input = event?.target;
   if (!input) return;
@@ -56,6 +66,10 @@ async function bootstrap() {
     showLoading('Carregando dados...');
 
     if (!validateApiUrl()) return;
+
+    if (els.addAlunoPageBtn) {
+      els.addAlunoPageBtn.setAttribute('href', buildAddAlunoPageUrl());
+    }
 
     await refreshFromBackend(false);
 
@@ -188,6 +202,11 @@ els.markAllPresentBtn.addEventListener('click', () => setAllPresence('sim'));
 els.markAllAbsentBtn.addEventListener('click', () => setAllPresence('nao'));
 els.copyTurmaBtn.addEventListener('click', () => copyText(buildTurmaReportText()));
 els.copyGeralBtn.addEventListener('click', () => copyText(buildGeneralReportText()));
+if (els.addAlunoPageBtn) {
+  els.addAlunoPageBtn.addEventListener('click', () => {
+    window.location.href = buildAddAlunoPageUrl();
+  });
+}
 els.turmaForm.addEventListener('submit', (event) => {
   event.preventDefault();
   addTurma(event).catch((err) => showError(err.message || 'Falha ao cadastrar turma.'));

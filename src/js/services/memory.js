@@ -385,7 +385,8 @@
           [
             `Novo aluno criado: ${payload.nome || '—'}.`,
             `Turma: ${payload.turmaNome || payload.turmaId || '—'}.`,
-          ].join('\n')
+            payload.dataNascimento ? `Data de nascimento: ${payload.dataNascimento}.` : null,
+          ].filter(Boolean).join('\n')
         ),
         { source: 'runtime', category: 'procedures' }
       );

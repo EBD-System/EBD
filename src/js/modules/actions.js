@@ -217,10 +217,6 @@ async function addTurma(event) {
 }
 
 async function addAluno(event) {
-  if (isRestrictedMode()) {
-    showError('Ação indisponível neste modo.');
-    return;
-  }
   event.preventDefault();
   const nome = els.alunoNome.value.trim();
   const celular = formatToBrPhone(els.alunoCelular.value);
@@ -240,6 +236,7 @@ async function addAluno(event) {
     nome,
     celular,
     turmaId,
+    dataNascimento: String(els.alunoDataNascimento?.value || '').trim(),
   });
 
   showSuccess(result.message || 'Aluno cadastrado.');
@@ -248,6 +245,7 @@ async function addAluno(event) {
       nome,
       turmaId,
       turmaNome: getTurmasSorted().find((t) => String(t.TurmaID || '') === String(turmaId || ''))?.Nome || turmaId,
+      dataNascimento: String(els.alunoDataNascimento?.value || '').trim(),
     });
   }
   els.alunoNome.value = '';
