@@ -173,12 +173,13 @@ function showError(message) {
 function apiUrl(params = {}) {
   const url = new URL(APPS_SCRIPT_URL);
   Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
     const normalizedValue = key === 'action' && typeof value === 'string'
       ? value.trim().toLowerCase()
       : value;
-    url.searchParams.set(key, normalizedValue);
-    if (key === 'action' && normalizedValue !== undefined && normalizedValue !== null) {
-      url.searchParams.set('acao', normalizedValue);
+    url.searchParams.set(key, String(normalizedValue));
+    if (key === 'action') {
+      url.searchParams.set('acao', String(normalizedValue));
     }
   });
   return url.toString();
@@ -249,16 +250,26 @@ async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
   const bodyParams = new URLSearchParams();
   const queryParams = {};
   const actionName = String(params.action || params.acao || '').trim().toLowerCase();
+  const mirrorAllParamsInQuery = ['addaluno', 'addturma', 'updatealuno'].includes(actionName);
 
   Object.entries(params).forEach(([key, value]) => {
     if (value === undefined || value === null) return;
+
     const normalizedValue = key === 'action' && typeof value === 'string'
       ? value.trim().toLowerCase()
       : value;
+
     bodyParams.set(key, String(normalizedValue));
-    queryParams[key] = normalizedValue;
+
+    // O body sempre leva o payload completo.
+    // A query string só espelha todos os campos quando existe fallback por GET.
+    if (mirrorAllParamsInQuery) {
+      queryParams[key] = normalizedValue;
+    }
+
     if (key === 'action') {
       bodyParams.set('acao', String(normalizedValue));
+      queryParams.action = normalizedValue;
       queryParams.acao = normalizedValue;
     }
   });
@@ -285,7 +296,13 @@ async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
   };
 
   try {
-    const response = await fetch(apiUrl(queryParams), {
+    const requestUrl = apiUrl({
+      action: queryParams.action,
+      acao: queryParams.acao,
+      ...(mirrorAllParamsInQuery ? queryParams : {}),
+    });
+
+    const response = await fetch(requestUrl, {
       method: 'POST',
       mode: 'cors',
       cache: 'no-store',

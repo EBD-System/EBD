@@ -13,7 +13,8 @@ Pontos centrais:
 - O botão **Editar** leva para essa rota com a chave de edição baseada no nome atual do aluno.
 - O fluxo de edição grava alterações diretamente na aba `cadastro` da planilha.
 - As ações enviadas ao Apps Script são normalizadas para minúsculas no cliente.
-- O cliente agora envia POST como `application/x-www-form-urlencoded`, além de repetir a query string e o alias `acao`, para melhorar a compatibilidade com o Apps Script.
+- O cliente envia POST como `application/x-www-form-urlencoded`; o espelhamento completo na query string só deve acontecer quando houver fallback real por GET.
+- O salvamento de chamada (`saveCall`) não deve repetir `rowsJson` na URL, porque isso pode quebrar o envio em turmas grandes.
 - O Web App do Apps Script pode redirecionar POST para GET; por isso, salvamentos precisam ter `action` também na query string e o backend deve aceitar a mesma rota em `doGet`.
 - O modo `restricted` também pode editar alunos; apenas o modo `self` segue bloqueado para edição.
 - Na edição de aluno, o campo `Status` está visível, mas fica desativado temporariamente na interface.
@@ -39,16 +40,12 @@ Pontos centrais:
 - Na tela de ações da chamada, o botão de salvar ocupa a faixa inteira e os botões de relatório foram renomeados para `Relatório Turma` e `Relatório Geral`.
 - Na página dedicada de inclusão de aluno, a turma fica pré-selecionada quando houver opções e o envio fica bloqueado enquanto não existir turma cadastrada.
 
-
-
 - A página dedicada de inclusão de aluno agora inicia a turma em `< SELECIONE >`, exige escolha explícita antes do envio, mantém **Cancelar** e **Voltar** apontando para a mesma navegação e usa a formatação brasileira de celular via `formatToBrPhone`.
 
 - Na edição de aluno, o topo perdeu o bloco de código/turma atual; o código interno continua visível apenas no formulário.
 - O botão destrutivo **Excluir Aluno** foi movido para o topo, ao lado de **Voltar**.
 - O campo de celular da edição agora usa `formatToBrPhone` também enquanto o usuário digita, e o botão **Cancelar** do formulário segue a mesma navegação de retorno do **Voltar**.
 
-
 - Foi adicionado um console de diagnóstico visível na chamada e nas páginas de aluno; ele distingue erros de `FRONTEND` e `BACKEND` para facilitar suporte e depuração.
 - O console de diagnóstico foi ajustado para ficar visível apenas no acesso `50292230`; em outros acessos, os erros continuam aparecendo só no feedback vermelho.
 - Erros sem prefixo no cliente devem ser registrados como `FRONTEND` no console de diagnóstico, enquanto respostas `ok: false` do backend continuam como `BACKEND`.
-
