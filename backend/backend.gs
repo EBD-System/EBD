@@ -209,11 +209,7 @@ function saveCall_(p) {
   const frontByAlunoId = new Map();
 
   const activeRows = rows.filter(row => String(row?.statusAluno || row?.STATUS || 'ativo').trim().toLowerCase() !== 'inativo');
-  const markedRows = activeRows.filter(row => toInt_(row?.salvo ?? row?.SALVO ?? 0) === 1);
-  if (!markedRows.length) {
-    throw new Error('Marque ao menos 1 aluno antes de salvar.');
-  }
-  const presentesCount = countPresentesFromRows_(markedRows);
+  const presentesCount = countPresentesFromRows_(activeRows);
   const visitantes = clampInt_(p.visitantes, 0, 50);
   const maxBibliasRevistas = Math.max(0, presentesCount + visitantes);
   const biblias = clampInt_(p.biblias, 0, maxBibliasRevistas);
@@ -801,11 +797,33 @@ function buildCallForTurma_(dateKey, turma, alunos, chamadaRows, baseRows) {
     }
   }
 
+  const hasPartialCurrentSave = !useBaseForDate && classRows.length > 0;
+
   const effectiveRows = turmaAlunos.map(aluno => {
     const cached = byAluno.get(normalizeKey_(aluno.Nome)) || null;
-    return useBaseForDate
-      ? buildFrontRowFromBase_(cached, aluno, turmaNome)
-      : buildFrontRowFromChamada_(cached, aluno, turmaNome);
+    if (useBaseForDate) {
+      return buildFrontRowFromBase_(cached, aluno, turmaNome);
+    }
+    if (cached) {
+      return buildFrontRowFromChamada_(cached, aluno, turmaNome);
+    }
+    if (hasPartialCurrentSave) {
+      return {
+        alunoId: aluno.AlunoID,
+        nome: aluno.Nome,
+        turmaId: aluno.TurmaID,
+        turmaNome,
+        presenca: 'nao',
+        atraso: false,
+        observacao: '',
+        statusAluno: aluno.Status || 'ativo',
+        autoPresenca: 0,
+        autoAtraso: 0,
+        salvo: 1,
+        ausSeguidas: 0,
+      };
+    }
+    return buildFrontRowFromChamada_(cached, aluno, turmaNome);
   });
 
   const activeRows = effectiveRows.filter(r =>

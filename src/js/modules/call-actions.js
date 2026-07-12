@@ -46,21 +46,24 @@ async function saveCurrentCall({ silent = false } = {}) {
     throw new Error('Selecione uma turma antes de salvar.');
   }
 
-  const markedRows = (call.rows || []).filter(
-    (row) => !isInactiveStudent(row) && isSavedRow(row)
+  const presentRows = (call.rows || []).filter(
+    (row) => !isInactiveStudent(row) && isPresentLikeValue(row.presenca)
+  );
+  const absentRows = (call.rows || []).filter(
+    (row) => !isInactiveStudent(row) && !isPresentLikeValue(row.presenca)
   );
 
-  if (!markedRows.length) {
-    showError('Marque ao menos 1 aluno antes de salvar.');
+  if (!presentRows.length) {
+    showError('Marque ao menos um aluno como presente ou atrasado antes de salvar.');
     if (window.ProjectMemory) {
       window.ProjectMemory.recordFromEvent('save-blocked', {
         dateKey: state.dateKey,
         turmaNome: turma.Nome,
         turmaId: turma.TurmaID,
-        message: 'Nenhum aluno marcado para salvamento.',
+        message: 'Nenhum aluno marcado como presente ou atrasado.',
       });
     }
-    throw new Error('Marque ao menos 1 aluno antes de salvar.');
+    throw new Error('Nenhum aluno marcado como presente ou atrasado.');
   }
 
   const beforeRows = Number(state.baseRowsCount || 0);
@@ -76,7 +79,7 @@ async function saveCurrentCall({ silent = false } = {}) {
     biblias: String(call.biblias ?? 0),
     revistas: String(call.revistas ?? 0),
     //visitantesTexto: call.visitantesTexto || '',
-    rowsJson: JSON.stringify(call.rows),
+    rowsJson: JSON.stringify(presentRows),
   };
 
   if (!silent) {
@@ -140,9 +143,9 @@ async function saveCurrentCall({ silent = false } = {}) {
           dateKey: state.dateKey,
           turmaId: turma.TurmaID,
           turmaNome: turma.Nome,
-          presentes: Number((call.rows || []).filter((row) => isPresentLikeValue(row.presenca)).length),
-          ausentes: Number((call.rows || []).filter((row) => normalizePresenceValue(row.presenca) === 'nao').length),
-          atrasos: Number((call.rows || []).filter((row) => isDelayedValue(row.presenca)).length),
+          presentes: Number(presentRows.filter((row) => isPresentLikeValue(row.presenca)).length),
+          atrasos: Number(presentRows.filter((row) => isDelayedValue(row.presenca)).length),
+          ausentes: Number(absentRows.length),
           visitantes: Number(call.visitantes || 0),
           oferta: call.oferta,
         });
@@ -170,9 +173,9 @@ async function saveCurrentCall({ silent = false } = {}) {
           dateKey: state.dateKey,
           turmaId: turma.TurmaID,
           turmaNome: turma.Nome,
-          presentes: Number((call.rows || []).filter((row) => isPresentLikeValue(row.presenca)).length),
-          ausentes: Number((call.rows || []).filter((row) => normalizePresenceValue(row.presenca) === 'nao').length),
-          atrasos: Number((call.rows || []).filter((row) => isDelayedValue(row.presenca)).length),
+          presentes: Number(presentRows.filter((row) => isPresentLikeValue(row.presenca)).length),
+          atrasos: Number(presentRows.filter((row) => isDelayedValue(row.presenca)).length),
+          ausentes: Number(absentRows.length),
           visitantes: Number(call.visitantes || 0),
           oferta: call.oferta,
         });
