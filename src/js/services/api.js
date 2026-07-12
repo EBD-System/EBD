@@ -53,6 +53,10 @@ function normalizeBoolValue(value) {
   return v === 'sim' || v === 'true' || v === '1' || v === 'yes' || v === 'y';
 }
 
+function nowIso() {
+  return new Date().toISOString();
+}
+
 function createAppError(message, meta = {}) {
   const err = message instanceof Error ? message : new Error(String(message || 'Erro desconhecido.'));
   err.source = String(meta.source || err.source || 'frontend').toLowerCase();

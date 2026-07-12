@@ -51,3 +51,4 @@ Pontos centrais:
 - Erros sem prefixo no cliente devem ser registrados como `FRONTEND` no console de diagnóstico, enquanto respostas `ok: false` do backend continuam como `BACKEND`.
 
 - O botão **Salvar** grava uma snapshot local da chamada da turma/data; relatórios e busca por data devem priorizar esse armazenamento e usar a planilha apenas como fallback.
+- O fluxo de salvar chamada depende do helper local `nowIso()` em `src/js/services/api.js`; sem ele, a snapshot local falha com erro de referência.
