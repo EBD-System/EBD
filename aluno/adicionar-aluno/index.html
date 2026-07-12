@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="../../src/css/utilities.css" />
   <script defer src="../../src/js/config/app.config.js"></script>
   <script defer src="../../src/js/utils/helpers.js"></script>
+  <script defer src="../../src/js/utils/format.js"></script>
   <script defer src="../../src/js/services/api.js"></script>
   <script defer src="../../src/js/services/memory.js"></script>
   <script defer src="../../src/js/pages/add-aluno-page.js"></script>
@@ -38,12 +39,12 @@
       <form id="studentAddForm" class="student-edit-form hidden">
         <div class="field">
           <label for="studentAddName">Nome do aluno</label>
-          <input id="studentAddName" type="text" autocomplete="off" required />
+          <input id="studentAddName" type="text" placeholder="Nome do Aluno" autocomplete="off" required />
         </div>
 
         <div class="field">
           <label for="studentAddCelular">Celular (opcional)</label>
-          <input id="studentAddCelular" type="text" inputmode="numeric" placeholder="(XX) X XXXX-XXXX" autocomplete="off" />
+          <input id="studentAddCelular" type="text" inputmode="numeric" placeholder="(XX) 9XXXX-XXXX" autocomplete="off" />
         </div>
 
         <div class="field">
@@ -57,7 +58,7 @@
         </div>
 
         <div class="student-edit-form__actions">
-          <a class="btn btn--ghost" href="../../index.html">Cancelar</a>
+          <a id="studentAddCancel" class="btn btn--ghost" href="../../index.html">Cancelar</a>
           <button class="btn btn--primary" type="submit">Adicionar aluno</button>
         </div>
       </form>

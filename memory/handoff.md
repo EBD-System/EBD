@@ -39,3 +39,6 @@ Pontos centrais:
 - Na tela de ações da chamada, o botão de salvar ocupa a faixa inteira e os botões de relatório foram renomeados para `Relatório Turma` e `Relatório Geral`.
 - Na página dedicada de inclusão de aluno, a turma fica pré-selecionada quando houver opções e o envio fica bloqueado enquanto não existir turma cadastrada.
 
+
+
+- A página dedicada de inclusão de aluno agora inicia a turma em `< SELECIONE >`, exige escolha explícita antes do envio, mantém **Cancelar** e **Voltar** apontando para a mesma navegação e usa a formatação brasileira de celular via `formatToBrPhone`.

@@ -118,34 +118,26 @@ function stripLeadingZeros_(value) {
 }
 
 function formatToBrPhone(phone = '') {
-  const splitNumber = String(phone || '').replace(/\D/g, '').split('');
+  const digits = String(phone || '').replace(/\D/g, '').slice(0, 11);
 
-  if (splitNumber.length > 11) {
-    splitNumber.length = 11;
+  if (!digits) return '';
+
+  const ddd = digits.slice(0, 2);
+  const rest = digits.slice(2);
+
+  if (digits.length <= 2) {
+    return `(${ddd}`;
   }
 
-  phone = splitNumber.join('');
-
-  if (!phone) return '';
-
-  const areaBr = phone.substring(0, 2);
-  const areaCode = phone.substring(2, 3);
-  const middle = phone.substring(3, 7);
-  const last = phone.substring(7, 11);
-
-  if (phone.length <= 2) {
-    return `(${areaBr}`;
+  if (digits.length <= 3) {
+    return `(${ddd}) ${rest}`;
   }
 
-  if (phone.length <= 3) {
-    return `(${areaBr}) ${areaCode}`;
+  if (digits.length <= 7) {
+    return `(${ddd}) ${rest.slice(0, 1)}${rest.slice(1)}`;
   }
 
-  if (phone.length <= 7) {
-    return `(${areaBr}) ${areaCode} ${middle}`;
-  }
-
-  return `(${areaBr}) ${areaCode} ${middle}-${last}`;
+  return `(${ddd}) ${rest.slice(0, 1)}${rest.slice(1, 5)}-${rest.slice(5, 9)}`;
 }
 
 function formatBrazilCellPhone(value) {

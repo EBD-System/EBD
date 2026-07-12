@@ -250,6 +250,7 @@ async function addAluno(event) {
   }
   els.alunoNome.value = '';
   els.alunoCelular.value = '';
+  if (els.alunoTurma) els.alunoTurma.value = '';
   await refreshFromBackend(false);
   renderAll();
 }

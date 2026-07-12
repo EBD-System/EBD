@@ -330,15 +330,23 @@ function formatDateBR(dateKey) {
 function renderTurmaSelects() {
   const options = getTurmasSorted().map((turma) => `<option value="${escapeHtml(turma.TurmaID)}">${escapeHtml(turma.Nome)}</option>`).join('');
   els.turmaSelect.innerHTML = options || '<option value="">Nenhuma turma cadastrada</option>';
-  els.alunoTurma.innerHTML = options || '<option value="">Cadastre uma turma primeiro</option>';
+
+  const alunoOptions = getTurmasSorted().length
+    ? [
+        '<option value="" selected disabled>&lt; SELECIONE &gt;</option>',
+        ...getTurmasSorted().map((turma) => `<option value="${escapeHtml(turma.TurmaID)}">${escapeHtml(turma.Nome)}</option>`),
+      ].join('')
+    : '<option value="">Cadastre uma turma primeiro</option>';
+
+  els.alunoTurma.innerHTML = alunoOptions;
 
   const exists = getTurmasSorted().some((t) => String(t.TurmaID || '') === String(state.selectedTurmaId || ''));
-  if (!exists) {
+  if (!exists && getTurmasSorted().length) {
     state.selectedTurmaId = getTurmasSorted()[0]?.TurmaID || '';
   }
 
   els.turmaSelect.value = state.selectedTurmaId || '';
-  els.alunoTurma.value = state.selectedTurmaId || getTurmasSorted()[0]?.TurmaID || '';
+  els.alunoTurma.value = '';
 }
 
 function renderSummary() {

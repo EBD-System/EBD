@@ -4,6 +4,7 @@
 
   const els = {
     back: document.getElementById('addAlunoBackBtn'),
+    cancel: document.getElementById('studentAddCancel'),
     form: document.getElementById('studentAddForm'),
     loading: document.getElementById('studentAddLoading'),
     name: document.getElementById('studentAddName'),
@@ -23,6 +24,18 @@
     return query ? `../../index.html?${query}` : '../../index.html';
   }
 
+  function applyReturnUrl() {
+    const returnUrl = buildBackUrl();
+    if (els.back) els.back.setAttribute('href', returnUrl);
+    if (els.cancel) els.cancel.setAttribute('href', returnUrl);
+  }
+
+  function formatCellPhoneInput(event) {
+    const input = event?.target;
+    if (!input) return;
+    input.value = formatToBrPhone(input.value);
+  }
+
   function setFeedback(type, message) {
     if (!els.feedback) return;
     els.feedback.className = `feedback show ${type}`;
@@ -40,9 +53,10 @@
     els.turma.innerHTML = '';
     const placeholder = document.createElement('option');
     placeholder.value = '';
-    placeholder.textContent = turmas.length ? 'Selecione uma turma' : 'Cadastre uma turma primeiro';
+    placeholder.textContent = turmas.length ? '< SELECIONE >' : 'Cadastre uma turma primeiro';
     placeholder.disabled = true;
-    placeholder.hidden = turmas.length > 0;
+    placeholder.selected = true;
+    placeholder.hidden = false;
     els.turma.appendChild(placeholder);
 
     (turmas || []).forEach((turma) => {
@@ -55,7 +69,7 @@
     if (turmas.length) {
       const fallback = selectedTurmaId && turmas.some((turma) => String(turma.TurmaID || '') === String(selectedTurmaId || ''))
         ? selectedTurmaId
-        : String(turmas[0]?.TurmaID || '');
+        : '';
       els.turma.value = fallback;
       els.turma.disabled = false;
       if (els.submit) els.submit.disabled = false;
@@ -73,7 +87,7 @@
     try {
       const data = await apiGet({ action: 'init', date: todayKey() });
       turmas = Array.isArray(data.turmas) ? data.turmas : [];
-      renderTurmaOptions(turmas[0]?.TurmaID || '');
+      renderTurmaOptions('');
 
       if (window.ProjectMemory && data?.memory) {
         try {
@@ -142,8 +156,8 @@
       els.name.value = '';
       els.celular.value = '';
       els.nascimento.value = '';
-      if (turmas.length && els.turma) {
-        els.turma.value = String(turmas[0]?.TurmaID || els.turma.value || '');
+      if (els.turma) {
+        els.turma.value = '';
       }
       if (els.name) els.name.focus();
     } catch (err) {
@@ -154,8 +168,11 @@
     }
   }
 
-  if (els.back) {
-    els.back.setAttribute('href', buildBackUrl());
+  applyReturnUrl();
+
+  if (els.celular) {
+    els.celular.addEventListener('input', formatCellPhoneInput);
+    els.celular.addEventListener('blur', formatCellPhoneInput);
   }
 
   if (els.form) {
