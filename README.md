@@ -25,6 +25,69 @@ Este repositório reúne o esquema PostgreSQL da Escola Bíblica Dominical (EBD)
 
 ---
 
+## Fluxo real de uso da chamada
+
+A ordem abaixo representa o uso mais natural do sistema no dia da aula:
+
+1. abrir a chamada da classe;
+2. registrar presença de cada aluno;
+3. aplicar ações coletivas, quando necessário;
+4. registrar oferta, visitantes, bíblias, revistas e observações;
+5. conferir os resumos e rankings;
+6. fechar a chamada;
+7. reabrir somente se houver necessidade e permissão.
+
+### Exemplo de ciclo completo
+
+```sql
+-- 1) abrir a chamada
+SELECT public.fn_ebd_abrir_chamada(1, CURRENT_DATE);
+
+-- 2) obter o id da chamada aberta
+SELECT * FROM public.fn_ebd_chamada_classe(1, CURRENT_DATE);
+
+-- 3) registrar a presença de um aluno específico
+SELECT public.fn_ebd_alterar_status_chamada(12, 1, 'presente');
+
+-- 4) registrar um aluno como atrasado
+SELECT public.fn_ebd_alterar_status_chamada(12, 2, 'atrasado');
+
+-- 5) marcar todos como presentes, se a aula começar com a classe completa
+SELECT public.fn_ebd_todos_presentes(12);
+
+-- 6) registrar oferta e visitante
+SELECT public.fn_ebd_registrar_oferta(12, 123.45);
+SELECT public.fn_ebd_registrar_visitante(12, 'Carlos Teste', 'Visitante da aula');
+
+-- 7) consultar o resumo
+SELECT * FROM public.fn_ebd_resumo_classe(1, CURRENT_DATE);
+
+-- 8) fechar a chamada ao final
+SELECT public.fn_ebd_fechar_chamada(12);
+```
+
+### Exemplo de uso com variáveis no app
+
+Para facilitar a leitura no código da aplicação, use variáveis em vez de números soltos:
+
+```js
+const idChamada = 12;
+const idAlunoClasse = 1;
+
+// marca presença
+fnEbdAlterarStatusChamada(idChamada, idAlunoClasse, 'presente');
+
+// marca atraso
+fnEbdAlterarStatusChamada(idChamada, idAlunoClasse, 'atrasado');
+
+// marca ausência
+fnEbdAlterarStatusChamada(idChamada, idAlunoClasse, 'ausente');
+```
+
+> Se você quiser uma função mais amigável no front-end, pode criar um wrapper como `FuncaoPresenca(alunoId)` ou `marcarPresenca(alunoId)`, e internamente ela chama a função SQL genérica.
+
+---
+
 ## Funções
 
 ## `fn_ebd_abrir_chamada`
@@ -161,17 +224,23 @@ Gabriel Nunes | ALU0010   | Crianças Maiores   | 2025-02-01  | 2026-01-15 | fal
 
 ---
 
-## `fn_ebd_marcar_presenca`
+## `fn_ebd_alterar_status_chamada`
 
 ```sql
-SELECT public.fn_ebd_marcar_presenca(1, 1, 'presente');
+SELECT public.fn_ebd_alterar_status_chamada(1, 1, 'presente');
 ```
 
-Marca a presença de um aluno na chamada.
+Função genérica para atualizar o status do aluno na chamada.
 
 **Retorno:** `void`.
 
-**Status aceitos:** `presente` ou `atrasado`.
+**Status aceitos:** `presente`, `atrasado` ou `ausente`.
+
+**Exemplo de uso com variável no front-end:**
+```js
+const idAlunoClasse = 1;
+fnEbdAlterarStatusChamada(idChamada, idAlunoClasse, 'presente');
+```
 
 ---
 
@@ -418,7 +487,7 @@ Marca todos os alunos da chamada como presentes.
 - `fn_ebd_resumo_classe` — agora inclui `visitantes`, `biblias`, `revistas` e `presenca_turma`
 - `fn_ebd_resumo_chamada` — agora consolida os totais gerais do dia
 - `fn_ebd_registrar_visitante` — retorno é o `id_chamada_visitante`
-- `fn_ebd_fechar_chamada`, `fn_ebd_reabrir_chamada`, `fn_ebd_marcar_presenca`, `fn_ebd_todos_presentes`, `fn_ebd_todos_ausentes` — retorno `void`
+- `fn_ebd_fechar_chamada`, `fn_ebd_reabrir_chamada`, `fn_ebd_alterar_status_chamada`, `fn_ebd_todos_presentes`, `fn_ebd_todos_ausentes` — retorno `void`
 
 ---
 
