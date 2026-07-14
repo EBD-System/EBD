@@ -19,3 +19,5 @@
 
 - A navegação principal deve reconhecer as rotas `/login`, `/turma`, `/turma/:id`, `/chamada`, `/abrir-chamada` e `/inativos`, com sessão persistida no navegador e `?code=` apenas como compatibilidade temporária.
 - A ação `init` do backend pode receber `view` para respostas mais leves em telas de listagem, especialmente para `/turma` e `/inativos`.
+
+- Em GitHub Pages, a navegação interna deve preservar o basename `/EBD`; redirects e links do frontend precisam usar helpers centralizados e não podem construir URLs na raiz do domínio.

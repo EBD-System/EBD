@@ -17,3 +17,8 @@ Pontos centrais:
 - A edição de aluno acontece em uma página dedicada em `aluno/editar-aluno/`.
 - O cadastro de aluno fica em `aluno/adicionar-aluno/` e não inclui cadastro de nova turma.
 - O backend atual é PostgreSQL; a interface deve ser mantida genérica para qualquer ponte HTTP compatível.
+
+- O roteador agora é basename-aware para GitHub Pages e preserva `/EBD` em navegações internas.
+- Existe um bypass temporário centralizado em `DEV_BYPASS_AUTH`; quando ativo, o guard não bloqueia o acesso às rotas internas.
+- As rotas internas continuam sendo tratadas no cliente, mas qualquer navegação deve passar por helpers que reconstruem a URL com o basename correto.
+

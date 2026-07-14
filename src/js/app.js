@@ -7,7 +7,7 @@ function validateApiUrl() {
 }
 
 function buildAddAlunoPageUrl() {
-  return 'aluno/adicionar-aluno/';
+  return buildAppPath('/aluno/adicionar-aluno/');
 }
 
 function normalizeCelularInput(event) {

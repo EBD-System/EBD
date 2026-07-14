@@ -97,7 +97,7 @@ function closeStudentEditModal() {
 }
 
 function buildStudentEditPageUrl(alunoId) {
-  const route = 'aluno/editar-aluno/';
+  const route = buildAppPath('/aluno/editar-aluno/');
   const params = new URLSearchParams();
 
   if (alunoId) {
