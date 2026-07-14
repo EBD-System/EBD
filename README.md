@@ -12,7 +12,13 @@ Exemplo de saída:
 
 ## fn_ebd_matricular_aluno
 ```sql
-SELECT public.fn_ebd_matricular_aluno(4, 'ALU9999', 4, CURRENT_DATE, 'Matrícula de teste para validação das funções');
+-- turma = 4
+-- pessoa = 4
+-- matrícula = ALU9999
+-- data_inicio = CURRENT_DATE
+-- observacao = Matrícula de teste para validação das funções
+
+SELECT public.fn_ebd_matricular_aluno(turma, matricula, pessoa, data_inicio, observacao);
 ```
 Essa função matricula uma pessoa como aluno em uma classe.
 Exemplo de saída:
