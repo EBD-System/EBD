@@ -1,192 +1,433 @@
-# Funções testadas na EBD
+# EBD — Banco de Dados e Funções
 
-## fn_ebd_abrir_chamada
+Este repositório reúne o esquema PostgreSQL da Escola Bíblica Dominical (EBD), com tabelas, constraints, índices, triggers e funções utilitárias para matrícula, chamada, presença, visitantes, ofertas, resumos e rankings.
+
+> Os exemplos abaixo usam a base carregada no dump `ebd_backup.sql`.
+
+## Visão geral
+
+### Principais entidades
+- `ebd_pessoa`: cadastro base da pessoa
+- `ebd_aluno`: vínculo da pessoa como aluno
+- `ebd_aluno_classe`: histórico de vínculo do aluno com uma classe
+- `ebd_classe`: cadastro das classes
+- `ebd_chamada`: chamada por classe e data
+- `ebd_chamada_aluno`: presença/ausência por aluno na chamada
+- `ebd_chamada_visitante`: visitantes da chamada
+- `ebd_funcao`, `ebd_pessoa_funcao`: funções da pessoa na EBD
+- `ebd_usuario`, `ebd_perfil`, `ebd_usuario_perfil`: autenticação e perfis
+
+### Regras importantes
+- A chamada é única por `id_classe` + `data_chamada`.
+- Só é permitido alterar chamada do dia atual nas rotinas de presença, oferta, visitantes, fechar e zerar.
+- `fn_ebd_reabrir_chamada` permite reabrir chamada fora da data atual apenas para usuário com perfil de administrador.
+- `visitante` é um registro da chamada do dia, não um vínculo permanente.
+
+---
+
+## Funções
+
+## `fn_ebd_abrir_chamada`
+
 ```sql
-SELECT public.fn_ebd_abrir_chamada(1, CURRENT_DATE);
+SELECT public.fn_ebd_abrir_chamada(1, DATE '2026-07-13');
 ```
-Essa função abre a chamada da classe na data informada. Se a chamada já existir, ela reaproveita a mesma.
-Exemplo de saída:
+
+Abre a chamada de uma classe para uma data. Se a chamada já existir, a função reaproveita o mesmo registro. Também cria automaticamente os registros dos alunos ativos da classe com status `ausente`.
+
+**Retorno:** `bigint` com o `id_chamada`.
+
+**Exemplo de saída:**
 ```text
-11
+1
 ```
 
-## fn_ebd_matricular_aluno
-```sql
--- turma = 4
--- pessoa = 4
--- matrícula = ALU9999
--- data_inicio = CURRENT_DATE
--- observacao = Matrícula de teste para validação das funções
+---
 
-SELECT public.fn_ebd_matricular_aluno(turma, matricula, pessoa, data_inicio, observacao);
-```
-Essa função matricula uma pessoa como aluno em uma classe.
-Exemplo de saída:
-```text
-15
-```
+## `fn_ebd_alunos_classe`
 
-## fn_ebd_alunos_classe
 ```sql
 SELECT * FROM public.fn_ebd_alunos_classe(1);
 ```
-Essa função lista os alunos da classe informada.
-Exemplo de saída:
+
+Lista os alunos ativos de uma classe.
+
+**Retorno:** tabela com `id_aluno`, `id_pessoa`, `nome`, `matricula`, `status`.
+
+**Exemplo de saída:**
 ```text
-Pedro Santos
-Elisa Santos
+ id_aluno | id_pessoa |      nome       | matricula | status
+----------+-----------+-----------------+-----------+--------
+ 1        | 5         | Pedro Santos    | ALU0005   | ativo
+ 2        | 6         | Elisa Santos    | ALU0006   | ativo
 ```
 
-## fn_ebd_aniversariantes
+---
+
+## `fn_ebd_aniversariantes`
+
 ```sql
-SELECT * FROM public.fn_ebd_aniversariantes(CURRENT_DATE);
-```
-Essa função lista os aniversariantes do período consultado.
-Exemplo de saída:
-```text
-Thiago Costa
-Bruno Rocha
-Patrícia Almeida
-Gabriel Nunes
+SELECT * FROM public.fn_ebd_aniversariantes(DATE '2026-07-13');
 ```
 
-## fn_ebd_chamada_classe
-```sql
-SELECT * FROM public.fn_ebd_chamada_classe(1, CURRENT_DATE);
-```
-Essa função mostra os dados da chamada da classe na data informada.
-Exemplo de saída:
+Lista aniversariantes agrupados por período: semana passada, semana seguinte, mês atual e trimestre atual.
+
+**Retorno:** tabela com `periodo`, `id_pessoa`, `nome`, `data_nascimento`, `aniversario_no_ano`, `idade`.
+
+**Exemplo de saída resumida:**
 ```text
-classe: Crianças Menores
-oferta: 123.45
-visitantes: 1
-ausentes: 2
+periodo         | nome
+-----------------|----------------
+semana_passada   | Thiago Costa
+mes_atual        | Thiago Costa
+trimestre_atual  | Thiago Costa
+trimestre_atual  | Patrícia Almeida
+trimestre_atual  | Gabriel Nunes
+trimestre_atual  | Bruno Rocha
 ```
 
-## fn_ebd_historico_aluno
+---
+
+## `fn_ebd_chamada_classe`
+
 ```sql
-SELECT * FROM public.fn_ebd_historico_aluno(<id_aluno>);
-```
-Essa função mostra o histórico de vínculo do aluno.
-Exemplo de saída:
-```text
-Daniela Souza | ALU9999 | ativo
+SELECT * FROM public.fn_ebd_chamada_classe(1, DATE '2026-07-13');
 ```
 
-## fn_ebd_data_aniversario_no_ano
-```sql
-SELECT public.fn_ebd_data_aniversario_no_ano(DATE '2016-02-29', EXTRACT(YEAR FROM CURRENT_DATE)::INTEGER);
+Mostra o detalhamento da chamada de uma classe em uma data.
+
+**Retorno:** tabela com:
+`id_chamada`, `id_chamada_aluno`, `id_classe`, `classe`, `data_chamada`, `id_aluno_classe`, `id_aluno`, `id_pessoa`, `matricula`, `aluno`, `status`, `observacao`.
+
+**Exemplo de saída:**
+```text
+id_chamada | classe            | aluno         | status   | observacao
+-----------+-------------------+---------------+----------+------------------------
+1          | Crianças Menores  | Pedro Santos  | presente | 
+1          | Crianças Menores  | Elisa Santos  | atrasado | Chegou após o início.
 ```
-Essa função ajusta a data de nascimento para o ano informado.
-Exemplo de saída:
+
+---
+
+## `fn_ebd_data_aniversario_no_ano`
+
+```sql
+SELECT public.fn_ebd_data_aniversario_no_ano(DATE '2016-02-29', 2026);
+```
+
+Ajusta a data de nascimento para o ano informado. Em ano não bissexto, 29/02 vira 28/02.
+
+**Retorno:** `date`.
+
+**Exemplo de saída:**
 ```text
 2026-02-28
 ```
 
-## fn_ebd_resumo_classe
+---
+
+## `fn_ebd_fechar_chamada`
+
 ```sql
-SELECT * FROM public.fn_ebd_resumo_classe(1, CURRENT_DATE);
-```
-Essa função mostra um resumo da chamada da classe.
-Exemplo de saída:
-```text
-total_alunos: 2
-presentes: 0
-atrasados: 0
-ausentes: 2
+SELECT public.fn_ebd_fechar_chamada(1);
 ```
 
-## fn_ebd_resumo_chamada
+Fecha a chamada informada.
+
+**Retorno:** `void`.
+
+**Observação:** só fecha chamada do dia atual.
+
+---
+
+## `fn_ebd_historico_aluno`
+
 ```sql
-SELECT * FROM public.fn_ebd_resumo_chamada(CURRENT_DATE);
-```
-Essa função mostra o resumo geral da chamada do dia.
-Exemplo de saída:
-```text
-total_alunos: 2
-presentes: 0
-atrasados: 0
-ausentes: 2
+SELECT * FROM public.fn_ebd_historico_aluno(6);
 ```
 
-## fn_ebd_registrar_oferta
-```sql
-SELECT public.fn_ebd_registrar_oferta(<id_chamada>, 123.45);
-```
-Essa função registra o valor da oferta na chamada.
-Exemplo de saída:
+Mostra o histórico de vínculos do aluno com classes.
+
+**Retorno:** tabela com:
+`id_aluno`, `id_pessoa`, `nome`, `matricula`, `status_aluno`, `id_aluno_classe`, `id_classe`, `classe`, `data_inicio`, `data_fim`, `ativo_classe`, `motivo`.
+
+**Exemplo de saída resumida:**
 ```text
-oferta: 123.45
+nome          | matricula | classe             | data_inicio | data_fim   | ativo_classe
+-------------|-----------|--------------------|-------------|------------|-------------
+Gabriel Nunes | ALU0010   | Adolescentes       | 2026-01-16  |            | true
+Gabriel Nunes | ALU0010   | Crianças Maiores   | 2025-02-01  | 2026-01-15 | false
 ```
 
-## fn_ebd_registrar_visitante
+---
+
+## `fn_ebd_marcar_presenca`
+
 ```sql
-SELECT public.fn_ebd_registrar_visitante(<id_chamada>, 'Carlos Teste', 'Visitante para validação');
-```
-Essa função registra um visitante na chamada.
-Exemplo de saída:
-```text
-visitantes: 1
+SELECT public.fn_ebd_marcar_presenca(1, 1, 'presente');
 ```
 
-## fn_ebd_marcar_presenca
+Marca a presença de um aluno na chamada.
+
+**Retorno:** `void`.
+
+**Status aceitos:** `presente` ou `atrasado`.
+
+---
+
+## `fn_ebd_matricular_aluno`
+
 ```sql
-SELECT public.fn_ebd_marcar_presenca(<id_chamada>, 1, 'presente');
-```
-Essa função marca a presença de um aluno na chamada.
-Exemplo de saída:
-```text
-Aluno 1 presente
+SELECT public.fn_ebd_matricular_aluno(4, 'ALU9999', 4, CURRENT_DATE, 'Matrícula de teste para validação');
 ```
 
-## fn_ebd_todos_presentes
+Matricula uma pessoa como aluno em uma classe.
+
+**Assinatura atual:**
 ```sql
-SELECT public.fn_ebd_todos_presentes(<id_chamada>);
-```
-Essa função marca todos os alunos da chamada como presentes.
-Exemplo de saída:
-```text
-Todos presentes
+fn_ebd_matricular_aluno(
+    p_id_pessoa bigint,
+    p_matricula text,
+    p_id_classe bigint,
+    p_data_inicio date DEFAULT CURRENT_DATE,
+    p_observacao text DEFAULT ''
+)
 ```
 
-## fn_ebd_todos_ausentes
-```sql
-SELECT public.fn_ebd_todos_ausentes(<id_chamada>);
-```
-Essa função marca todos os alunos da chamada como ausentes.
-Exemplo de saída:
+**Retorno:** `bigint` com o novo `id_aluno`.
+
+**Exemplo de saída:**
 ```text
-Todos ausentes
+16
 ```
 
-## fn_ebd_fechar_chamada
+---
+
+## `fn_ebd_ranking_oferta`
+
 ```sql
-SELECT public.fn_ebd_fechar_chamada(<id_chamada>);
-```
-Essa função fecha a chamada.
-Exemplo de saída:
-```text
-Chamada fechada
+SELECT * FROM public.fn_ebd_ranking_oferta(DATE '2026-07-13');
 ```
 
-## fn_ebd_reabrir_chamada
-```sql
-SELECT public.fn_ebd_reabrir_chamada(<id_chamada>);
-```
-Essa função reabre a chamada.
-Exemplo de saída:
+Mostra o ranking das classes pela soma de ofertas no dia.
+
+**Retorno:** tabela com `id_classe`, `classe`, `valor_oferta`, `posicao`, `resultado`.
+
+**Exemplo de saída resumida:**
 ```text
-Chamada reaberta
+posicao | classe            | valor_oferta | resultado
+------- |-------------------|-------------|----------------------
+1       | Senhores          | 150.00      | vencedora
+2       | Senhoras          | 110.00      | participante
+3       | Jovens            | 87.00       | participante
+4       | Crianças Maiores   | 52.50       | participante
+5       | Adolescentes      | 40.00       | participante
+6       | Crianças Menores  | 35.00       | participante
 ```
 
-## fn_ebd_set_atualizado_em
+---
+
+## `fn_ebd_ranking_presenca`
+
+```sql
+SELECT * FROM public.fn_ebd_ranking_presenca(DATE '2026-07-13');
+```
+
+Mostra o ranking das classes por percentual de presença no dia.
+
+**Retorno:** tabela com `id_classe`, `classe`, `total_alunos`, `presentes`, `atrasados`, `ausentes`, `percentual_presenca`, `posicao`, `resultado`.
+
+**Regra de empate:** quando duas ou mais classes têm o maior percentual, todas recebem `resultado = 'empate na liderança'`.
+
+**Exemplo de saída resumida:**
+```text
+posicao | classe            | percentual_presenca | resultado
+------- |-------------------|--------------------|----------------------
+1       | Adolescentes      | 100.0              | empate na liderança
+2       | Crianças Menores  | 100.0              | empate na liderança
+3       | Jovens            | 100.0              | empate na liderança
+4       | Crianças Maiores  | 50.0               | participante
+5       | Senhores          | 50.0               | participante
+6       | Senhoras          | 50.0               | participante
+```
+
+---
+
+## `fn_ebd_ranking_visitantes`
+
+```sql
+SELECT * FROM public.fn_ebd_ranking_visitantes(DATE '2026-07-13');
+```
+
+Mostra o ranking das classes pelo número de visitantes no dia.
+
+**Retorno:** tabela com `id_classe`, `classe`, `visitantes`, `posicao`, `resultado`.
+
+**Regra de empate:** quando duas ou mais classes têm o maior número de visitantes, todas recebem `resultado = 'empate na liderança'`.
+
+**Exemplo de saída resumida:**
+```text
+posicao | classe            | visitantes | resultado
+------- |-------------------|-----------|----------------------
+1       | Jovens            | 2         | vencedora
+2       | Crianças Maiores  | 1         | participante
+3       | Senhores          | 1         | participante
+4       | Senhoras          | 1         | participante
+5       | Adolescentes      | 0         | participante
+6       | Crianças Menores  | 0         | participante
+```
+
+---
+
+## `fn_ebd_reabrir_chamada`
+
+```sql
+SELECT public.fn_ebd_reabrir_chamada(1);
+```
+
+Reabre a chamada informada.
+
+**Retorno:** `void`.
+
+**Observação:** fora da data atual, apenas administrador pode reabrir.
+
+---
+
+## `fn_ebd_registrar_oferta`
+
+```sql
+SELECT public.fn_ebd_registrar_oferta(1, 123.45);
+```
+
+Registra o valor da oferta na chamada.
+
+**Retorno:** `numeric`.
+
+**Exemplo de saída:**
+```text
+123.45
+```
+
+---
+
+## `fn_ebd_registrar_visitante`
+
+```sql
+SELECT public.fn_ebd_registrar_visitante(1, 'Carlos Teste', 'Visitante para validação');
+```
+
+Registra um visitante na chamada.
+
+**Retorno:** `bigint` com o `id_chamada_visitante`.
+
+**Exemplo de saída:**
+```text
+10
+```
+
+---
+
+## `fn_ebd_resumo_chamada`
+
+```sql
+SELECT * FROM public.fn_ebd_resumo_chamada(DATE '2026-07-13');
+```
+
+Mostra o resumo geral de todas as chamadas do dia.
+
+**Retorno:** tabela com:
+`id_chamada`, `id_classe`, `classe`, `data_chamada`, `oferta`, `visitantes`, `biblias`, `revistas`, `observacao`, `total_alunos`, `presentes`, `atrasados`, `ausentes`, `presenca_turma`.
+
+**Exemplo de saída resumida:**
+```text
+classe          | oferta  | visitantes | biblias | revistas | total_alunos | presentes | atrasados | ausentes | presenca_turma
+---------------|---------|------------|---------|----------|--------------|-----------|-----------|----------|---------------
+Resumo Geral    | 474.50  | 5          | 19      | 11       | 12           | 7         | 2         | 3        | 75.0
+```
+
+---
+
+## `fn_ebd_resumo_classe`
+
+```sql
+SELECT * FROM public.fn_ebd_resumo_classe(1, DATE '2026-07-13');
+```
+
+Mostra o resumo de uma classe em uma data.
+
+**Retorno:** tabela com:
+`id_chamada`, `id_classe`, `classe`, `data_chamada`, `oferta`, `visitantes`, `biblias`, `revistas`, `observacao`, `total_alunos`, `presentes`, `atrasados`, `ausentes`, `presenca_turma`.
+
+**Exemplo de saída resumida:**
+```text
+classe            | oferta | visitantes | biblias | revistas | total_alunos | presentes | atrasados | ausentes | presenca_turma
+-----------------|--------|------------|---------|----------|--------------|-----------|-----------|----------|---------------
+Crianças Menores | 35.00  | 0          | 2       | 2        | 2            | 1         | 1         | 0        | 100.0
+```
+
+---
+
+## `fn_ebd_set_atualizado_em`
+
 ```sql
 UPDATE public.ebd_pessoa
    SET observacao = observacao
  WHERE id_pessoa = 1;
 ```
-Essa função de trigger atualiza automaticamente o campo `atualizado_em`.
-Exemplo de saída:
-```text
-2026-07-14 08:48:07.843532-03
+
+Função de trigger usada para atualizar automaticamente o campo `atualizado_em`.
+
+**Retorno:** `trigger`.
+
+---
+
+## `fn_ebd_todos_ausentes`
+
+```sql
+SELECT public.fn_ebd_todos_ausentes(1);
 ```
+
+Marca todos os alunos da chamada como ausentes.
+
+**Retorno:** `void`.
+
+---
+
+## `fn_ebd_todos_presentes`
+
+```sql
+SELECT public.fn_ebd_todos_presentes(1);
+```
+
+Marca todos os alunos da chamada como presentes.
+
+**Retorno:** `void`.
+
+---
+
+## Observações finais
+
+### Funções adicionadas neste dump
+- `fn_ebd_ranking_oferta`
+- `fn_ebd_ranking_presenca`
+- `fn_ebd_ranking_visitantes`
+
+### Funções com comportamento ou exemplo ajustado
+- `fn_ebd_matricular_aluno` — ordem correta dos parâmetros
+- `fn_ebd_chamada_classe` — colunas retornadas atualizadas
+- `fn_ebd_resumo_classe` — agora inclui `visitantes`, `biblias`, `revistas` e `presenca_turma`
+- `fn_ebd_resumo_chamada` — agora consolida os totais gerais do dia
+- `fn_ebd_registrar_visitante` — retorno é o `id_chamada_visitante`
+- `fn_ebd_fechar_chamada`, `fn_ebd_reabrir_chamada`, `fn_ebd_marcar_presenca`, `fn_ebd_todos_presentes`, `fn_ebd_todos_ausentes` — retorno `void`
+
+---
+
+## Banco de dados
+
+O dump também contém:
+- tabelas
+- constraints
+- índices
+- FKs
+- triggers
+- dados de exemplo para carga inicial
