@@ -1,6 +1,6 @@
-const APPS_SCRIPT_URL =
-  window.APPS_SCRIPT_URL ||
-  'https://script.google.com/macros/s/AKfycbxqqMq1jnkQ3c_5KjEW7i6a0EZgXiy-hqduShtvpeRl-4olRKc6cEKFPAH1C42HZQ2kUw/exec';
+// Configure a URL da API HTTP que conversa com PostgreSQL.
+// TODO: conectar o site a um backend real que exponha o banco de dados.
+const BACKEND_API_URL = window.BACKEND_API_URL || window.API_BASE_URL || '';
 
 const STORAGE_KEY = 'prb_presenca_turmas_v2';
 const ROSTER_CACHE_KEY = 'prb_roster_cache_v1';
@@ -52,6 +52,12 @@ const state = {
   accessMode: 'self',
   selfCelularSuffix: '',
   baseRowsCount: 0,
+  routeName: '',
+  routeParams: {},
+  routeData: null,
+  inativos: [],
+  routerStarted: false,
+  session: null,
 };
 
 const ACCESS_CODES = {

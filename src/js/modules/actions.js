@@ -104,11 +104,6 @@ function buildStudentEditPageUrl(alunoId) {
     params.set('alunoId', String(alunoId).trim());
   }
 
-  const accessCode = String(state.accessCode || '').trim();
-  if (accessCode) {
-    params.set('code', accessCode);
-  }
-
   const query = params.toString();
   return query ? `${route}?${query}` : route;
 }
@@ -463,7 +458,7 @@ function bindCallFieldValues() {
 
 
 
-async function refreshFromBackend(showMessage = false, { silent = false, preferLocal = true } = {}) {
+async function refreshFromBackend(showMessage = false, { silent = false, preferLocal = true, view = '', turmaId = '' } = {}) {
   clearAutosaveTimer();
   state.loading = true;
 
@@ -478,18 +473,34 @@ async function refreshFromBackend(showMessage = false, { silent = false, preferL
       {
         action: 'init',
         date: state.dateKey,
+        view,
+        turmaId,
       },
       { timeoutMs: 30000 }
     );
 
-    state.turmas = Array.isArray(data.turmas) ? data.turmas : [];
-    state.alunos = Array.isArray(data.alunos) ? data.alunos : [];
     const backendCalls = data.callsByTurma || {};
-    state.chamadasByTurma = localSnapshot
+    state.chamadasByTurma = localSnapshot && !view
       ? mergeCallsByTurma_(backendCalls, localSnapshot.callsByTurma || {})
       : backendCalls;
     state.resumoGeral = data.resumoGeral || state.resumoGeral || null;
     state.baseRowsCount = Number(data.baseRowsCount || state.baseRowsCount || 0);
+    state.inativos = Array.isArray(data.inativos) ? data.inativos : state.inativos || [];
+
+    if (Array.isArray(data.turmas)) {
+      state.turmas = data.turmas;
+    }
+
+    if (Array.isArray(data.alunos)) {
+      state.alunos = data.alunos;
+    }
+
+    if (data.selectedTurmaId) {
+      state.selectedTurmaId = String(data.selectedTurmaId);
+    }
+
+
+    state.routeData = data;
 
     if (window.ProjectMemory && data.memory) {
       try {
@@ -519,8 +530,8 @@ async function refreshFromBackend(showMessage = false, { silent = false, preferL
         state.alunos = Array.isArray(rosterCache.alunos) ? rosterCache.alunos : state.alunos;
       }
 
-      state.chamadasByTurma = mergeCallsByTurma_({}, localSnapshot.callsByTurma || {});
-      if (!state.selectedTurmaId) {
+      state.chamadasByTurma = view ? {} : mergeCallsByTurma_({}, localSnapshot.callsByTurma || {});
+      if (!state.selectedTurmaId && !view) {
         state.selectedTurmaId = Object.keys(localSnapshot.callsByTurma || {})[0] || state.turmas[0]?.TurmaID || state.selectedTurmaId;
       }
 

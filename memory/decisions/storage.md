@@ -6,7 +6,7 @@ Rascunhos de chamada continuam no navegador, e cada salvamento confirmado grava 
 
 ## Motivo
 
-Isso preserva o preenchimento quando o envio ao Apps Script falha e permite reabrir chamadas antigas pelo armazenamento local antes de consultar a planilha.
+Isso preserva o preenchimento quando o envio ao backend falha e permite reabrir chamadas antigas pelo armazenamento local antes de consultar o backend.
 
 ## Data
 

@@ -1,7 +1,21 @@
 (function () {
   const params = new URLSearchParams(window.location.search);
-  const accessCode = String(params.get('code') || '').trim();
+  const session = typeof loadAccessSession === 'function'
+    ? loadAccessSession()
+    : (typeof getStoredAccessSession === 'function' ? getStoredAccessSession() : null);
+  const accessCode = String(
+    session?.legacyAccessCode ||
+    session?.accessCode ||
+    params.get('code') ||
+    state.accessCode ||
+    ''
+  ).trim();
+
+  state.session = session || state.session || null;
   state.accessCode = accessCode;
+  state.accessMode = String(session?.accessMode || resolveAccessMode(session || accessCode)).trim().toLowerCase();
+  if (typeof applyAccessMode === 'function') applyAccessMode();
+  if (typeof renderResponsavelLabel === 'function') renderResponsavelLabel();
   syncDebugConsoleVisibility();
 
   const els = {
@@ -20,10 +34,7 @@
   let turmas = [];
 
   function buildBackUrl() {
-    const backParams = new URLSearchParams();
-    if (accessCode) backParams.set('code', accessCode);
-    const query = backParams.toString();
-    return query ? `../../index.html?${query}` : '../../index.html';
+    return '../../index.html';
   }
 
   function applyReturnUrl() {

@@ -1,19 +1,13 @@
 function validateApiUrl() {
-  if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('COLE_AQUI')) {
-    showError('Cole a URL do Web App do Apps Script em APPS_SCRIPT_URL.');
+  if (!BACKEND_API_URL || String(BACKEND_API_URL).includes('COLE_AQUI')) {
+    showError('Configure a URL da API do backend PostgreSQL em BACKEND_API_URL.');
     return false;
   }
   return true;
 }
 
 function buildAddAlunoPageUrl() {
-  const params = new URLSearchParams();
-  const accessCode = String(state.accessCode || '').trim();
-  if (accessCode) {
-    params.set('code', accessCode);
-  }
-  const query = params.toString();
-  return query ? `aluno/adicionar-aluno/?${query}` : 'aluno/adicionar-aluno/';
+  return 'aluno/adicionar-aluno/';
 }
 
 function normalizeCelularInput(event) {
@@ -220,4 +214,10 @@ els.alunoForm.addEventListener('submit', (event) => {
 els.alunoCelular.addEventListener('input', normalizeCelularInput);
 els.alunoCelular.addEventListener('blur', normalizeCelularInput);
 
-document.addEventListener('DOMContentLoaded', bootstrap);
+document.addEventListener('DOMContentLoaded', () => {
+  if (window.AppRouter && typeof window.AppRouter.start === 'function') {
+    window.AppRouter.start();
+    return;
+  }
+  bootstrap();
+});

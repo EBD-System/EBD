@@ -205,7 +205,7 @@ async function saveCurrentCall({ silent = false } = {}) {
             if (isDebugConsoleEnabled()) console.warn('Falha ao atualizar dados após salvar:', err);
           });
         } else if (settled?.type === 'error') {
-          if (isDebugConsoleEnabled()) console.warn('Resposta do Apps Script falhou depois dos 7s:', settled.error);
+          if (isDebugConsoleEnabled()) console.warn('Resposta do backend PostgreSQL falhou depois dos 7s:', settled.error);
         }
       });
 

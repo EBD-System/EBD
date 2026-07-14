@@ -1,3 +1,128 @@
+function currentIsoNow() {
+  return new Date().toISOString();
+}
+
+function normalizeAccessText(value) {
+  return String(value ?? '').trim();
+}
+
+function normalizeProfileName(value) {
+  return normalizeAccessText(value).toLowerCase();
+}
+
+function normalizeProfileList(perfis) {
+  if (!Array.isArray(perfis)) return [];
+  const seen = new Set();
+  const normalized = [];
+
+  perfis.forEach((perfil) => {
+    const name = normalizeAccessText(perfil);
+    const key = normalizeProfileName(name);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    normalized.push(name);
+  });
+
+  return normalized;
+}
+
+function inferAccessModeFromProfiles(perfis = []) {
+  const normalized = normalizeProfileList(perfis).map(normalizeProfileName);
+
+  if (normalized.includes('administrador')) {
+    return 'full';
+  }
+
+  if (normalized.length > 0) {
+    return 'restricted';
+  }
+
+  return 'self';
+}
+
+function legacyCodeToMode(code) {
+  const normalized = normalizeAccessText(code).toLowerCase();
+  if (!normalized) return 'self';
+  if (ACCESS_CODES.full.has(normalized)) return 'full';
+  if (ACCESS_CODES.restricted.has(normalized)) return 'restricted';
+  return 'restricted';
+}
+
+function buildLegacySession(code, accessMode = legacyCodeToMode(code)) {
+  const normalizedCode = normalizeAccessText(code);
+  const mode = String(accessMode || legacyCodeToMode(normalizedCode)).trim().toLowerCase();
+
+  return {
+    userId: null,
+    login: normalizedCode,
+    nome: normalizedCode || 'Acesso legado',
+    perfis: mode === 'full' ? ['Administrador'] : [],
+    accessMode: mode,
+    accessCode: normalizedCode,
+    legacyAccessCode: normalizedCode,
+    createdAt: currentIsoNow(),
+    updatedAt: currentIsoNow(),
+  };
+}
+
+function normalizeAccessSession(sessionOrCode, accessModeHint = '') {
+  if (!sessionOrCode) {
+    return null;
+  }
+
+  if (typeof sessionOrCode === 'string') {
+    return buildLegacySession(sessionOrCode, accessModeHint || legacyCodeToMode(sessionOrCode));
+  }
+
+  if (typeof sessionOrCode !== 'object') {
+    return null;
+  }
+
+  const perfis = normalizeProfileList(sessionOrCode.perfis || sessionOrCode.perfil || []);
+  const legacyAccessCode = normalizeAccessText(
+    sessionOrCode.legacyAccessCode ??
+    sessionOrCode.accessCode ??
+    sessionOrCode.code ??
+    ''
+  );
+
+  const inferredMode = sessionOrCode.accessMode
+    ? String(sessionOrCode.accessMode).trim().toLowerCase()
+    : inferAccessModeFromProfiles(perfis);
+
+  const accessMode = inferredMode || legacyCodeToMode(legacyAccessCode) || normalizeAccessText(accessModeHint).toLowerCase() || 'self';
+
+  const normalizedSession = {
+    userId: sessionOrCode.userId ?? sessionOrCode.id_usuario ?? sessionOrCode.idUsuario ?? null,
+    login: normalizeAccessText(sessionOrCode.login || sessionOrCode.usuario || legacyAccessCode),
+    nome: normalizeAccessText(sessionOrCode.nome || sessionOrCode.name || sessionOrCode.login || legacyAccessCode || 'Usuário'),
+    perfis,
+    accessMode,
+    accessCode: legacyAccessCode,
+    legacyAccessCode,
+    createdAt: normalizeAccessText(sessionOrCode.createdAt || sessionOrCode.criadoEm || sessionOrCode.created_at) || currentIsoNow(),
+    updatedAt: currentIsoNow(),
+  };
+
+  if (normalizedSession.userId !== null && normalizedSession.userId !== undefined && normalizedSession.userId !== '') {
+    const numeric = Number(normalizedSession.userId);
+    normalizedSession.userId = Number.isFinite(numeric) ? numeric : normalizedSession.userId;
+  } else {
+    normalizedSession.userId = null;
+  }
+
+  if (normalizedSession.accessMode !== 'full' && normalizedSession.accessMode !== 'restricted' && normalizedSession.accessMode !== 'self') {
+    normalizedSession.accessMode = inferAccessModeFromProfiles(perfis);
+  }
+
+  if (!normalizedSession.legacyAccessCode && normalizedSession.userId === null) {
+    normalizedSession.legacyAccessCode = normalizedSession.login;
+    normalizedSession.accessCode = normalizedSession.login;
+  }
+
+  return normalizedSession;
+}
+
 function getAccessCodeFromUrl() {
   try {
     return String(new URLSearchParams(window.location.search).get('code') || '').trim();
@@ -6,14 +131,70 @@ function getAccessCodeFromUrl() {
   }
 }
 
-function resolveAccessMode(code) {
-  const normalized = String(code || '').trim().toLowerCase();
+function getStoredAccessSession() {
+  const store = storageState();
+  return store.accessSession || null;
+}
 
-  if (!normalized) return 'self';
-  if (ACCESS_CODES.full.has(normalized)) return 'full';
-  if (ACCESS_CODES.restricted.has(normalized)) return 'restricted';
+function persistAccessSession(sessionOrCode, accessMode = '') {
+  const nextSession = normalizeAccessSession(sessionOrCode, accessMode);
+  if (!nextSession) return null;
 
-  return 'restricted';
+  const store = ensureStorageStateShape();
+  const previous = store.accessSession && typeof store.accessSession === 'object' ? store.accessSession : null;
+  nextSession.createdAt = previous?.createdAt || nextSession.createdAt || currentIsoNow();
+  nextSession.updatedAt = currentIsoNow();
+
+  store.accessSession = nextSession;
+  saveStorageState(store);
+
+  state.session = nextSession;
+  state.accessCode = String(nextSession.accessCode || nextSession.legacyAccessCode || nextSession.login || '').trim();
+  state.accessMode = String(nextSession.accessMode || 'self').trim().toLowerCase();
+  applyAccessMode();
+  renderResponsavelLabel();
+  return nextSession;
+}
+
+function clearAccessSession() {
+  const store = ensureStorageStateShape();
+  delete store.accessSession;
+  saveStorageState(store);
+
+  state.session = null;
+  state.accessCode = '';
+  state.accessMode = 'self';
+  applyAccessMode();
+  renderResponsavelLabel();
+}
+
+function loadAccessSession() {
+  const session = normalizeAccessSession(getStoredAccessSession());
+  state.session = session || null;
+
+  if (session) {
+    state.accessCode = String(session.accessCode || session.legacyAccessCode || session.login || '').trim();
+    state.accessMode = String(session.accessMode || inferAccessModeFromProfiles(session.perfis)).trim().toLowerCase();
+    applyAccessMode();
+    renderResponsavelLabel();
+  }
+
+  return state.session;
+}
+
+function resolveAccessMode(value) {
+  if (value && typeof value === 'object') {
+    const session = normalizeAccessSession(value);
+    return session?.accessMode || inferAccessModeFromProfiles(session?.perfis) || 'self';
+  }
+
+  const text = normalizeAccessText(value || state.accessCode || state.session?.legacyAccessCode || state.session?.login || '');
+  const sessionMode = state.session
+    ? (state.session.accessMode || inferAccessModeFromProfiles(state.session.perfis))
+    : '';
+
+  if (sessionMode) return String(sessionMode).trim().toLowerCase();
+  return legacyCodeToMode(text);
 }
 
 function isRestrictedMode() {
@@ -21,6 +202,10 @@ function isRestrictedMode() {
 }
 
 function canShareRestrictedReports() {
+  if (state.session?.accessMode === 'full') return true;
+  if (Array.isArray(state.session?.perfis) && state.session.perfis.some((perfil) => normalizeProfileName(perfil) === 'administrador')) {
+    return true;
+  }
   return ACCESS_CODES.restricted.has(String(state.accessCode || '').trim().toLowerCase());
 }
 
@@ -39,10 +224,18 @@ function applyAccessMode() {
   document.body.classList.toggle('access-share-reports', canShareRestrictedReports());
 }
 
-
 function renderResponsavelLabel() {
   if (!els.responsavelLabel) return;
-  els.responsavelLabel.textContent = capitalizeFirstLetter(state.accessCode) || '—';
+
+  const session = state.session || loadAccessSession();
+  const label =
+    session?.nome ||
+    session?.login ||
+    session?.legacyAccessCode ||
+    state.accessCode ||
+    '—';
+
+  els.responsavelLabel.textContent = capitalizeFirstLetter(label) || '—';
 }
 
 function normalizeSelfCelularSuffix(value) {
@@ -130,8 +323,8 @@ async function handleSelfCelularSubmit() {
     new CustomEvent('selfCelularSuffixReady', { detail: { celularSuffix: suffix } })
   );
 
-  if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('COLE_AQUI')) {
-    setSelfAccessMessage('error', 'Configure a URL do backend antes de enviar a presença.');
+  if (!BACKEND_API_URL || String(BACKEND_API_URL).includes('COLE_AQUI')) {
+    setSelfAccessMessage('error', 'Configure a URL da API do backend PostgreSQL antes de enviar a presença.');
     return null;
   }
 
@@ -176,4 +369,3 @@ function renderSelfAccessGate() {
   hideLoading(true);
   clearFeedback();
 }
-
