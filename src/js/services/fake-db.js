@@ -2,7 +2,7 @@
   if (window.FakeDatabase) return;
 
   const STORAGE_KEY = 'prb_fake_database_v1';
-  const SEED_URL = window.EXAMPLE_DB_URL || 'backend/exampleDb.json';
+  const SEED_URL = (typeof EXAMPLE_DB_URL !== 'undefined' && EXAMPLE_DB_URL) || window.EXAMPLE_DB_URL || 'backend/exampleDb.json';
   const STATUS_VALUES = new Set(['ativo', 'inativo', 'transferido', 'falecido']);
   const ACCESS = {
     active: 'ativo',
@@ -68,6 +68,11 @@
 
   function writeStore(state) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function hasAnyTableRows(tables) {
+    if (!tables || typeof tables !== 'object') return false;
+    return Object.values(tables).some((rows) => Array.isArray(rows) && rows.length > 0);
   }
 
   async function loadSeed() {
@@ -178,7 +183,10 @@
 
   function loadRuntimeState(seed) {
     const stored = readStore();
-    if (stored && stored.version === 1 && stored.tables) {
+    const seedHasData = hasAnyTableRows(seed?.tables);
+    const storedHasData = hasAnyTableRows(stored?.tables);
+
+    if (stored && stored.version === 1 && stored.tables && storedHasData && (!seedHasData || stored.seedVersion === seed?.version)) {
       return {
         version: 1,
         seedVersion: seed?.version || 1,

@@ -18,3 +18,9 @@ Pontos centrais:
 - O modo `restricted` também pode editar alunos; apenas o modo `self` segue bloqueado para edição.
 - A edição de aluno acontece em uma página dedicada em `aluno/editar-aluno/`.
 - O cadastro de aluno fica em `aluno/adicionar-aluno/` e não inclui cadastro de nova turma.
+
+
+## Banco fake local
+- `DEV_FAKE_DATABASE` habilita o modo fake no frontend.
+- O seed precisa usar uma URL absoluta resolvida em `EXAMPLE_DB_URL`; não depender de caminho relativo da rota atual.
+- Se o armazenamento local estiver vazio por uma carga inicial mal sucedida, o runtime deve voltar ao seed do JSON.

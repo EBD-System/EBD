@@ -5,6 +5,10 @@ const APP_BASE_URL = new URL('../../../', document.currentScript?.src || window.
 const EXAMPLE_DB_URL = new URL('backend/exampleDb.json', APP_BASE_URL).href;
 const BACKEND_API_URL = window.BACKEND_API_URL || window.API_BASE_URL || '';
 
+window.DEV_FAKE_DATABASE = DEV_FAKE_DATABASE;
+window.EXAMPLE_DB_URL = EXAMPLE_DB_URL;
+window.BACKEND_API_URL = BACKEND_API_URL;
+
 const STORAGE_KEY = 'prb_presenca_turmas_v2';
 const ROSTER_CACHE_KEY = 'prb_roster_cache_v1';
 const ROSTER_CACHE_VERSION = 1;
