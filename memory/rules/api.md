@@ -1,7 +1,7 @@
 # Regras da API
 
 - Toda resposta do backend deve ser JSON.
-- O backend deve expor uma ponte HTTP para o PostgreSQL; o cliente conversa com essa API, não com o banco diretamente.
+- O backend expõe a lógica de banco; o cliente conversa somente com a API HTTP, nunca com o PostgreSQL diretamente.
 - O backend principal exposto pelo projeto fica em `https://ebd-fj9u.onrender.com/api`; as rotas `/auth/login` e `/auth/register` ficam no mesmo serviço, na raiz do domínio.
 - As ações enviadas pelo cliente devem ser normalizadas para minúsculas.
 - As rotas gerais da API continuam usando `POST` como `application/x-www-form-urlencoded`.

@@ -350,7 +350,7 @@ async function handleSelfCelularSubmit() {
   );
 
   if (!BACKEND_API_URL || String(BACKEND_API_URL).includes('COLE_AQUI')) {
-    setSelfAccessMessage('error', 'Configure a URL da API do backend PostgreSQL antes de enviar a presença.');
+    setSelfAccessMessage('error', 'Configure a URL da API do backend antes de enviar a presença.');
     return null;
   }
 

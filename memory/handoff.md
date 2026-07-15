@@ -5,10 +5,10 @@ Antes de responder ou alterar o projeto, consulte primeiro a memória consolidad
 Pontos centrais:
 
 - A base oficial de dados é PostgreSQL.
-- O frontend consome somente a API HTTP do backend.
+- O frontend consome somente a API HTTP do backend. A tela de login também possui entrada estática própria em `/login/` e um alias compatível para `/login`.
 - Não existe mais banco fake local no frontend.
 - O navegador usa localStorage para rascunhos, snapshots consolidadas de chamadas, sessão de acesso e estado da interface.
-- A navegação principal usa um roteador cliente com sessão persistida no navegador.
+- A navegação principal usa um roteador cliente com sessão persistida no navegador; a rota de login precisa continuar acessível mesmo em deploy estático.
 - O parâmetro `?code=` continua só como compatibilidade temporária.
 - O login deve ser tratado como camada de acesso; a sessão precisa carregar identidade e perfis, e as páginas internas devem confiar nessa sessão, não na URL.
 - As rotas `/login`, `/turma`, `/turma/:id`, `/chamada`, `/abrir-chamada` e `/inativos` já existem no shell principal.

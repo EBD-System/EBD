@@ -2,7 +2,7 @@
 
 ## Passos
 
-1. Abrir `/login`.
+1. Abrir `/login` ou `/login/`.
 2. Informar login e senha.
 3. Enviar o formulário para `POST /auth/login` em JSON.
 4. Persistir a sessão retornada pelo backend no `localStorage`.

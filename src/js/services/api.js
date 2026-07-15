@@ -176,7 +176,7 @@ function showError(message) {
 
 function apiUrl(params = {}) {
   if (!BACKEND_API_URL || String(BACKEND_API_URL).includes('COLE_AQUI')) {
-    throw createAppError('Configure a URL da API do backend PostgreSQL antes de continuar.', {
+    throw createAppError('Configure a URL da API do backend antes de continuar.', {
       source: 'frontend',
       stage: 'config',
     });
@@ -246,7 +246,7 @@ async function apiGet(params = {}, { timeoutMs = 30000 } = {}) {
 
     const message = String(err?.message || err || '');
     if (/failed to fetch|networkerror|fetch failed/i.test(message)) {
-      throw createAppError(`Falha de comunicação com o backend PostgreSQL: ${message || 'Failed to fetch'}`, {
+      throw createAppError(`Falha de comunicação com o backend: ${message || 'Failed to fetch'}`, {
         source: 'frontend',
         stage: 'network',
         raw: message || err,
@@ -345,7 +345,7 @@ async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
 
     const message = String(err?.message || err || '');
     if (/failed to fetch|networkerror|fetch failed/i.test(message)) {
-      throw createAppError(`Falha de comunicação com o backend PostgreSQL: ${message || 'Failed to fetch'}`, {
+      throw createAppError(`Falha de comunicação com o backend: ${message || 'Failed to fetch'}`, {
         source: 'frontend',
         stage: 'network',
         raw: message || err,
@@ -404,7 +404,7 @@ async function authJsonRequest(path = '/', payload = {}, { timeoutMs = 30000 } =
 
     const message = String(err?.message || err || '');
     if (/failed to fetch|networkerror|fetch failed/i.test(message)) {
-      throw createAppError(`Falha de comunicação com o backend PostgreSQL: ${message || 'Failed to fetch'}`, {
+      throw createAppError(`Falha de comunicação com o backend: ${message || 'Failed to fetch'}`, {
         source: 'frontend',
         stage: 'network',
         raw: message || err,

@@ -1,4 +1,4 @@
-// Configure a URL da API HTTP que conversa com PostgreSQL.
+// Configure a URL da API HTTP do backend.
 const APP_BASE_URL = new URL('../../../', document.currentScript?.src || window.location.href).href;
 const APP_BASE_PATH = new URL(APP_BASE_URL).pathname.replace(/\/+$/, '') || '/';
 
