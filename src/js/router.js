@@ -257,7 +257,7 @@
       'EBD • Navegação'
     );
 
-    const turmas = Array.isArray(data?.turmas) ? data.turmas : [];
+    const turmas = normalizeTurmasList(data);
     const cards = turmas.length
       ? turmas.map((turma, index) => {
           const ref = index + 1;

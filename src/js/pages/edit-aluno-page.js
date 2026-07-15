@@ -171,7 +171,10 @@
 
     try {
       const data = await apiGet({ action: 'init', date: todayKey() });
-      turmas = Array.isArray(data.turmas) ? data.turmas : [];
+      turmas = normalizeTurmasList(data);
+      if (!turmas.length && Array.isArray(data.turmas)) turmas = data.turmas.map((row, index) => normalizeTurmaRow(row, index)).filter(Boolean);
+      if (!turmas.length && Array.isArray(data.classes)) turmas = data.classes.map((row, index) => normalizeTurmaRow(row, index)).filter(Boolean);
+      if (!turmas.length && Array.isArray(data.data)) turmas = data.data.map((row, index) => normalizeTurmaRow(row, index)).filter(Boolean);
       const alunos = Array.isArray(data.alunos) ? data.alunos : [];
       const found = alunos.find((item) => String(item.AlunoID || '') === String(alunoKey) || String(item.Nome || '') === String(alunoKey));
 

@@ -23,3 +23,4 @@
 - O modo fake local continua disponível para desenvolvimento isolado, mas a operação padrão do projeto passa pelo backend PostgreSQL.
 
 - Em GitHub Pages, toda navegação cliente deve preservar o subpath base do projeto (`APP_BASE_PATH`), evitando enviar o usuário para `/<rota>` na raiz do domínio.
+- A carga de turmas pode receber `turmas`, `classes`, `data` ou `rows`; o frontend deve normalizar qualquer uma dessas formas para `TurmaID`, `Nome`, `Ordem`, `Ativo` e contadores derivados.

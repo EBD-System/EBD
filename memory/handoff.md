@@ -23,3 +23,4 @@ Pontos centrais:
 - `DEV_FAKE_DATABASE` habilita o modo fake no frontend.
 - O seed precisa usar uma URL absoluta resolvida em `EXAMPLE_DB_URL`; não depender de caminho relativo da rota atual.
 - Se o armazenamento local estiver vazio por uma carga inicial mal sucedida, o runtime deve voltar ao seed do JSON.
+- A carga de turmas e páginas de aluno aceita tanto o contrato normalizado `turmas` quanto coleções cruas vindas do PostgreSQL (`classes`, `data` ou `rows`); a interface normaliza tudo antes de renderizar.
