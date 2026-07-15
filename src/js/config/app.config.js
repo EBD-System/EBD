@@ -1,6 +1,6 @@
 // Configure a URL da API HTTP que conversa com PostgreSQL.
-// TODO: conectar o site a um backend real que exponha o banco de dados.
-const DEV_FAKE_DATABASE = window.DEV_FAKE_DATABASE ?? true;
+// O modo fake continua disponível via `window.DEV_FAKE_DATABASE = true`.
+const DEV_FAKE_DATABASE = window.DEV_FAKE_DATABASE ?? false;
 const APP_BASE_URL = new URL('../../../', document.currentScript?.src || window.location.href).href;
 const APP_BASE_PATH = new URL(APP_BASE_URL).pathname.replace(/\/+$/, '') || '/';
 
@@ -12,7 +12,7 @@ function buildAppRoutePath(path = '/') {
 }
 
 const EXAMPLE_DB_URL = new URL('backend/exampleDb.json', APP_BASE_URL).href;
-const BACKEND_API_URL = window.BACKEND_API_URL || window.API_BASE_URL || '';
+const BACKEND_API_URL = window.BACKEND_API_URL || window.API_BASE_URL || new URL('api', APP_BASE_URL).href;
 
 window.DEV_FAKE_DATABASE = DEV_FAKE_DATABASE;
 window.APP_BASE_URL = APP_BASE_URL;
@@ -20,6 +20,7 @@ window.APP_BASE_PATH = APP_BASE_PATH;
 window.buildAppRoutePath = buildAppRoutePath;
 window.EXAMPLE_DB_URL = EXAMPLE_DB_URL;
 window.BACKEND_API_URL = BACKEND_API_URL;
+window.API_BASE_URL = BACKEND_API_URL;
 
 const STORAGE_KEY = 'prb_presenca_turmas_v2';
 const ROSTER_CACHE_KEY = 'prb_roster_cache_v1';
