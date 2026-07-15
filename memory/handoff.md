@@ -24,3 +24,5 @@ Pontos centrais:
 - `DEV_FAKE_DATABASE` habilita o modo fake no frontend.
 - O seed precisa usar uma URL absoluta resolvida em `EXAMPLE_DB_URL`; não depender de caminho relativo da rota atual.
 - Se o armazenamento local estiver vazio por uma carga inicial mal sucedida, o runtime deve voltar ao seed do JSON.
+
+- O projeto roda em subpath no GitHub Pages (`/EBD/`); o roteador deve montar URLs com `APP_BASE_PATH` para não cair na raiz do domínio.

@@ -19,3 +19,5 @@
 - A navegação principal deve reconhecer as rotas `/login`, `/turma`, `/turma/:id`, `/chamada`, `/abrir-chamada` e `/inativos`, com sessão persistida no navegador e `?code=` apenas como compatibilidade temporária.
 - A ação `init` do backend pode receber `view` para respostas mais leves em telas de listagem, especialmente para `/turma` e `/inativos`.
 - `DEV_FAKE_DATABASE = true` desvia a camada `api.js` para o banco fake local; nesse modo o seed oficial vem de `backend/exampleDb.json` e o estado mutável fica no navegador.
+
+- Em GitHub Pages, toda navegação cliente deve preservar o subpath base do projeto (`APP_BASE_PATH`), evitando enviar o usuário para `/<rota>` na raiz do domínio.

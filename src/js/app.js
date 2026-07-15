@@ -11,7 +11,7 @@ function validateApiUrl() {
 }
 
 function buildAddAlunoPageUrl() {
-  return 'aluno/adicionar-aluno/';
+  return typeof buildRoutePath === 'function' ? buildRoutePath('/aluno/adicionar-aluno/') : 'aluno/adicionar-aluno/';
 }
 
 function normalizeCelularInput(event) {

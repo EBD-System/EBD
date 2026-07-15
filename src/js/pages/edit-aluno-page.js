@@ -47,7 +47,7 @@
   }
 
   function buildBackUrl() {
-    return '../../index.html';
+    return typeof buildRoutePath === 'function' ? buildRoutePath('/chamada') : '../../index.html';
   }
 
   function applyBackUrl() {

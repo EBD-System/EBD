@@ -8,3 +8,7 @@ Essa estrutura separa o ponto de entrada da área interna, reduz carregamento de
 
 ## Data
 2026-07-14
+
+
+## Atualização
+As rotas cliente precisam ser prefixadas com `APP_BASE_PATH` derivado de `APP_BASE_URL`, para funcionar corretamente em subpaths do GitHub Pages como `/EBD/`.

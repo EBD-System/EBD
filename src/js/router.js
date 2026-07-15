@@ -19,6 +19,38 @@
     'abrir-chamada': 'Abrir chamada',
     inativos: 'Inativos',
   };
+  function getAppBasePath() {
+    const fromWindow = String(window.APP_BASE_PATH || '').trim();
+    if (fromWindow) return fromWindow === '/' ? '/' : fromWindow.replace(/\/+$/, '');
+    const baseUrl = String(window.APP_BASE_URL || window.location.origin + '/').trim();
+    try {
+      return new URL(baseUrl).pathname.replace(/\/+$/, '') || '/';
+    } catch (err) {
+      return '/';
+    }
+  }
+
+  function buildRoutePath(path = '/') {
+    const raw = String(path || '/').trim();
+    const normalized = raw.startsWith('/') ? raw : `/${raw}`;
+    const basePath = getAppBasePath();
+    if (!basePath || basePath === '/') return normalized;
+    return `${basePath}${normalized}`.replace(/\/+/g, '/');
+  }
+
+  function stripBasePath(pathname = window.location.pathname) {
+    const cleanPath = String(pathname || '/').replace(/\/+$/, '') || '/';
+    const basePath = getAppBasePath();
+    if (!basePath || basePath === '/') return cleanPath || '/';
+
+    const normalizedBase = basePath.replace(/\/+$/, '') || '/';
+    if (cleanPath === normalizedBase) return '/';
+    if (cleanPath.startsWith(`${normalizedBase}/`)) {
+      return cleanPath.slice(normalizedBase.length) || '/';
+    }
+    return cleanPath || '/';
+  }
+
 
   function routePortal() {
     let portal = document.getElementById('routePortal');
@@ -99,8 +131,8 @@
   }
 
   function normalizeRoute() {
-    const pathname = window.location.pathname.replace(/\/+$/, '');
-    const parts = pathname.split('/').filter(Boolean);
+    const pathname = stripBasePath(window.location.pathname);
+    const parts = pathname.replace(/\/+$/, '').split('/').filter(Boolean);
 
     if (!parts.length) return { name: 'root', params: {} };
     if (parts[0] === 'login') return { name: 'login', params: {} };
@@ -384,9 +416,9 @@
   function navigateTo(path, { replace = false } = {}) {
     const nextPath = String(path || '/').trim() || '/';
     if (replace) {
-      window.history.replaceState({}, '', nextPath);
+      window.history.replaceState({}, '', buildRoutePath(nextPath));
     } else {
-      window.history.pushState({}, '', nextPath);
+      window.history.pushState({}, '', buildRoutePath(nextPath));
     }
     start();
   }
