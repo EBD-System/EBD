@@ -34,7 +34,7 @@
   let turmas = [];
 
   function buildBackUrl() {
-    return buildAppPath('/chamada');
+    return '../../index.html';
   }
 
   function applyReturnUrl() {

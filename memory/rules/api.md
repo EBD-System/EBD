@@ -16,8 +16,6 @@
 - As respostas de erro do backend devem incluir `source: backend` e, quando útil, `stage`; o frontend usa isso para exibir um console de diagnóstico com a origem do erro.
 - O botão **Salvar** deve persistir também uma snapshot local da chamada salva, com prioridade de leitura para buscas por data e relatórios.
 - Na chamada, `PRESENÇA`, `ATRASO` e `AUSÊNCIA` devem ser gravados como estados mutuamente exclusivos em cada salvamento; ao corrigir a presença de um aluno, o backend precisa zerar os campos que não correspondem ao novo status.
-
 - A navegação principal deve reconhecer as rotas `/login`, `/turma`, `/turma/:id`, `/chamada`, `/abrir-chamada` e `/inativos`, com sessão persistida no navegador e `?code=` apenas como compatibilidade temporária.
 - A ação `init` do backend pode receber `view` para respostas mais leves em telas de listagem, especialmente para `/turma` e `/inativos`.
-
-- Em GitHub Pages, a navegação interna deve preservar o basename `/EBD`; redirects e links do frontend precisam usar helpers centralizados e não podem construir URLs na raiz do domínio.
+- `DEV_FAKE_DATABASE = true` desvia a camada `api.js` para o banco fake local; nesse modo o seed oficial vem de `backend/exampleDb.json` e o estado mutável fica no navegador.

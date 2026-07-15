@@ -99,12 +99,10 @@
   }
 
   function normalizeRoute() {
-    const pathname = stripAppBasePath?.(window.location.pathname) || window.location.pathname;
-    const cleanPath = String(pathname || '/').replace(/\/+$/, '') || '/';
-    const parts = cleanPath.split('/').filter(Boolean);
+    const pathname = window.location.pathname.replace(/\/+$/, '');
+    const parts = pathname.split('/').filter(Boolean);
 
     if (!parts.length) return { name: 'root', params: {} };
-    if (parts[0] === 'index.html') return { name: 'root', params: {} };
     if (parts[0] === 'login') return { name: 'login', params: {} };
     if (parts[0] === 'turma' && parts[1]) return { name: 'turma-detail', params: { turmaRef: decodeURIComponent(parts[1]) } };
     if (parts[0] === 'turma') return { name: 'turmas', params: {} };
@@ -375,7 +373,6 @@
   }
 
   function ensureSessionForRoute(route) {
-    if (DEV_BYPASS_AUTH) return true;
     if (route.name === 'login') return true;
     const session = getStoredSession();
     if (session && (session.accessCode || session.legacyAccessCode || session.login || session.userId !== null)) {
@@ -385,7 +382,7 @@
   }
 
   function navigateTo(path, { replace = false } = {}) {
-    const nextPath = buildAppPath?.(path || '/') || String(path || '/').trim() || '/';
+    const nextPath = String(path || '/').trim() || '/';
     if (replace) {
       window.history.replaceState({}, '', nextPath);
     } else {
@@ -401,7 +398,7 @@
     state.routeParams = route.params;
 
     if (route.name === 'root') {
-      if (DEV_BYPASS_AUTH || getStoredSession()) {
+      if (getStoredSession()) {
         navigateTo('/chamada', { replace: true });
       } else {
         navigateTo('/login', { replace: true });

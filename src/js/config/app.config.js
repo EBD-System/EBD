@@ -1,73 +1,14 @@
 // Configure a URL da API HTTP que conversa com PostgreSQL.
 // TODO: conectar o site a um backend real que exponha o banco de dados.
+const DEV_FAKE_DATABASE = window.DEV_FAKE_DATABASE ?? true;
+const APP_BASE_URL = new URL('../../../', document.currentScript?.src || window.location.href).href;
+const EXAMPLE_DB_URL = new URL('backend/exampleDb.json', APP_BASE_URL).href;
 const BACKEND_API_URL = window.BACKEND_API_URL || window.API_BASE_URL || '';
 
 const STORAGE_KEY = 'prb_presenca_turmas_v2';
 const ROSTER_CACHE_KEY = 'prb_roster_cache_v1';
 const ROSTER_CACHE_VERSION = 1;
 const DEBUG_CONSOLE_ACCESS_CODE = '50292230';
-
-// Base path when hosted on GitHub Pages.
-const APP_BASE_PATH = '/EBD';
-
-// Temporary development bypass while authentication is not complete.
-const DEV_BYPASS_AUTH = true;
-
-const NORMALIZED_APP_BASE_PATH = String(APP_BASE_PATH || '').trim().replace(/\/+$/, '');
-
-function splitRouteSuffix(input = '') {
-  const raw = String(input || '').trim();
-  const hashIndex = raw.indexOf('#');
-  const queryIndex = raw.indexOf('?');
-
-  let pathEnd = raw.length;
-  if (queryIndex !== -1) pathEnd = Math.min(pathEnd, queryIndex);
-  if (hashIndex !== -1) pathEnd = Math.min(pathEnd, hashIndex);
-
-  return {
-    path: raw.slice(0, pathEnd) || '/',
-    query: queryIndex !== -1
-      ? raw.slice(queryIndex, hashIndex !== -1 && hashIndex > queryIndex ? hashIndex : raw.length)
-      : '',
-    hash: hashIndex !== -1 ? raw.slice(hashIndex) : '',
-  };
-}
-
-function stripAppBasePath(pathname = window.location.pathname) {
-  const raw = String(pathname || '/').replace(/\/+/g, '/');
-  const clean = raw.replace(/\/+$/, '') || '/';
-
-  if (!NORMALIZED_APP_BASE_PATH) return clean;
-  if (clean === NORMALIZED_APP_BASE_PATH) return '/';
-  if (clean.startsWith(`${NORMALIZED_APP_BASE_PATH}/`)) {
-    const next = clean.slice(NORMALIZED_APP_BASE_PATH.length);
-    return next || '/';
-  }
-
-  return clean;
-}
-
-function buildAppPath(path = '/') {
-  const { path: rawPath, query, hash } = splitRouteSuffix(path);
-  let normalized = String(rawPath || '/').replace(/\/+/g, '/').trim() || '/';
-
-  if (!normalized.startsWith('/')) normalized = `/${normalized}`;
-  normalized = normalized.replace(/\/+$/, '') || '/';
-
-  if (normalized === '/index.html' || normalized === '/index') {
-    normalized = '/';
-  }
-
-  if (NORMALIZED_APP_BASE_PATH && normalized.startsWith(`${NORMALIZED_APP_BASE_PATH}/`)) {
-    normalized = normalized.slice(NORMALIZED_APP_BASE_PATH.length) || '/';
-  }
-
-  const finalPath = NORMALIZED_APP_BASE_PATH
-    ? `${NORMALIZED_APP_BASE_PATH}${normalized === '/' ? '/' : normalized}`
-    : normalized;
-
-  return `${finalPath}${query}${hash}`;
-}
 
 // Se false, o carregamento inicial usa somente o que vem do backend.
 // Se true, o rascunho local pode voltar a ser aplicado quando existir.

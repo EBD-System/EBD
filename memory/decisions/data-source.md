@@ -2,15 +2,15 @@
 
 ## Decisão
 
-O PostgreSQL é a fonte oficial de dados do sistema.
+O PostgreSQL continua sendo a fonte oficial de dados do sistema. Para desenvolvimento local e demonstração, existe um modo de banco fake no frontend controlado por `DEV_FAKE_DATABASE`.
 
 ## Motivo
 
-A base do projeto agora está descrita e sustentada pelo script `backend/backend.sql`, com funções e tabelas centralizadas no banco.
+A base do projeto segue descrita em `backend/backend.sql`, mas o frontend agora consegue operar sem o servidor real quando o modo fake está ativo. Esse modo usa `backend/exampleDb.json` como seed e mantém o estado mutável no navegador.
 
 ## Observação
 
-A interface web deve falar com uma API HTTP que seja a ponte entre o frontend e o PostgreSQL. A integração ainda precisa existir fora do repositório, porque o site não conversa diretamente com o banco.
+Quando `DEV_FAKE_DATABASE = true`, a camada `api.js` desvia as consultas e salvamentos para o banco fake local. Quando `false`, o fluxo volta a usar a API HTTP que conversa com o PostgreSQL.
 
 ## Data
 

@@ -323,7 +323,7 @@ async function handleSelfCelularSubmit() {
     new CustomEvent('selfCelularSuffixReady', { detail: { celularSuffix: suffix } })
   );
 
-  if (!BACKEND_API_URL || String(BACKEND_API_URL).includes('COLE_AQUI')) {
+  if (!DEV_FAKE_DATABASE && (!BACKEND_API_URL || String(BACKEND_API_URL).includes('COLE_AQUI'))) {
     setSelfAccessMessage('error', 'Configure a URL da API do backend PostgreSQL antes de enviar a presença.');
     return null;
   }

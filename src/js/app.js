@@ -1,4 +1,8 @@
 function validateApiUrl() {
+  if (DEV_FAKE_DATABASE) {
+    return true;
+  }
+
   if (!BACKEND_API_URL || String(BACKEND_API_URL).includes('COLE_AQUI')) {
     showError('Configure a URL da API do backend PostgreSQL em BACKEND_API_URL.');
     return false;
@@ -7,7 +11,7 @@ function validateApiUrl() {
 }
 
 function buildAddAlunoPageUrl() {
-  return buildAppPath('/aluno/adicionar-aluno/');
+  return 'aluno/adicionar-aluno/';
 }
 
 function normalizeCelularInput(event) {
