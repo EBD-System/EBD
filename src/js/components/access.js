@@ -57,9 +57,12 @@ function buildLegacySession(code, accessMode = legacyCodeToMode(code)) {
     login: normalizedCode,
     nome: normalizedCode || 'Acesso legado',
     perfis: mode === 'full' ? ['Administrador'] : [],
+    profiles: mode === 'full' ? ['Administrador'] : [],
     accessMode: mode,
     accessCode: normalizedCode,
     legacyAccessCode: normalizedCode,
+    token: '',
+    accessToken: '',
     createdAt: currentIsoNow(),
     updatedAt: currentIsoNow(),
   };
@@ -78,7 +81,18 @@ function normalizeAccessSession(sessionOrCode, accessModeHint = '') {
     return null;
   }
 
-  const perfis = normalizeProfileList(sessionOrCode.perfis || sessionOrCode.perfil || []);
+  const token = normalizeAccessText(
+    sessionOrCode.token ??
+    sessionOrCode.accessToken ??
+    sessionOrCode.authToken ??
+    sessionOrCode.jwt ??
+    sessionOrCode.data?.token ??
+    sessionOrCode.user?.token ??
+    ''
+  );
+
+  const rawProfiles = sessionOrCode.perfis || sessionOrCode.perfil || sessionOrCode.profiles || sessionOrCode.profile || [];
+  const perfis = normalizeProfileList(rawProfiles);
   const legacyAccessCode = normalizeAccessText(
     sessionOrCode.legacyAccessCode ??
     sessionOrCode.accessCode ??
@@ -93,13 +107,25 @@ function normalizeAccessSession(sessionOrCode, accessModeHint = '') {
   const accessMode = inferredMode || legacyCodeToMode(legacyAccessCode) || normalizeAccessText(accessModeHint).toLowerCase() || 'self';
 
   const normalizedSession = {
-    userId: sessionOrCode.userId ?? sessionOrCode.id_usuario ?? sessionOrCode.idUsuario ?? null,
-    login: normalizeAccessText(sessionOrCode.login || sessionOrCode.usuario || legacyAccessCode),
-    nome: normalizeAccessText(sessionOrCode.nome || sessionOrCode.name || sessionOrCode.login || legacyAccessCode || 'Usuário'),
+    userId: sessionOrCode.userId ?? sessionOrCode.id_usuario ?? sessionOrCode.idUsuario ?? sessionOrCode.id_usuario ?? sessionOrCode.user?.id_usuario ?? sessionOrCode.user?.id ?? null,
+    login: normalizeAccessText(sessionOrCode.login || sessionOrCode.usuario || sessionOrCode.user?.login || legacyAccessCode),
+    nome: normalizeAccessText(
+      sessionOrCode.nome ||
+      sessionOrCode.name ||
+      sessionOrCode.pessoa_nome ||
+      sessionOrCode.user?.pessoa_nome ||
+      sessionOrCode.user?.nome ||
+      sessionOrCode.login ||
+      legacyAccessCode ||
+      'Usuário'
+    ),
     perfis,
+    profiles: perfis,
     accessMode,
     accessCode: legacyAccessCode,
     legacyAccessCode,
+    token,
+    accessToken: token,
     createdAt: normalizeAccessText(sessionOrCode.createdAt || sessionOrCode.criadoEm || sessionOrCode.created_at) || currentIsoNow(),
     updatedAt: currentIsoNow(),
   };

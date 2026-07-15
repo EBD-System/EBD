@@ -9,7 +9,7 @@ function buildAppRoutePath(path = '/') {
   return `${base}${normalized}`.replace(/\/+/g, '/');
 }
 
-const BACKEND_API_URL = window.BACKEND_API_URL || window.API_BASE_URL || new URL('api', APP_BASE_URL).href;
+const BACKEND_API_URL = window.BACKEND_API_URL || window.API_BASE_URL || 'https://ebd-fj9u.onrender.com/api';
 
 window.APP_BASE_URL = APP_BASE_URL;
 window.APP_BASE_PATH = APP_BASE_PATH;

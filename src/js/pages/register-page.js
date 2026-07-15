@@ -27,7 +27,12 @@
   };
 
   function buildBackUrl() {
-    return typeof buildRoutePath === 'function' ? buildRoutePath('/login') : '../index.html';
+    if (typeof buildRoutePath === 'function') return buildRoutePath('/login');
+    try {
+      return new URL('../login/', window.location.href).toString();
+    } catch (err) {
+      return '../login/';
+    }
   }
 
   function applyReturnUrl() {
@@ -134,7 +139,6 @@
     setFeedback('info', 'Enviando dados para o backend...');
 
     const payload = {
-      action: 'register',
       nome,
       login,
       senha,
@@ -151,13 +155,10 @@
       uf,
       cep,
       observacao,
-      nomeCompleto: nome,
-      password: senha,
-      confirmarSenha,
     };
 
     try {
-      const result = await apiPost(payload, { timeoutMs: 30000 });
+      const result = await authRegister(payload, { timeoutMs: 30000 });
       const okMessage = result?.message || 'Cadastro realizado com sucesso.';
       showSuccess(okMessage);
       setFeedback('success', okMessage);
@@ -176,6 +177,12 @@
 
       if (els.form) els.form.reset();
       if (els.nome) els.nome.focus();
+      const loginUrl = buildBackUrl();
+      if (loginUrl) {
+        setTimeout(() => {
+          window.location.href = loginUrl;
+        }, 1200);
+      }
     } catch (err) {
       const errorText = formatAppError(err, 'Registrar acesso');
       showError(errorText);

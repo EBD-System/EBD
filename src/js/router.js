@@ -180,7 +180,7 @@
     setRouteVisibility('login');
     setHeroCopy(
       'Acesse sua área',
-      'Entre para criar ou recuperar a sessão de navegação do sistema.',
+      'Entre com login e senha para criar a sessão autenticada do sistema.',
       'EBD • Acesso'
     );
 
@@ -198,14 +198,18 @@
       <div class="panel__head">
         <div>
           <h2>Login</h2>
-          <p>O sistema mantém a sessão no navegador. O código de acesso continua disponível apenas como compatibilidade temporária.</p>
+          <p>O acesso agora é validado pelo backend em <code>/auth/login</code>. A sessão fica salva no navegador após o primeiro acesso.</p>
         </div>
       </div>
       ${sessionSummary}
       <form id="routeLoginForm" class="mini-form route-login-form">
         <div class="field">
-          <label for="routeLoginCode">Código ou identificador de acesso</label>
-          <input id="routeLoginCode" type="text" autocomplete="off" placeholder="Digite o acesso" />
+          <label for="routeLoginUser">Login</label>
+          <input id="routeLoginUser" type="text" autocomplete="username" placeholder="Seu login" required />
+        </div>
+        <div class="field">
+          <label for="routeLoginPassword">Senha</label>
+          <input id="routeLoginPassword" type="password" autocomplete="current-password" placeholder="Sua senha" required />
         </div>
         <div class="route-login-form__actions">
           <button class="btn btn--primary" type="submit">Entrar</button>
@@ -219,24 +223,59 @@
     `);
 
     const form = document.getElementById('routeLoginForm');
-    const input = document.getElementById('routeLoginCode');
+    const inputUser = document.getElementById('routeLoginUser');
+    const inputPassword = document.getElementById('routeLoginPassword');
     const logoutBtn = document.getElementById('routeLogoutBtn');
 
-    if (input) {
-      input.value = String(getResolvedAccessCode() || '');
-      input.focus?.();
+    if (inputUser) {
+      inputUser.value = String(session?.login || getResolvedAccessCode() || '');
     }
+    if (inputPassword) {
+      inputPassword.value = '';
+    }
+    if (inputUser) {
+      inputUser.focus?.();
+    }
+
     if (form && !form.dataset.bound) {
       form.dataset.bound = '1';
-      form.addEventListener('submit', (event) => {
+      form.addEventListener('submit', async (event) => {
         event.preventDefault();
-        const value = String(input?.value || '').trim();
-        if (!value) {
-          showError('Digite um código de acesso válido.');
+
+        const login = String(inputUser?.value || '').trim();
+        const senha = String(inputPassword?.value || '');
+        if (!login) {
+          showError('Digite seu login.');
           return;
         }
-        persistAccessSession(value);
-        navigateTo('/chamada', { replace: true });
+        if (!senha) {
+          showError('Digite sua senha.');
+          return;
+        }
+
+        showBusy('Autenticando...');
+        try {
+          const result = await authLogin({ login, senha }, { timeoutMs: 30000 });
+          const data = result?.data || {};
+          const user = data.user || data.usuario || {};
+
+          persistAccessSession({
+            userId: user.id_usuario ?? user.userId ?? user.id ?? null,
+            login: user.login || login,
+            nome: user.pessoa_nome || user.nome || user.name || login,
+            perfis: user.profiles || user.perfis || user.perfil || [],
+            token: data.token || data.accessToken || user.token || '',
+            accessToken: data.token || data.accessToken || user.token || '',
+            accessMode: inferAccessModeFromProfiles(user.profiles || user.perfis || user.perfil || []),
+          });
+
+          showSuccess(result.message || 'Login realizado com sucesso.');
+          navigateTo('/chamada', { replace: true });
+        } catch (err) {
+          showError(formatAppError(err, 'Login'));
+        } finally {
+          hideLoading?.();
+        }
       });
     }
 
@@ -248,6 +287,7 @@
       });
     }
   }
+
 
   function renderTurmasView(data) {
     const portal = routePortal();

@@ -17,5 +17,6 @@ Pontos centrais:
 - A edição de aluno acontece em uma página dedicada em `aluno/editar-aluno/`.
 - O cadastro de aluno fica em `aluno/adicionar-aluno/` e não inclui cadastro de nova turma.
 - Existe agora uma página pública de cadastro em `cadastro/` para criar acesso sem depender da sessão interna.
-- O cadastro público envia `action=register` ao backend.
+- O cadastro público envia `POST /auth/register` em JSON ao backend.
+- A tela de login usa `POST /auth/login` em JSON e grava a sessão autenticada retornada pelo backend.
 - O subpath do GitHub Pages deve ser preservado em toda navegação cliente.
