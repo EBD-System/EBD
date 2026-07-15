@@ -781,6 +781,80 @@
     return aluno;
   }
 
+  function registerAccess(state, payload) {
+    const nome = trimText(payload.nome || payload.nomeCompleto || payload.name || '');
+    const login = lowerText(payload.login || payload.usuario || '');
+    const senha = String(payload.senha || payload.password || '');
+
+    if (!nome) throw new Error('Informe o nome completo.');
+    if (!login) throw new Error('Informe o login.');
+    if (!senha) throw new Error('Informe a senha.');
+
+    const pessoas = getTable(state, 'ebd_pessoa');
+    const usuarios = getTable(state, 'ebd_usuario');
+    const usuariosPerfil = getTable(state, 'ebd_usuario_perfil');
+    const perfis = getTable(state, 'ebd_perfil');
+
+    const cpf = String(payload.cpf || payload.cpf_cnpj || '').replace(/\D/g, '').slice(0, 11);
+    if (cpf && pessoas.some((row) => String(row.cpf || '').replace(/\D/g, '') === cpf)) {
+      throw new Error('CPF já cadastrado.');
+    }
+
+    if (usuarios.some((row) => lowerText(row.login || '') === login)) {
+      throw new Error('Login já cadastrado.');
+    }
+
+    const idPessoa = nextId(pessoas, 'id_pessoa');
+    const pessoa = {
+      id_pessoa: idPessoa,
+      nome,
+      sexo: lowerText(payload.sexo || 'nao_informado') || 'nao_informado',
+      cpf,
+      data_nascimento: trimText(payload.dataNascimento || payload.data_nascimento || '') || null,
+      telefone: String(payload.telefone || '').replace(/\D/g, '').slice(0, 11),
+      email: trimText(payload.email || ''),
+      logradouro: trimText(payload.logradouro || ''),
+      numero: trimText(payload.numero || ''),
+      bairro: trimText(payload.bairro || ''),
+      cidade: trimText(payload.cidade || ''),
+      uf: trimText(payload.uf || '').toUpperCase().slice(0, 2),
+      cep: String(payload.cep || '').replace(/\D/g, '').slice(0, 8),
+      observacao: trimText(payload.observacao || ''),
+      criado_em: nowIso(),
+      atualizado_em: nowIso(),
+    };
+
+    pessoas.push(pessoa);
+
+    const idUsuario = nextId(usuarios, 'id_usuario');
+    const usuario = {
+      id_usuario: idUsuario,
+      id_pessoa: idPessoa,
+      login,
+      senha_hash: `FAKE_HASH_${login}`,
+      ultimo_login: null,
+      ativo: true,
+      criado_em: nowIso(),
+    };
+
+    usuarios.push(usuario);
+
+    const perfilConsulta = perfis.find((row) => lowerText(row.nome || '') === 'consulta') || null;
+    if (perfilConsulta) {
+      usuariosPerfil.push({
+        id_usuario_perfil: nextId(usuariosPerfil, 'id_usuario_perfil'),
+        id_usuario: idUsuario,
+        id_perfil: perfilConsulta.id_perfil,
+      });
+    }
+
+    return {
+      pessoa,
+      usuario,
+      perfil: perfilConsulta,
+    };
+  }
+
   function setCallStatsOnAluno(state, alunoId, status, dateKey, turmaId, callId) {
     const aluno = getTable(state, 'ebd_aluno').find((row) => String(row.id_aluno) === String(alunoId));
     if (!aluno) return;
@@ -1051,6 +1125,24 @@
           alunoId: String(created.alunoId),
           matricula: created.matricula,
           resumoGeral: buildResumoGeral(state, buildIndex(state), todayKey()),
+        };
+      }
+
+      if (action === 'register') {
+        const created = registerAccess(state, params);
+        saveRuntimeState(state);
+        return {
+          ok: true,
+          source: 'fake-database',
+          stage: 'register',
+          message: 'Cadastro realizado com sucesso no banco fake.',
+          pessoa: created.pessoa,
+          usuario: {
+            id_usuario: String(created.usuario.id_usuario),
+            login: created.usuario.login,
+            id_pessoa: String(created.usuario.id_pessoa),
+            perfis: created.perfil ? [created.perfil.nome] : [],
+          },
         };
       }
 

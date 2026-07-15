@@ -487,15 +487,8 @@ async function refreshFromBackend(showMessage = false, { silent = false, preferL
     state.baseRowsCount = Number(data.baseRowsCount || state.baseRowsCount || 0);
     state.inativos = Array.isArray(data.inativos) ? data.inativos : state.inativos || [];
 
-    const normalizedTurmas = normalizeTurmasList(data);
-    if (normalizedTurmas.length) {
-      state.turmas = normalizedTurmas;
-    } else if (Array.isArray(data.turmas)) {
-      state.turmas = data.turmas.map((row, index) => normalizeTurmaRow(row, index)).filter(Boolean);
-    } else if (Array.isArray(data.classes)) {
-      state.turmas = data.classes.map((row, index) => normalizeTurmaRow(row, index)).filter(Boolean);
-    } else if (Array.isArray(data.data)) {
-      state.turmas = data.data.map((row, index) => normalizeTurmaRow(row, index)).filter(Boolean);
+    if (Array.isArray(data.turmas)) {
+      state.turmas = data.turmas;
     }
 
     if (Array.isArray(data.alunos)) {

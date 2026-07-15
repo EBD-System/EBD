@@ -17,10 +17,11 @@ Pontos centrais:
 - O modo `restricted` também pode editar alunos; apenas o modo `self` segue bloqueado para edição.
 - A edição de aluno acontece em uma página dedicada em `aluno/editar-aluno/`.
 - O cadastro de aluno fica em `aluno/adicionar-aluno/` e não inclui cadastro de nova turma.
+- Existe agora uma página pública de cadastro em `cadastro/` para criar acesso sem depender da sessão interna.
+- O cadastro público envia `action=register` ao backend e também funciona no modo fake local.
 - O subpath do GitHub Pages deve ser preservado em toda navegação cliente.
 
 ## Banco fake local
 - `DEV_FAKE_DATABASE` habilita o modo fake no frontend.
 - O seed precisa usar uma URL absoluta resolvida em `EXAMPLE_DB_URL`; não depender de caminho relativo da rota atual.
 - Se o armazenamento local estiver vazio por uma carga inicial mal sucedida, o runtime deve voltar ao seed do JSON.
-- A carga de turmas e páginas de aluno aceita tanto o contrato normalizado `turmas` quanto coleções cruas vindas do PostgreSQL (`classes`, `data` ou `rows`); a interface normaliza tudo antes de renderizar.

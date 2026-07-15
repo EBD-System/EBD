@@ -53,75 +53,6 @@ function normalizeBoolValue(value) {
   return v === 'sim' || v === 'true' || v === '1' || v === 'yes' || v === 'y';
 }
 
-function normalizeTurmaRow(row = {}, index = 0) {
-  if (!row || typeof row !== 'object') return null;
-
-  const turmaId = row.TurmaID ?? row.id_classe ?? row.idClasse ?? row.id ?? '';
-  const nome = row.Nome ?? row.nome ?? row.classe ?? row.classe_nome ?? '';
-  const ordem = row.Ordem ?? row.ordem ?? row.ordem_turma ?? row.id_classe ?? index + 1;
-  const ativoRaw = row.Ativo ?? row.ativo ?? row.status ?? row.status_turma ?? true;
-
-  const alunoAtivos = Number(
-    row.alunosAtivos ??
-    row.total_alunos_ativos ??
-    row.totalAlunosAtivos ??
-    0
-  ) || 0;
-
-  const alunoInativos = Number(
-    row.alunosInativos ??
-    row.total_alunos_inativos ??
-    row.totalAlunosInativos ??
-    0
-  ) || 0;
-
-  const totalAlunos = Number(
-    row.totalAlunos ??
-    row.total_alunos ??
-    row.total_alunos_ativos ??
-    row.total_alunos_inativos ??
-    (alunoAtivos + alunoInativos)
-  ) || 0;
-
-  return {
-    ...row,
-    TurmaID: String(turmaId || '').trim(),
-    Nome: String(nome || '').trim(),
-    Ordem: Number(ordem || 0) || 0,
-    Ativo: normalizeBoolValue(ativoRaw) ? 'sim' : 'nao',
-    alunosAtivos: alunoAtivos,
-    alunosInativos: alunoInativos,
-    totalAlunos,
-  };
-}
-
-function normalizeTurmasList(value) {
-  if (Array.isArray(value)) {
-    return value
-      .map((row, index) => normalizeTurmaRow(row, index))
-      .filter((row) => row && row.TurmaID);
-  }
-
-  if (value && typeof value === 'object') {
-    const candidates = [
-      value.turmas,
-      value.classes,
-      value.data,
-      value.rows,
-      value.result,
-    ];
-
-    for (const candidate of candidates) {
-      if (Array.isArray(candidate)) {
-        return normalizeTurmasList(candidate);
-      }
-    }
-  }
-
-  return [];
-}
-
-
 function nowIso() {
   return new Date().toISOString();
 }
@@ -362,7 +293,7 @@ async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
   const bodyParams = new URLSearchParams();
   const queryParams = {};
   const actionName = String(params.action || params.acao || '').trim().toLowerCase();
-  const mirrorAllParamsInQuery = ['addaluno', 'addturma', 'updatealuno'].includes(actionName);
+  const mirrorAllParamsInQuery = ['addaluno', 'addturma', 'updatealuno', 'register'].includes(actionName);
 
   Object.entries(params).forEach(([key, value]) => {
     if (value === undefined || value === null) return;
@@ -392,7 +323,7 @@ async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
   const shouldRetryAsGet = (err) => {
     const message = String(err?.message || err || '');
     return (
-      ['addaluno', 'addturma', 'updatealuno'].includes(actionName) &&
+      ['addaluno', 'addturma', 'updatealuno', 'register'].includes(actionName) &&
       /failed to fetch|networkerror|fetch failed|ação inválida|acao inválida|action invalid|aç[aã]o inválida/i.test(message)
     );
   };

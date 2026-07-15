@@ -424,3 +424,8 @@ Exemplo de saída:
 5. Consultar resumos e rankings.
 6. Usar `fn_ebd_ativar_aluno` ou `fn_ebd_inativar_aluno` quando houver necessidade manual.
 
+
+
+## Cadastro público
+
+- A página `cadastro/` permite registrar novos acessos sem depender da sessão interna.

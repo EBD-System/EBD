@@ -209,6 +209,7 @@
         </div>
         <div class="route-login-form__actions">
           <button class="btn btn--primary" type="submit">Entrar</button>
+          <a class="btn btn--ghost" href="${escapeHtml(buildRoutePath('/cadastro/'))}">Criar cadastro</a>
           ${session ? '<button id="routeLogoutBtn" class="btn btn--soft" type="button">Sair</button>' : ''}
         </div>
       </form>
@@ -257,7 +258,7 @@
       'EBD • Navegação'
     );
 
-    const turmas = normalizeTurmasList(data);
+    const turmas = Array.isArray(data?.turmas) ? data.turmas : [];
     const cards = turmas.length
       ? turmas.map((turma, index) => {
           const ref = index + 1;

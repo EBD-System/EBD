@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cadastro • EBD</title>
+  <meta
+    name="description"
+    content="Área pública para cadastrar uma pessoa e criar o acesso no backend PostgreSQL."
+  />
+  <link rel="stylesheet" href="../src/css/base.css" />
+  <link rel="stylesheet" href="../src/css/layout.css" />
+  <link rel="stylesheet" href="../src/css/components.css" />
+  <link rel="stylesheet" href="../src/css/pages.css" />
+  <link rel="stylesheet" href="../src/css/utilities.css" />
+  <script defer src="../src/js/config/app.config.js"></script>
+  <script defer src="../src/js/utils/helpers.js"></script>
+  <script defer src="../src/js/utils/format.js"></script>
+  <script defer src="../src/js/services/fake-db.js"></script>
+  <script defer src="../src/js/services/api.js"></script>
+  <script defer src="../src/js/services/memory.js"></script>
+  <script defer src="../src/js/pages/register-page.js"></script>
+</head>
+<body>
+  <main class="app">
+    <section class="panel card">
+      <div class="panel__head">
+        <div>
+          <h2>Novo cadastro</h2>
+          <p>Preencha os dados da pessoa e crie o acesso no backend PostgreSQL.</p>
+        </div>
+
+        <div class="panel__actions">
+          <a id="registerBackBtn" class="btn btn--ghost" href="../login/">Voltar</a>
+        </div>
+      </div>
+
+      <div id="feedback" class="feedback" aria-live="polite"></div>
+      <pre id="debugConsole" class="debug-console" aria-live="polite"></pre>
+      <div id="registerLoading" class="empty-state">Carregando formulário...</div>
+
+      <form id="registerForm" class="student-edit-form hidden">
+        <div class="field">
+          <label for="registerNome">Nome completo</label>
+          <input id="registerNome" type="text" placeholder="Nome completo" autocomplete="name" required />
+        </div>
+
+        <div class="field">
+          <label for="registerLogin">Login</label>
+          <input id="registerLogin" type="text" placeholder="Nome de acesso" autocomplete="username" required />
+        </div>
+
+        <div class="field">
+          <label for="registerSenha">Senha</label>
+          <input id="registerSenha" type="password" placeholder="Crie uma senha" autocomplete="new-password" required />
+        </div>
+
+        <div class="field">
+          <label for="registerConfirmarSenha">Confirmar senha</label>
+          <input id="registerConfirmarSenha" type="password" placeholder="Repita a senha" autocomplete="new-password" required />
+        </div>
+
+        <div class="field">
+          <label for="registerCpf">CPF (opcional)</label>
+          <input id="registerCpf" type="text" inputmode="numeric" placeholder="Somente números" autocomplete="off" />
+        </div>
+
+        <div class="field">
+          <label for="registerSexo">Sexo</label>
+          <select id="registerSexo">
+            <option value="nao_informado">Não informado</option>
+            <option value="F">Feminino</option>
+            <option value="M">Masculino</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="registerDataNascimento">Data de nascimento (opcional)</label>
+          <input id="registerDataNascimento" type="date" autocomplete="bday" />
+        </div>
+
+        <div class="field">
+          <label for="registerTelefone">Telefone (opcional)</label>
+          <input id="registerTelefone" type="text" inputmode="numeric" placeholder="(XX) 9XXXX-XXXX" autocomplete="tel" />
+        </div>
+
+        <div class="field">
+          <label for="registerEmail">E-mail (opcional)</label>
+          <input id="registerEmail" type="email" placeholder="nome@exemplo.com" autocomplete="email" />
+        </div>
+
+        <div class="field">
+          <label for="registerLogradouro">Logradouro (opcional)</label>
+          <input id="registerLogradouro" type="text" placeholder="Rua, avenida..." autocomplete="street-address" />
+        </div>
+
+        <div class="field">
+          <label for="registerNumero">Número (opcional)</label>
+          <input id="registerNumero" type="text" placeholder="Número" autocomplete="address-line2" />
+        </div>
+
+        <div class="field">
+          <label for="registerBairro">Bairro (opcional)</label>
+          <input id="registerBairro" type="text" placeholder="Bairro" autocomplete="address-level3" />
+        </div>
+
+        <div class="field">
+          <label for="registerCidade">Cidade (opcional)</label>
+          <input id="registerCidade" type="text" placeholder="Cidade" autocomplete="address-level2" />
+        </div>
+
+        <div class="field">
+          <label for="registerUf">UF (opcional)</label>
+          <input id="registerUf" type="text" maxlength="2" placeholder="PE" autocomplete="address-level1" />
+        </div>
+
+        <div class="field">
+          <label for="registerCep">CEP (opcional)</label>
+          <input id="registerCep" type="text" inputmode="numeric" placeholder="00000000" autocomplete="postal-code" />
+        </div>
+
+        <div class="field">
+          <label for="registerObservacao">Observação (opcional)</label>
+          <textarea id="registerObservacao" rows="4" placeholder="Observações complementares"></textarea>
+        </div>
+
+        <div class="student-edit-form__actions">
+          <a id="registerCancel" class="btn btn--ghost" href="../login/">Cancelar</a>
+          <button class="btn btn--primary" type="submit">Registrar</button>
+        </div>
+      </form>
+    </section>
+  </main>
+</body>
+</html>
