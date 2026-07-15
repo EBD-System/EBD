@@ -11,3 +11,7 @@ A interface tratava `self` como um bloqueio total da aplicação, mas a própria
 ## Solução
 
 A ocultação da `.app` não deve valer quando `body[data-route-mode="login"]` estiver ativo. A rota `/login` precisa continuar visível mesmo sem sessão salva.
+
+## Complemento
+
+Quando existir sessão autenticada salva, a rota `/login` não deve permanecer na própria tela de login; ela deve encaminhar o usuário para `/chamada`.

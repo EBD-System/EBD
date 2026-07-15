@@ -70,6 +70,25 @@
     return portal;
   }
 
+  function syncForgotPasswordDialog() {
+    const dialog = document.getElementById('forgotPasswordDialog');
+    if (!dialog || dialog.dataset.bound) return dialog;
+
+    dialog.dataset.bound = '1';
+    dialog.addEventListener('click', (event) => {
+      const target = event.target;
+      if (target instanceof HTMLElement && (target.dataset.action === 'close' || target === dialog)) {
+        dialog.close?.();
+      }
+    });
+
+    dialog.addEventListener('cancel', () => {
+      dialog.close?.();
+    });
+
+    return dialog;
+  }
+
   function setRouteVisibility(mode) {
     const hideDefault = ['toolbar', 'shortcutPanel', 'summaryGrid', 'actionsPanel', 'reportsPanel', 'registrationPanel', 'studentsList', 'emptyState'];
     const hideLogin = [...hideDefault];
@@ -88,9 +107,15 @@
       el.hidden = hiddenIds.includes(id);
     });
 
+    const hero = document.querySelector('.hero');
+    if (hero) {
+      hero.hidden = mode === 'login';
+    }
+
     const portal = routePortal();
     portal.hidden = mode === 'call';
     portal.classList.toggle('route-portal--hidden', mode === 'call');
+    portal.classList.toggle('route-portal--login', mode === 'login');
     document.body.dataset.routeMode = mode;
   }
 
@@ -178,63 +203,75 @@
     const portal = routePortal();
     const session = getStoredSession();
     setRouteVisibility('login');
+    portal.classList.add('route-portal--login');
     setHeroCopy(
-      'Acesse sua área',
-      'Entre com login e senha para criar a sessão autenticada do sistema.',
+      'Login',
+      '',
       'EBD • Acesso'
     );
 
-    const sessionSummary = session
-      ? `
-        <div class="feedback show success">
-          Sessão ativa: <strong>${escapeHtml(session.nome || session.login || session.legacyAccessCode || 'usuário')}</strong>
-          ${session.perfis?.length ? `• Perfis: ${escapeHtml(session.perfis.join(', '))}` : ''}
-          ${session.accessMode ? `• Modo: ${escapeHtml(session.accessMode)}` : ''}
-        </div>
-      `
-      : '';
+    const rememberedLogin = String(getRememberedLogin?.() || session?.login || getResolvedAccessCode() || '').trim();
+    const rememberChecked = shouldRememberLogin?.() || !!rememberedLogin;
 
     safeSetInnerHtml(portal, `
-      <div class="panel__head">
-        <div>
-          <h2>Login</h2>
-          <p>O acesso agora é validado pelo backend em <code>/auth/login</code>. A sessão fica salva no navegador após o primeiro acesso.</p>
+      <section class="card route-login-card">
+        <span class="badge">EBD • Acesso</span>
+        <h1>Login</h1>
+        <p class="route-login-card__subtitle">Entre com seu nome de usuário e senha para acessar o sistema.</p>
+
+        <form id="routeLoginForm" class="route-login-form">
+          <div class="field">
+            <label for="routeLoginUser">Nome de usuário</label>
+            <input id="routeLoginUser" type="text" autocomplete="username" placeholder="Nome de usuário" required />
+          </div>
+
+          <div class="field">
+            <label for="routeLoginPassword">Senha</label>
+            <input id="routeLoginPassword" type="password" autocomplete="current-password" placeholder="Senha" required />
+          </div>
+
+          <label class="route-login-remember">
+            <input id="routeLoginRemember" type="checkbox" ${rememberChecked ? 'checked' : ''} />
+            <span>Lembrar meu nome de usuário</span>
+          </label>
+
+          <div class="route-login-form__links">
+            <button id="routeForgotPasswordBtn" class="route-login-link" type="button">Esqueci minha senha</button>
+          </div>
+
+          <div class="route-login-form__actions">
+            <button class="btn btn--primary" type="submit">Entrar</button>
+            <a class="btn btn--ghost" href="${escapeHtml(buildRoutePath('/cadastro/'))}">Criar cadastro</a>
+          </div>
+        </form>
+      </section>
+
+      <dialog id="forgotPasswordDialog" class="route-login-dialog">
+        <div class="card route-login-dialog__card">
+          <h2>Esqueci minha senha</h2>
+          <p>Essa funcionalidade ainda não foi criada.</p>
+          <div class="route-login-dialog__actions">
+            <button id="routeForgotPasswordCloseBtn" class="btn btn--primary" type="button">Fechar</button>
+          </div>
         </div>
-      </div>
-      ${sessionSummary}
-      <form id="routeLoginForm" class="mini-form route-login-form">
-        <div class="field">
-          <label for="routeLoginUser">Login</label>
-          <input id="routeLoginUser" type="text" autocomplete="username" placeholder="Seu login" required />
-        </div>
-        <div class="field">
-          <label for="routeLoginPassword">Senha</label>
-          <input id="routeLoginPassword" type="password" autocomplete="current-password" placeholder="Sua senha" required />
-        </div>
-        <div class="route-login-form__actions">
-          <button class="btn btn--primary" type="submit">Entrar</button>
-          <a class="btn btn--ghost" href="${escapeHtml(buildRoutePath('/cadastro/'))}">Criar cadastro</a>
-          ${session ? '<button id="routeLogoutBtn" class="btn btn--soft" type="button">Sair</button>' : ''}
-        </div>
-      </form>
-      <div class="feedback show info">
-        Se você já entrou antes, a sessão salva será reaproveitada automaticamente.
-      </div>
+      </dialog>
     `);
 
     const form = document.getElementById('routeLoginForm');
     const inputUser = document.getElementById('routeLoginUser');
     const inputPassword = document.getElementById('routeLoginPassword');
-    const logoutBtn = document.getElementById('routeLogoutBtn');
+    const rememberInput = document.getElementById('routeLoginRemember');
+    const forgotBtn = document.getElementById('routeForgotPasswordBtn');
+    const dialog = syncForgotPasswordDialog();
+    const dialogCloseBtn = document.getElementById('routeForgotPasswordCloseBtn');
 
     if (inputUser) {
-      inputUser.value = String(session?.login || getResolvedAccessCode() || '');
+      inputUser.value = rememberedLogin;
+      inputUser.focus?.();
+      inputUser.select?.();
     }
     if (inputPassword) {
       inputPassword.value = '';
-    }
-    if (inputUser) {
-      inputUser.focus?.();
     }
 
     if (form && !form.dataset.bound) {
@@ -244,8 +281,9 @@
 
         const login = String(inputUser?.value || '').trim();
         const senha = String(inputPassword?.value || '');
+        const rememberUsername = !!rememberInput?.checked;
         if (!login) {
-          showError('Digite seu login.');
+          showError('Digite seu nome de usuário.');
           return;
         }
         if (!senha) {
@@ -269,6 +307,10 @@
             accessMode: inferAccessModeFromProfiles(user.profiles || user.perfis || user.perfil || []),
           });
 
+          if (typeof setRememberedLogin === 'function') {
+            setRememberedLogin(login, rememberUsername);
+          }
+
           showSuccess(result.message || 'Login realizado com sucesso.');
           navigateTo('/chamada', { replace: true });
         } catch (err) {
@@ -279,14 +321,25 @@
       });
     }
 
-    if (logoutBtn && !logoutBtn.dataset.bound) {
-      logoutBtn.dataset.bound = '1';
-      logoutBtn.addEventListener('click', () => {
-        clearAccessSession();
-        navigateTo('/login', { replace: true });
+    if (forgotBtn && !forgotBtn.dataset.bound) {
+      forgotBtn.dataset.bound = '1';
+      forgotBtn.addEventListener('click', () => {
+        if (dialog?.showModal) {
+          dialog.showModal();
+        } else {
+          window.alert('Essa funcionalidade ainda não foi criada.');
+        }
+      });
+    }
+
+    if (dialogCloseBtn && !dialogCloseBtn.dataset.bound) {
+      dialogCloseBtn.dataset.bound = '1';
+      dialogCloseBtn.addEventListener('click', () => {
+        dialog?.close?.();
       });
     }
   }
+
 
 
   function renderTurmasView(data) {
@@ -490,6 +543,12 @@
       state.accessMode = String(state.session?.accessMode || resolveAccessMode(state.session || state.accessCode)).trim().toLowerCase();
       applyAccessMode();
       renderResponsavelLabel?.();
+
+      if (state.session && (state.session.accessCode || state.session.legacyAccessCode || state.session.login || state.session.userId !== null)) {
+        navigateTo('/chamada', { replace: true });
+        return;
+      }
+
       renderLoginView();
       return;
     }

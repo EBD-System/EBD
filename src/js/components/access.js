@@ -157,6 +157,48 @@ function getAccessCodeFromUrl() {
   }
 }
 
+function getLoginPreferences() {
+  const store = storageState();
+  const prefs = store.loginPreferences;
+  return prefs && typeof prefs === 'object' ? prefs : {};
+}
+
+function saveLoginPreferences(nextPreferences = {}) {
+  const store = ensureStorageStateShape();
+  store.loginPreferences = {
+    ...(store.loginPreferences && typeof store.loginPreferences === 'object' ? store.loginPreferences : {}),
+    ...nextPreferences,
+  };
+  saveStorageState(store);
+  return store.loginPreferences;
+}
+
+function setRememberedLogin(login, remember = true) {
+  const normalizedLogin = normalizeAccessText(login);
+  const preferences = getLoginPreferences();
+
+  if (!remember || !normalizedLogin) {
+    delete preferences.rememberedLogin;
+    preferences.rememberUsername = false;
+    saveLoginPreferences(preferences);
+    return preferences;
+  }
+
+  preferences.rememberedLogin = normalizedLogin;
+  preferences.rememberUsername = true;
+  saveLoginPreferences(preferences);
+  return preferences;
+}
+
+function getRememberedLogin() {
+  return normalizeAccessText(getLoginPreferences().rememberedLogin || '');
+}
+
+function shouldRememberLogin() {
+  const preferences = getLoginPreferences();
+  return !!preferences.rememberUsername && !!normalizeAccessText(preferences.rememberedLogin || '');
+}
+
 function getStoredAccessSession() {
   const store = storageState();
   return store.accessSession || null;

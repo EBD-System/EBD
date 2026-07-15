@@ -19,5 +19,6 @@ Pontos centrais:
 - Existe agora uma página pública de cadastro em `cadastro/` para criar acesso sem depender da sessão interna.
 - O cadastro público envia `POST /auth/register` em JSON ao backend.
 - A tela de login usa `POST /auth/login` em JSON e grava a sessão autenticada retornada pelo backend.
+- A tela de login também lembra opcionalmente o nome de usuário em `localStorage` e oferece um diálogo estático para "Esqueci minha senha".
 - O subpath do GitHub Pages deve ser preservado em toda navegação cliente.
-- O modo `self` continua ocultando a aplicação principal, mas a rota `/login` precisa escapar dessa regra para que a tela de login apareça mesmo sem sessão salva.
+- O modo `self` continua ocultando a aplicação principal, mas a rota `/login` precisa escapar dessa regra para que a tela de login apareça mesmo sem sessão salva. Quando já existe sessão salva, `/login` deve redirecionar para `/chamada`.
