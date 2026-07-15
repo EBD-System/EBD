@@ -12,3 +12,5 @@ Essa estrutura separa o ponto de entrada da área interna, reduz carregamento de
 
 ## Atualização
 As rotas cliente precisam ser prefixadas com `APP_BASE_PATH` derivado de `APP_BASE_URL`, para funcionar corretamente em subpaths do GitHub Pages como `/EBD/`.
+
+- A rota `/login` deve permanecer visível mesmo quando o modo de acesso atual seja `self`; a regra de ocultação da aplicação principal precisa respeitar `data-route-mode="login"`.

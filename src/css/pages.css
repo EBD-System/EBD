@@ -27,7 +27,7 @@ body.access-restricted.access-share-reports #actionsPanel .panel__actions #sendT
 body.access-restricted.access-share-reports #actionsPanel .panel__actions #sendGeralBtn{
   display:inline-flex !important;
 }
-body.access-self .app {
+body.access-self:not([data-route-mode="login"]) .app {
   display: none !important;
 }
 

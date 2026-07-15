@@ -20,3 +20,4 @@ Pontos centrais:
 - O cadastro público envia `POST /auth/register` em JSON ao backend.
 - A tela de login usa `POST /auth/login` em JSON e grava a sessão autenticada retornada pelo backend.
 - O subpath do GitHub Pages deve ser preservado em toda navegação cliente.
+- O modo `self` continua ocultando a aplicação principal, mas a rota `/login` precisa escapar dessa regra para que a tela de login apareça mesmo sem sessão salva.
