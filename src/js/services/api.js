@@ -224,33 +224,7 @@ async function parseJsonResponse(response) {
 }
 
 
-function isFakeDatabaseEnabled() {
-  return !!DEV_FAKE_DATABASE && !!window.FakeDatabase && typeof window.FakeDatabase.handleGet === 'function' && typeof window.FakeDatabase.handlePost === 'function';
-}
-
-async function runFakeDatabase(kind, params = {}) {
-  if (!isFakeDatabaseEnabled()) {
-    throw createAppError('O modo de banco fake não está disponível.', {
-      source: 'frontend',
-      stage: 'fake-database',
-    });
-  }
-
-  if (window.FakeDatabase?.ensureReady) {
-    await window.FakeDatabase.ensureReady();
-  }
-
-  if (kind === 'get') {
-    return window.FakeDatabase.handleGet(params);
-  }
-
-  return window.FakeDatabase.handlePost(params);
-}
-
 async function apiGet(params = {}, { timeoutMs = 30000 } = {}) {
-  if (isFakeDatabaseEnabled()) {
-    return runFakeDatabase('get', params);
-  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.max(5000, Number(timeoutMs) || 30000));
@@ -286,9 +260,6 @@ async function apiGet(params = {}, { timeoutMs = 30000 } = {}) {
 }
 
 async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
-  if (isFakeDatabaseEnabled()) {
-    return runFakeDatabase('post', params);
-  }
 
   const bodyParams = new URLSearchParams();
   const queryParams = {};

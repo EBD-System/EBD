@@ -5,7 +5,7 @@
 - As ações enviadas pelo cliente devem ser normalizadas para minúsculas.
 - O cliente deve enviar `POST` como `application/x-www-form-urlencoded`.
 - A mesma rota pode aceitar `GET` como fallback de compatibilidade.
-- A rota de compatibilidade do frontend aceita `action` ou `acao` e devolve o mesmo formato usado pelo modo fake.
+- A rota de compatibilidade do frontend aceita `action` ou `acao` e devolve o mesmo formato do backend.
 - A ação `init` precisa retornar `turmas`, `alunos`, `callsByTurma`, `inativos`, `resumoGeral`, `baseRowsCount` e `selectedTurmaId`.
 - O código exibido após `#` na edição do aluno é somente leitura na interface e não pode ser alterado pelo usuário.
 - Usuários com acesso `restricted` também podem editar cadastro de aluno; apenas o modo `self` continua bloqueado.
@@ -20,6 +20,6 @@
 - Na chamada, `PRESENÇA`, `ATRASO` e `AUSÊNCIA` devem ser gravados como estados mutuamente exclusivos em cada salvamento; ao corrigir a presença de um aluno, o backend precisa zerar os campos que não correspondem ao novo status.
 - A navegação principal deve reconhecer as rotas `/login`, `/turma`, `/turma/:id`, `/chamada`, `/abrir-chamada` e `/inativos`, com sessão persistida no navegador e `?code=` apenas como compatibilidade temporária.
 - A ação `init` do backend pode receber `view` para respostas mais leves em telas de listagem, especialmente para `/turma` e `/inativos`.
-- O modo fake local continua disponível para desenvolvimento isolado, mas a operação padrão do projeto passa pelo backend PostgreSQL.
+- Não existe mais modo fake local no frontend; toda operação passa pelo backend PostgreSQL.
 
 - Em GitHub Pages, toda navegação cliente deve preservar o subpath base do projeto (`APP_BASE_PATH`), evitando enviar o usuário para `/<rota>` na raiz do domínio.

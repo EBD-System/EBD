@@ -4,11 +4,10 @@ Antes de responder ou alterar o projeto, consulte primeiro a memória consolidad
 
 Pontos centrais:
 
-- A base oficial de dados continua sendo PostgreSQL.
-- O frontend agora usa a API HTTP do backend como caminho padrão.
-- O arquivo `backend/exampleDb.json` segue como seed do modo fake local, que só deve ser ativado manualmente.
-- A interface web ainda pode falar com o modo fake quando `DEV_FAKE_DATABASE = true`.
-- O navegador usa localStorage para rascunhos, snapshots consolidadas de chamadas, sessão de acesso e estado do banco fake.
+- A base oficial de dados é PostgreSQL.
+- O frontend consome somente a API HTTP do backend.
+- Não existe mais banco fake local no frontend.
+- O navegador usa localStorage para rascunhos, snapshots consolidadas de chamadas, sessão de acesso e estado da interface.
 - A navegação principal usa um roteador cliente com sessão persistida no navegador.
 - O parâmetro `?code=` continua só como compatibilidade temporária.
 - O login deve ser tratado como camada de acesso; a sessão precisa carregar identidade e perfis, e as páginas internas devem confiar nessa sessão, não na URL.
@@ -18,10 +17,5 @@ Pontos centrais:
 - A edição de aluno acontece em uma página dedicada em `aluno/editar-aluno/`.
 - O cadastro de aluno fica em `aluno/adicionar-aluno/` e não inclui cadastro de nova turma.
 - Existe agora uma página pública de cadastro em `cadastro/` para criar acesso sem depender da sessão interna.
-- O cadastro público envia `action=register` ao backend e também funciona no modo fake local.
+- O cadastro público envia `action=register` ao backend.
 - O subpath do GitHub Pages deve ser preservado em toda navegação cliente.
-
-## Banco fake local
-- `DEV_FAKE_DATABASE` habilita o modo fake no frontend.
-- O seed precisa usar uma URL absoluta resolvida em `EXAMPLE_DB_URL`; não depender de caminho relativo da rota atual.
-- Se o armazenamento local estiver vazio por uma carga inicial mal sucedida, o runtime deve voltar ao seed do JSON.

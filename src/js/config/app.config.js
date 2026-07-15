@@ -1,6 +1,4 @@
 // Configure a URL da API HTTP que conversa com PostgreSQL.
-// O modo fake continua disponível via `window.DEV_FAKE_DATABASE = true`.
-const DEV_FAKE_DATABASE = window.DEV_FAKE_DATABASE ?? false;
 const APP_BASE_URL = new URL('../../../', document.currentScript?.src || window.location.href).href;
 const APP_BASE_PATH = new URL(APP_BASE_URL).pathname.replace(/\/+$/, '') || '/';
 
@@ -11,14 +9,11 @@ function buildAppRoutePath(path = '/') {
   return `${base}${normalized}`.replace(/\/+/g, '/');
 }
 
-const EXAMPLE_DB_URL = new URL('backend/exampleDb.json', APP_BASE_URL).href;
 const BACKEND_API_URL = window.BACKEND_API_URL || window.API_BASE_URL || new URL('api', APP_BASE_URL).href;
 
-window.DEV_FAKE_DATABASE = DEV_FAKE_DATABASE;
 window.APP_BASE_URL = APP_BASE_URL;
 window.APP_BASE_PATH = APP_BASE_PATH;
 window.buildAppRoutePath = buildAppRoutePath;
-window.EXAMPLE_DB_URL = EXAMPLE_DB_URL;
 window.BACKEND_API_URL = BACKEND_API_URL;
 window.API_BASE_URL = BACKEND_API_URL;
 
@@ -27,8 +22,7 @@ const ROSTER_CACHE_KEY = 'prb_roster_cache_v1';
 const ROSTER_CACHE_VERSION = 1;
 const DEBUG_CONSOLE_ACCESS_CODE = '50292230';
 
-// Se false, o carregamento inicial usa somente o que vem do backend.
-// Se true, o rascunho local pode voltar a ser aplicado quando existir.
+// O carregamento inicial usa somente o que vem do backend.
 const APPLY_LOCAL_DRAFTS_ON_LOAD = false;
 
 function isDebugConsoleEnabled(accessCode = state.accessCode) {
