@@ -11,6 +11,7 @@ Pontos centrais:
 - A navegação principal usa um roteador cliente com sessão persistida no navegador; a rota de login precisa continuar acessível mesmo em deploy estático.
 - O parâmetro `?code=` continua só como compatibilidade temporária.
 - O login deve ser tratado como camada de acesso; a sessão precisa carregar identidade e perfis, e as páginas internas devem confiar nessa sessão, não na URL.
+- Existe uma camada central de requisições no frontend que injeta automaticamente o Bearer token da sessão autenticada nas chamadas protegidas; login e cadastro público continuam sem autenticação.
 - As rotas `/login`, `/turma`, `/turma/:id`, `/chamada`, `/abrir-chamada` e `/inativos` já existem no shell principal.
 - As telas de lista podem pedir `init(view=turmas)` ou `init(view=inativos)` para evitar carregar a chamada inteira; a rota de chamada ainda usa o fluxo completo para preservar estabilidade.
 - O modo `restricted` também pode editar alunos; apenas o modo `self` segue bloqueado para edição.

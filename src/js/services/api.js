@@ -57,6 +57,59 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function getStoredAccessToken() {
+  const candidates = [
+    typeof state !== 'undefined' ? state.session : null,
+    typeof getStoredAccessSession === 'function' ? getStoredAccessSession() : null,
+    (() => {
+      try {
+        const store = storageState();
+        return store?.accessSession || null;
+      } catch (err) {
+        return null;
+      }
+    })(),
+  ];
+
+  for (const session of candidates) {
+    const token = normalizeAccessText(
+      session?.token ??
+      session?.accessToken ??
+      session?.authToken ??
+      session?.jwt ??
+      ''
+    );
+    if (token) return token;
+  }
+
+  return '';
+}
+
+function buildBackendHeaders({
+  contentType = 'application/x-www-form-urlencoded;charset=UTF-8',
+  accept = 'application/json',
+  auth = true,
+} = {}) {
+  const headers = {};
+
+  if (accept) {
+    headers.Accept = accept;
+  }
+
+  if (contentType) {
+    headers['Content-Type'] = contentType;
+  }
+
+  if (auth) {
+    const token = getStoredAccessToken();
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+  }
+
+  return headers;
+}
+
 function createAppError(message, meta = {}) {
   const err = message instanceof Error ? message : new Error(String(message || 'Erro desconhecido.'));
   err.source = String(meta.source || err.source || 'frontend').toLowerCase();
@@ -225,14 +278,18 @@ async function parseJsonResponse(response) {
 
 
 async function apiGet(params = {}, { timeoutMs = 30000 } = {}) {
-
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.max(5000, Number(timeoutMs) || 30000));
+
   try {
     const response = await fetch(apiUrl(params), {
       method: 'GET',
       mode: 'cors',
       cache: 'no-store',
+      headers: buildBackendHeaders({
+        contentType: '',
+        auth: true,
+      }),
       signal: controller.signal,
     });
     return await parseJsonResponse(response);
@@ -260,7 +317,6 @@ async function apiGet(params = {}, { timeoutMs = 30000 } = {}) {
 }
 
 async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
-
   const bodyParams = new URLSearchParams();
   const queryParams = {};
   const actionName = String(params.action || params.acao || '').trim().toLowerCase();
@@ -304,6 +360,10 @@ async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
       method: 'GET',
       mode: 'cors',
       cache: 'no-store',
+      headers: buildBackendHeaders({
+        contentType: '',
+        auth: true,
+      }),
       signal: controller.signal,
     });
     return parseJsonResponse(fallbackResponse);
@@ -320,9 +380,9 @@ async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
       method: 'POST',
       mode: 'cors',
       cache: 'no-store',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-      },
+      headers: buildBackendHeaders({
+        auth: true,
+      }),
       body: bodyParams.toString(),
       signal: controller.signal,
     });
@@ -386,10 +446,10 @@ async function authJsonRequest(path = '/', payload = {}, { timeoutMs = 30000 } =
       method: 'POST',
       mode: 'cors',
       cache: 'no-store',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
+      headers: buildBackendHeaders({
+        contentType: 'application/json',
+        auth: false,
+      }),
       body: JSON.stringify(payload ?? {}),
       signal: controller.signal,
     });

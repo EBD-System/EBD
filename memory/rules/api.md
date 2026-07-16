@@ -5,6 +5,7 @@
 - O backend principal exposto pelo projeto fica em `https://ebd-fj9u.onrender.com/api`; as rotas `/auth/login` e `/auth/register` ficam no mesmo serviço, na raiz do domínio.
 - As ações enviadas pelo cliente devem ser normalizadas para minúsculas.
 - As rotas gerais da API continuam usando `POST` como `application/x-www-form-urlencoded`.
+- As rotas protegidas devem receber `Authorization: Bearer <token>` extraído da sessão autenticada do navegador; o frontend aplica isso de forma centralizada no serviço de requisições.
 - A mesma rota pode aceitar `GET` como fallback de compatibilidade.
 - A rota de compatibilidade do frontend aceita `action` ou `acao` e devolve o mesmo formato do backend.
 - A ação `init` precisa retornar `turmas`, `alunos`, `callsByTurma`, `inativos`, `resumoGeral`, `baseRowsCount` e `selectedTurmaId`.
