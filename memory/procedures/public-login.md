@@ -3,13 +3,14 @@
 ## Passos
 
 1. Abrir `/login` ou `/login/`.
-2. Informar login e senha.
+2. Informar nome de usuário e senha.
 3. Enviar o formulário para `POST /auth/login` em JSON.
 4. Persistir a sessão retornada pelo backend no `localStorage`.
-5. Se a opção de lembrar o nome de usuário estiver marcada, salvar também o login informado como preferência local.
+5. Salvar automaticamente o último nome de usuário usado como preferência local para pré-preenchimento futuro.
 6. Entrar na chamada após a autenticação bem-sucedida.
 7. Ao abrir `/login` com uma sessão já salva, redirecionar imediatamente para `/chamada`.
+8. Na tela principal, usar o botão “Sair” para limpar a sessão local e voltar para `/login`.
 
 ## Observação
 
-A tela de login deve exibir apenas os campos essenciais, o atalho "Esqueci minha senha" e o botão de cadastro.
+A tela de login deve ficar enxuta: apenas nome de usuário, senha, botão de entrar e botão de criar cadastro.

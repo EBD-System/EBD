@@ -108,6 +108,11 @@ body::before{
   font-size:1.05rem;
 }
 
+.hero-panel__item--logout .btn{
+  width:100%;
+  justify-content:center;
+}
+
 .toolbar{
   padding:16px;
   display:grid;

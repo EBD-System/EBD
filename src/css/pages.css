@@ -31,6 +31,11 @@ body.access-self:not([data-route-mode="login"]) .app {
   display: none !important;
 }
 
+body[data-route-mode="login"] .app > *:not(#routePortal) {
+  display: none !important;
+}
+
+
 .shortcut-panel{
   margin-bottom:16px;
   padding:14px 16px;

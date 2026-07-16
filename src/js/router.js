@@ -211,13 +211,11 @@
     );
 
     const rememberedLogin = String(getRememberedLogin?.() || session?.login || getResolvedAccessCode() || '').trim();
-    const rememberChecked = shouldRememberLogin?.() || !!rememberedLogin;
 
     safeSetInnerHtml(portal, `
       <section class="card route-login-card">
         <span class="badge">EBD • Acesso</span>
         <h1>Login</h1>
-        <p class="route-login-card__subtitle">Entre com seu nome de usuário e senha para acessar o sistema.</p>
 
         <form id="routeLoginForm" class="route-login-form">
           <div class="field">
@@ -230,40 +228,17 @@
             <input id="routeLoginPassword" type="password" autocomplete="current-password" placeholder="Senha" required />
           </div>
 
-          <label class="route-login-remember">
-            <input id="routeLoginRemember" type="checkbox" ${rememberChecked ? 'checked' : ''} />
-            <span>Lembrar meu nome de usuário</span>
-          </label>
-
-          <div class="route-login-form__links">
-            <button id="routeForgotPasswordBtn" class="route-login-link" type="button">Esqueci minha senha</button>
-          </div>
-
           <div class="route-login-form__actions">
             <button class="btn btn--primary" type="submit">Entrar</button>
             <a class="btn btn--ghost" href="${escapeHtml(buildRoutePath('/cadastro/'))}">Criar cadastro</a>
           </div>
         </form>
       </section>
-
-      <dialog id="forgotPasswordDialog" class="route-login-dialog">
-        <div class="card route-login-dialog__card">
-          <h2>Esqueci minha senha</h2>
-          <p>Essa funcionalidade ainda não foi criada.</p>
-          <div class="route-login-dialog__actions">
-            <button id="routeForgotPasswordCloseBtn" class="btn btn--primary" type="button">Fechar</button>
-          </div>
-        </div>
-      </dialog>
     `);
 
     const form = document.getElementById('routeLoginForm');
     const inputUser = document.getElementById('routeLoginUser');
     const inputPassword = document.getElementById('routeLoginPassword');
-    const rememberInput = document.getElementById('routeLoginRemember');
-    const forgotBtn = document.getElementById('routeForgotPasswordBtn');
-    const dialog = syncForgotPasswordDialog();
-    const dialogCloseBtn = document.getElementById('routeForgotPasswordCloseBtn');
 
     if (inputUser) {
       inputUser.value = rememberedLogin;
@@ -281,7 +256,6 @@
 
         const login = String(inputUser?.value || '').trim();
         const senha = String(inputPassword?.value || '');
-        const rememberUsername = !!rememberInput?.checked;
         if (!login) {
           showError('Digite seu nome de usuário.');
           return;
@@ -308,7 +282,7 @@
           });
 
           if (typeof setRememberedLogin === 'function') {
-            setRememberedLogin(login, rememberUsername);
+            setRememberedLogin(login, true);
           }
 
           showSuccess(result.message || 'Login realizado com sucesso.');
@@ -318,24 +292,6 @@
         } finally {
           hideLoading?.();
         }
-      });
-    }
-
-    if (forgotBtn && !forgotBtn.dataset.bound) {
-      forgotBtn.dataset.bound = '1';
-      forgotBtn.addEventListener('click', () => {
-        if (dialog?.showModal) {
-          dialog.showModal();
-        } else {
-          window.alert('Essa funcionalidade ainda não foi criada.');
-        }
-      });
-    }
-
-    if (dialogCloseBtn && !dialogCloseBtn.dataset.bound) {
-      dialogCloseBtn.dataset.bound = '1';
-      dialogCloseBtn.addEventListener('click', () => {
-        dialog?.close?.();
       });
     }
   }
@@ -596,6 +552,14 @@
   document.addEventListener('click', (event) => {
     const target = event.target instanceof HTMLElement ? event.target : null;
     if (!target) return;
+
+    const logoutTarget = target.closest('#logoutBtn');
+    if (logoutTarget instanceof HTMLElement) {
+      event.preventDefault();
+      clearAccessSession?.();
+      navigateTo('/login', { replace: true });
+      return;
+    }
 
     const routeTarget = target.closest('[data-route]');
     if (routeTarget instanceof HTMLElement) {

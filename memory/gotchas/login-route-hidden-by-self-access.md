@@ -15,3 +15,5 @@ A ocultação da `.app` não deve valer quando `body[data-route-mode="login"]` e
 ## Complemento
 
 Quando existir sessão autenticada salva, a rota `/login` não deve permanecer na própria tela de login; ela deve encaminhar o usuário para `/chamada`.
+
+A tela de login agora também precisa esconder todo o restante do shell, deixando visível apenas o portal de acesso.

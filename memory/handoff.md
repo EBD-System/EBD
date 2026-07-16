@@ -7,7 +7,7 @@ Pontos centrais:
 - A base oficial de dados é PostgreSQL.
 - O frontend consome somente a API HTTP do backend. A tela de login também possui entrada estática própria em `/login/` e um alias compatível para `/login`.
 - Não existe mais banco fake local no frontend.
-- O navegador usa localStorage para rascunhos, snapshots consolidadas de chamadas, sessão de acesso e estado da interface.
+- O navegador usa localStorage para rascunhos, snapshots consolidadas de chamadas, sessão de acesso, preferências de login e estado da interface.
 - A navegação principal usa um roteador cliente com sessão persistida no navegador; a rota de login precisa continuar acessível mesmo em deploy estático.
 - O parâmetro `?code=` continua só como compatibilidade temporária.
 - O login deve ser tratado como camada de acesso; a sessão precisa carregar identidade e perfis, e as páginas internas devem confiar nessa sessão, não na URL.
@@ -19,6 +19,7 @@ Pontos centrais:
 - Existe agora uma página pública de cadastro em `cadastro/` para criar acesso sem depender da sessão interna.
 - O cadastro público envia `POST /auth/register` em JSON ao backend.
 - A tela de login usa `POST /auth/login` em JSON e grava a sessão autenticada retornada pelo backend.
-- A tela de login também lembra opcionalmente o nome de usuário em `localStorage` e oferece um diálogo estático para "Esqueci minha senha".
+- A tela de login foi enxugada para nome de usuário, senha, botão de entrar e botão de criar cadastro; o último nome de usuário é salvo automaticamente como preferência local.
+- A tela principal ganhou um botão “Sair” que limpa a sessão local e retorna para `/login`.
 - O subpath do GitHub Pages deve ser preservado em toda navegação cliente.
 - O modo `self` continua ocultando a aplicação principal, mas a rota `/login` precisa escapar dessa regra para que a tela de login apareça mesmo sem sessão salva. Quando já existe sessão salva, `/login` deve redirecionar para `/chamada`.
