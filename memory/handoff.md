@@ -12,9 +12,9 @@ Pontos centrais:
 - O parâmetro `?code=` continua só como compatibilidade temporária.
 - O login deve ser tratado como camada de acesso; a sessão precisa carregar identidade e perfis, e as páginas internas devem confiar nessa sessão, não na URL.
 - Existe uma camada central de requisições no frontend que injeta automaticamente o Bearer token da sessão autenticada nas chamadas protegidas; login e cadastro público continuam sem autenticação.
-- Essa mesma camada também propaga o `id_cadastro` da sessão via `x-cadastro-id` nas requisições autenticadas; o consumo de classes deve permanecer filtrado por tenant enquanto a migração para JWT exclusivo estiver em andamento.
+- Por limitação de CORS no backend, o frontend não deve depender de `x-cadastro-id`; o tenant precisa seguir no `id_cadastro` da query/body nas requisições autenticadas e, durante a migração, o backend continua aceitando o JWT como fonte principal quando disponível.
 - O shell principal hidrata a sessão salva no bootstrap para que o primeiro carregamento de turmas já tenha o tenant correto disponível.
-- A rota `GET /api/classes` é tenant-scoped e o frontend já envia `id_cadastro` como compatibilidade adicional quando a sessão possui esse valor.
+- A rota `GET /api/classes` é tenant-scoped e o frontend envia `id_cadastro` por compatibilidade adicional nas consultas autenticadas.
 - As rotas `/login`, `/turma`, `/turma/:id`, `/chamada`, `/abrir-chamada` e `/inativos` já existem no shell principal.
 - As telas de lista podem pedir `init(view=turmas)` ou `init(view=inativos)` para evitar carregar a chamada inteira; a rota de chamada ainda usa o fluxo completo para preservar estabilidade.
 - O modo `restricted` também pode editar alunos; apenas o modo `self` segue bloqueado para edição.
