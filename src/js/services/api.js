@@ -85,130 +85,6 @@ function getStoredAccessToken() {
   return '';
 }
 
-function readPersistedAccessSession_() {
-  try {
-    return storageState()?.accessSession || null;
-  } catch (err) {
-    return null;
-  }
-}
-
-function decodeJwtPayload_(token) {
-  const raw = String(token || '').trim();
-  if (!raw) return null;
-
-  const parts = raw.split('.');
-  if (parts.length < 2) return null;
-
-  try {
-    const base64Url = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    const padded = base64Url.padEnd(Math.ceil(base64Url.length / 4) * 4, '=');
-    const json = atob(padded);
-    return JSON.parse(json);
-  } catch (err) {
-    return null;
-  }
-}
-
-function normalizeTenantIdValue_(value) {
-  const raw = String(value ?? '').trim();
-  if (!raw) return '';
-
-  const numeric = Number(raw);
-  if (Number.isFinite(numeric) && numeric > 0) {
-    return String(Math.trunc(numeric));
-  }
-
-  return '';
-}
-
-function extractCadastroIdFromToken_(token) {
-  const payload = decodeJwtPayload_(token);
-  if (!payload || typeof payload !== 'object') return '';
-
-  return normalizeTenantIdValue_(
-    payload.id_cadastro ??
-    payload.idCadastro ??
-    payload.cadastro_id ??
-    payload.cadastroId ??
-    payload.tenant_id ??
-    payload.tenantId ??
-    payload.data?.id_cadastro ??
-    payload.data?.idCadastro ??
-    payload.user?.id_cadastro ??
-    payload.user?.idCadastro ??
-    ''
-  );
-}
-
-function resolveCadastroIdForRequest_() {
-  const candidates = [];
-
-  if (typeof getSessionCadastroId === 'function') {
-    try {
-      candidates.push(getSessionCadastroId());
-    } catch (err) {
-      // ignore and continue with local fallbacks
-    }
-  }
-
-  const session = typeof state !== 'undefined' ? state.session : null;
-  const storedSession = readPersistedAccessSession_();
-
-  candidates.push(
-    session?.idCadastro,
-    session?.id_cadastro,
-    session?.cadastroId,
-    session?.cadastro_id,
-    session?.tenantId,
-    session?.tenant_id,
-    session?.data?.id_cadastro,
-    session?.data?.idCadastro,
-    session?.user?.id_cadastro,
-    session?.user?.idCadastro,
-    storedSession?.idCadastro,
-    storedSession?.id_cadastro,
-    storedSession?.cadastroId,
-    storedSession?.cadastro_id,
-    storedSession?.tenantId,
-    storedSession?.tenant_id,
-    storedSession?.data?.id_cadastro,
-    storedSession?.data?.idCadastro,
-    storedSession?.user?.id_cadastro,
-    storedSession?.user?.idCadastro,
-  );
-
-  for (const candidate of candidates) {
-    const normalized = normalizeTenantIdValue_(candidate);
-    if (normalized) return normalized;
-  }
-
-  const tokenCandidates = [
-    session?.token,
-    session?.accessToken,
-    storedSession?.token,
-    storedSession?.accessToken,
-  ];
-
-  for (const candidate of tokenCandidates) {
-    const normalized = extractCadastroIdFromToken_(candidate);
-    if (normalized) return normalized;
-  }
-
-  return '';
-}
-
-function applyTenantQueryParam_(url) {
-  if (!(url instanceof URL)) return '';
-
-  const cadastroId = resolveCadastroIdForRequest_();
-  if (cadastroId && !url.searchParams.has('id_cadastro')) {
-    url.searchParams.set('id_cadastro', String(cadastroId));
-  }
-
-  return cadastroId;
-}
-
 function buildBackendHeaders({
   contentType = 'application/x-www-form-urlencoded;charset=UTF-8',
   accept = 'application/json',
@@ -406,10 +282,7 @@ async function apiGet(params = {}, { timeoutMs = 30000 } = {}) {
   const timer = setTimeout(() => controller.abort(), Math.max(5000, Number(timeoutMs) || 30000));
 
   try {
-    const requestUrl = new URL(apiUrl(params));
-    applyTenantQueryParam_(requestUrl);
-
-    const response = await fetch(requestUrl.toString(), {
+    const response = await fetch(apiUrl(params), {
       method: 'GET',
       mode: 'cors',
       cache: 'no-store',
@@ -446,7 +319,6 @@ async function apiGet(params = {}, { timeoutMs = 30000 } = {}) {
 async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
   const bodyParams = new URLSearchParams();
   const queryParams = {};
-  const cadastroId = resolveCadastroIdForRequest_();
   const actionName = String(params.action || params.acao || '').trim().toLowerCase();
   const mirrorAllParamsInQuery = ['addaluno', 'addturma', 'updatealuno', 'register'].includes(actionName);
 
@@ -472,11 +344,6 @@ async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
     }
   });
 
-  if (cadastroId) {
-    bodyParams.set('id_cadastro', cadastroId);
-    queryParams.id_cadastro = cadastroId;
-  }
-
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.max(5000, Number(timeoutMs) || 30000));
 
@@ -489,9 +356,7 @@ async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
   };
 
   const sendGetFallback = async () => {
-    const fallbackUrl = new URL(apiUrl(queryParams));
-    applyTenantQueryParam_(fallbackUrl);
-    const fallbackResponse = await fetch(fallbackUrl.toString(), {
+    const fallbackResponse = await fetch(apiUrl(queryParams), {
       method: 'GET',
       mode: 'cors',
       cache: 'no-store',
@@ -505,14 +370,13 @@ async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
   };
 
   try {
-    const requestUrl = new URL(apiUrl({
+    const requestUrl = apiUrl({
       action: queryParams.action,
       acao: queryParams.acao,
       ...(mirrorAllParamsInQuery ? queryParams : {}),
-    }));
-    applyTenantQueryParam_(requestUrl);
+    });
 
-    const response = await fetch(requestUrl.toString(), {
+    const response = await fetch(requestUrl, {
       method: 'POST',
       mode: 'cors',
       cache: 'no-store',
@@ -740,8 +604,6 @@ async function apiGetClasses(params = {}, { timeoutMs = 30000 } = {}) {
       if (value === undefined || value === null) return;
       url.searchParams.set(key, String(value));
     });
-
-    applyTenantQueryParam_(url);
 
     const response = await fetch(url.toString(), {
       method: 'GET',

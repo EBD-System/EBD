@@ -36,9 +36,6 @@ async function bootstrap() {
 
   try {
     state.accessCode = getAccessCodeFromUrl();
-    if (typeof loadAccessSession === 'function') {
-      loadAccessSession();
-    }
     state.accessMode = resolveAccessMode(state.accessCode);
     applyAccessMode();
     syncDebugConsoleVisibility();
