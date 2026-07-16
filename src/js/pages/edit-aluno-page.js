@@ -170,7 +170,7 @@
     showLoading('Carregando aluno...', 25000);
 
     try {
-      const data = await apiGet({ action: 'init', date: todayKey() });
+      const data = await apiGetClasses({ timeoutMs: 30000 });
       turmas = Array.isArray(data.turmas) ? data.turmas : [];
       const alunos = Array.isArray(data.alunos) ? data.alunos : [];
       const found = alunos.find((item) => String(item.AlunoID || '') === String(alunoKey) || String(item.Nome || '') === String(alunoKey));

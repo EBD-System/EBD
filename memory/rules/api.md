@@ -23,6 +23,7 @@
 - As rotas de autenticação usam JSON: `POST /auth/register` para cadastro e `POST /auth/login` para login. O frontend deve enviar `Accept: application/json` e `Content-Type: application/json` nessas duas chamadas.
 - O cadastro público deve enviar o tenant em `cadastro_nome`; o backend aceita aliases antigos, mas o frontend deve preferir a forma canônica.
 - A ação `init` do backend pode receber `view` para respostas mais leves em telas de listagem, especialmente para `/turma` e `/inativos`.
+- A listagem de classes/turmas em telas dedicadas deve consumir `GET /api/classes` com `Authorization: Bearer <token>` e aceitar respostas que exponham a lista em `classes` ou `turmas`.
 - Não existe mais modo fake local no frontend; toda operação passa pelo backend PostgreSQL.
 
 - Em GitHub Pages, toda navegação cliente deve preservar o subpath base do projeto (`APP_BASE_PATH`), evitando enviar o usuário para `/<rota>` na raiz do domínio.

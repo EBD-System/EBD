@@ -107,7 +107,7 @@
     setLoadingVisible(true);
 
     try {
-      const data = await apiGet({ action: 'init', date: todayKey() });
+      const data = await apiGetClasses({ timeoutMs: 30000 });
       turmas = Array.isArray(data.turmas) ? data.turmas : [];
       renderTurmaOptions('');
 

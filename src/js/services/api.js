@@ -518,6 +518,68 @@ async function authLogin(payload = {}, options = {}) {
 }
 
 
+function normalizeClassesResponse(payload = {}) {
+  const classes = Array.isArray(payload?.classes)
+    ? payload.classes
+    : Array.isArray(payload?.turmas)
+      ? payload.turmas
+      : Array.isArray(payload?.data)
+        ? payload.data
+        : [];
+
+  return {
+    ...payload,
+    classes,
+    turmas: Array.isArray(payload?.turmas) ? payload.turmas : classes,
+  };
+}
+
+async function apiGetClasses(params = {}, { timeoutMs = 30000 } = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), Math.max(5000, Number(timeoutMs) || 30000));
+
+  try {
+    const url = new URL(authApiUrl('/api/classes'));
+    Object.entries(params || {}).forEach(([key, value]) => {
+      if (value === undefined || value === null) return;
+      url.searchParams.set(key, String(value));
+    });
+
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      mode: 'cors',
+      cache: 'no-store',
+      headers: buildBackendHeaders({
+        contentType: '',
+        auth: true,
+      }),
+      signal: controller.signal,
+    });
+    return normalizeClassesResponse(await parseJsonResponse(response));
+  } catch (err) {
+    if (err?.name === 'AbortError') {
+      throw createAppError('A requisição demorou demais. Verifique sua conexão e tente novamente.', {
+        source: 'frontend',
+        stage: 'timeout',
+      });
+    }
+
+    const message = String(err?.message || err || '');
+    if (/failed to fetch|networkerror|fetch failed/i.test(message)) {
+      throw createAppError(`Falha de comunicação com o backend: ${message || 'Failed to fetch'}`, {
+        source: 'frontend',
+        stage: 'network',
+        raw: message || err,
+      });
+    }
+
+    throw normalizeAppError(err, 'frontend');
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+
 function storageState() {
   try {
     return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') || {};
