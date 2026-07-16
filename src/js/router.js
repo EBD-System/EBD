@@ -273,6 +273,8 @@
 
           persistAccessSession({
             userId: user.id_usuario ?? user.userId ?? user.id ?? null,
+            idCadastro: user.id_cadastro ?? user.idCadastro ?? data.id_cadastro ?? data.idCadastro ?? null,
+            id_cadastro: user.id_cadastro ?? user.idCadastro ?? data.id_cadastro ?? data.idCadastro ?? null,
             login: user.login || login,
             nome: user.pessoa_nome || user.nome || user.name || login,
             perfis: user.profiles || user.perfis || user.perfil || [],

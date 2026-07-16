@@ -105,6 +105,13 @@ function buildBackendHeaders({
     if (token) {
       headers.Authorization = `Bearer ${token}`;
     }
+
+    const cadastroId = typeof getSessionCadastroId === 'function'
+      ? getSessionCadastroId()
+      : '';
+    if (cadastroId) {
+      headers['x-cadastro-id'] = String(cadastroId);
+    }
   }
 
   return headers;
@@ -599,11 +606,18 @@ async function apiGetClasses(params = {}, { timeoutMs = 30000 } = {}) {
   const timer = setTimeout(() => controller.abort(), Math.max(5000, Number(timeoutMs) || 30000));
 
   try {
+    const cadastroId = typeof getSessionCadastroId === 'function'
+      ? getSessionCadastroId()
+      : '';
     const url = new URL(authApiUrl('/api/classes'));
     Object.entries(params || {}).forEach(([key, value]) => {
       if (value === undefined || value === null) return;
       url.searchParams.set(key, String(value));
     });
+
+    if (cadastroId && !url.searchParams.has('id_cadastro')) {
+      url.searchParams.set('id_cadastro', String(cadastroId));
+    }
 
     const response = await fetch(url.toString(), {
       method: 'GET',

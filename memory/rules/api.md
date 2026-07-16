@@ -29,3 +29,5 @@
 - Não existe mais modo fake local no frontend; toda operação passa pelo backend PostgreSQL.
 
 - Em GitHub Pages, toda navegação cliente deve preservar o subpath base do projeto (`APP_BASE_PATH`), evitando enviar o usuário para `/<rota>` na raiz do domínio.
+
+- Consultas de classes e chamadas devem respeitar o tenant ativo da sessão. Enquanto a migração para o JWT completo não termina, o frontend envia `x-cadastro-id` nas requisições autenticadas e `GET /api/classes` pode receber `id_cadastro` por compatibilidade.
