@@ -2,6 +2,102 @@ function currentIsoNow() {
   return new Date().toISOString();
 }
 
+
+function normalizeCadastroIdValue(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+
+  const numeric = Number(raw);
+  if (!Number.isFinite(numeric)) return raw;
+
+  return String(Math.trunc(numeric));
+}
+
+function decodeJwtPayload(token) {
+  const raw = String(token || '').trim();
+  if (!raw) return null;
+
+  const parts = raw.split('.');
+  if (parts.length < 2) return null;
+
+  try {
+    const base64Url = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64Url.padEnd(Math.ceil(base64Url.length / 4) * 4, '=');
+    const json = atob(padded);
+    return JSON.parse(json);
+  } catch (err) {
+    return null;
+  }
+}
+
+function extractCadastroIdFromToken(token) {
+  const payload = decodeJwtPayload(token);
+  if (!payload || typeof payload !== 'object') return '';
+
+  return normalizeCadastroIdValue(
+    payload.id_cadastro ??
+    payload.idCadastro ??
+    payload.cadastro_id ??
+    payload.cadastroId ??
+    payload.tenant_id ??
+    payload.tenantId ??
+    payload.data?.id_cadastro ??
+    payload.data?.idCadastro ??
+    payload.user?.id_cadastro ??
+    payload.user?.idCadastro ??
+    ''
+  );
+}
+
+function getSessionCadastroId(session = state?.session || null) {
+  const storedSession = typeof getStoredAccessSession === 'function' ? getStoredAccessSession() : null;
+  const candidates = [
+    session?.idCadastro,
+    session?.id_cadastro,
+    session?.cadastroId,
+    session?.cadastro_id,
+    session?.tenantId,
+    session?.tenant_id,
+    session?.data?.id_cadastro,
+    session?.data?.idCadastro,
+    session?.user?.id_cadastro,
+    session?.user?.idCadastro,
+    session?.user?.tenant_id,
+    session?.user?.tenantId,
+    session?.userIdCadastro,
+    session?.user?.userIdCadastro,
+    storedSession?.idCadastro,
+    storedSession?.id_cadastro,
+    storedSession?.cadastroId,
+    storedSession?.cadastro_id,
+    storedSession?.tenantId,
+    storedSession?.tenant_id,
+    storedSession?.data?.id_cadastro,
+    storedSession?.data?.idCadastro,
+    storedSession?.user?.id_cadastro,
+    storedSession?.user?.idCadastro,
+    storedSession?.user?.tenant_id,
+    storedSession?.user?.tenantId,
+    storedSession?.token,
+    storedSession?.accessToken,
+    session?.accessToken,
+    session?.token,
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = normalizeCadastroIdValue(candidate);
+    if (normalized && !/\./.test(normalized) && /^\d+$/.test(normalized)) {
+      return normalized;
+    }
+  }
+
+  for (const candidate of candidates) {
+    const normalized = extractCadastroIdFromToken(candidate);
+    if (normalized) return normalized;
+  }
+
+  return '';
+}
 function normalizeAccessText(value) {
   return String(value ?? '').trim();
 }
@@ -61,6 +157,8 @@ function buildLegacySession(code, accessMode = legacyCodeToMode(code)) {
     accessMode: mode,
     accessCode: normalizedCode,
     legacyAccessCode: normalizedCode,
+    idCadastro: '',
+    id_cadastro: '',
     token: '',
     accessToken: '',
     createdAt: currentIsoNow(),
@@ -99,6 +197,21 @@ function normalizeAccessSession(sessionOrCode, accessModeHint = '') {
     sessionOrCode.code ??
     ''
   );
+  const explicitCadastroId = normalizeCadastroIdValue(
+    sessionOrCode.id_cadastro ??
+    sessionOrCode.idCadastro ??
+    sessionOrCode.cadastroId ??
+    sessionOrCode.cadastro_id ??
+    sessionOrCode.tenant_id ??
+    sessionOrCode.tenantId ??
+    sessionOrCode.user?.id_cadastro ??
+    sessionOrCode.user?.idCadastro ??
+    sessionOrCode.user?.tenant_id ??
+    sessionOrCode.user?.tenantId ??
+    sessionOrCode.data?.id_cadastro ??
+    sessionOrCode.data?.idCadastro ??
+    ''
+  );
 
   const inferredMode = sessionOrCode.accessMode
     ? String(sessionOrCode.accessMode).trim().toLowerCase()
@@ -107,7 +220,9 @@ function normalizeAccessSession(sessionOrCode, accessModeHint = '') {
   const accessMode = inferredMode || legacyCodeToMode(legacyAccessCode) || normalizeAccessText(accessModeHint).toLowerCase() || 'self';
 
   const normalizedSession = {
-    userId: sessionOrCode.userId ?? sessionOrCode.id_usuario ?? sessionOrCode.idUsuario ?? sessionOrCode.id_usuario ?? sessionOrCode.user?.id_usuario ?? sessionOrCode.user?.id ?? null,
+    userId: sessionOrCode.userId ?? sessionOrCode.id_usuario ?? sessionOrCode.idUsuario ?? sessionOrCode.user?.id_usuario ?? sessionOrCode.user?.id ?? null,
+    idCadastro: explicitCadastroId,
+    id_cadastro: explicitCadastroId,
     login: normalizeAccessText(sessionOrCode.login || sessionOrCode.usuario || sessionOrCode.user?.login || legacyAccessCode),
     nome: normalizeAccessText(
       sessionOrCode.nome ||
@@ -139,6 +254,11 @@ function normalizeAccessSession(sessionOrCode, accessModeHint = '') {
 
   if (normalizedSession.accessMode !== 'full' && normalizedSession.accessMode !== 'restricted' && normalizedSession.accessMode !== 'self') {
     normalizedSession.accessMode = inferAccessModeFromProfiles(perfis);
+  }
+
+  if (!normalizedSession.idCadastro) {
+    normalizedSession.idCadastro = extractCadastroIdFromToken(token);
+    normalizedSession.id_cadastro = normalizedSession.idCadastro;
   }
 
   if (!normalizedSession.legacyAccessCode && normalizedSession.userId === null) {

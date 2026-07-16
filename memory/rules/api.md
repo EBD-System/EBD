@@ -24,8 +24,13 @@
 - O cadastro público deve enviar o tenant em `cadastro_nome`; o backend aceita aliases antigos, mas o frontend deve preferir a forma canônica.
 - A ação `init` do backend pode receber `view` para respostas mais leves em telas de listagem, especialmente para `/turma` e `/inativos`.
 - A listagem de classes/turmas em telas dedicadas deve consumir `GET /api/classes` com `Authorization: Bearer <token>` e aceitar respostas que exponham a lista em `classes` ou `turmas`.
+- Como o backend não libera `x-cadastro-id` no CORS, o frontend deve enviar o tenant como `id_cadastro` na query/body das requisições autenticadas; o backend ainda resolve o tenant pelo JWT quando possível.
+- O shell principal deve carregar a sessão autenticada salva no bootstrap antes da primeira requisição de turmas, para garantir que o tenant correto esteja disponível desde o início.
 - O frontend deve normalizar registros de turma vindos da API para `TurmaID` e `Nome`, aceitando aliases como `id_classe` e `nome`.
 - Quando `init` não trouxer turmas válidas, o shell principal pode fazer fallback em `GET /api/classes` para preencher o seletor de turmas.
 - Não existe mais modo fake local no frontend; toda operação passa pelo backend PostgreSQL.
 
 - Em GitHub Pages, toda navegação cliente deve preservar o subpath base do projeto (`APP_BASE_PATH`), evitando enviar o usuário para `/<rota>` na raiz do domínio.
+
+- Consultas de classes e chamadas devem respeitar o tenant ativo da sessão. Enquanto a migração para JWT exclusivo estiver em andamento, o frontend envia `id_cadastro` nas requisições autenticadas e o backend usa esse valor ou o tenant do token.
+
