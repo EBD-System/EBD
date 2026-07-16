@@ -477,8 +477,40 @@ async function authJsonRequest(path = '/', payload = {}, { timeoutMs = 30000 } =
   }
 }
 
+function normalizeRegisterPayload(payload = {}) {
+  const cadastroNome = String(
+    payload.cadastro_nome ??
+    payload.cadastroNome ??
+    payload.tenant_nome ??
+    payload.tenantNome ??
+    payload.nome_cadastro ??
+    payload.nomeCadastro ??
+    payload.nome ??
+    ''
+  ).trim();
+
+  return {
+    cadastro_nome: cadastroNome,
+    nome: String(payload.nome ?? '').trim(),
+    login: String(payload.login ?? '').trim(),
+    senha: String(payload.senha ?? ''),
+    cpf: String(payload.cpf ?? '').trim(),
+    sexo: String(payload.sexo ?? 'nao_informado').trim(),
+    data_nascimento: String(payload.data_nascimento ?? payload.dataNascimento ?? '').trim(),
+    telefone: String(payload.telefone ?? '').trim(),
+    email: String(payload.email ?? '').trim(),
+    logradouro: String(payload.logradouro ?? '').trim(),
+    numero: String(payload.numero ?? '').trim(),
+    bairro: String(payload.bairro ?? '').trim(),
+    cidade: String(payload.cidade ?? '').trim(),
+    uf: String(payload.uf ?? '').trim(),
+    cep: String(payload.cep ?? '').trim(),
+    observacao: String(payload.observacao ?? '').trim(),
+  };
+}
+
 async function authRegister(payload = {}, options = {}) {
-  return await authJsonRequest('/auth/register', payload, options);
+  return await authJsonRequest('/auth/register', normalizeRegisterPayload(payload), options);
 }
 
 async function authLogin(payload = {}, options = {}) {

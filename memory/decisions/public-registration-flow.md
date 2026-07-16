@@ -2,12 +2,12 @@
 
 ## Decisão
 
-A interface passou a oferecer uma página pública de cadastro em `cadastro/`, separada do shell autenticado. O formulário coleta os dados da pessoa e do acesso e envia `POST /auth/register` em JSON ao backend.
+A interface pública de cadastro em `cadastro/` agora cria um tenant/cadastro antes de criar a pessoa e o usuário. O formulário envia `POST /auth/register` em JSON com `cadastro_nome` como campo preferencial para o nome do tenant, além dos dados da pessoa e do acesso.
 
 ## Motivo
 
-O cadastro de novo acesso não deve depender da sessão interna da aplicação. Uma página pública reduz fricção e preserva a navegação principal, enquanto o backend centraliza a criação do usuário.
+O backend passou a exigir a criação do tenant como primeiro passo para garantir que o `id_cadastro` seja gerado antes de persistir `ebd_pessoa` e `ebd_usuario`.
 
 ## Data
 
-2026-07-15
+2026-07-16

@@ -8,6 +8,7 @@
     loading: document.getElementById('registerLoading'),
     feedback: document.getElementById('feedback'),
     submit: document.querySelector('#registerForm button[type="submit"]'),
+    cadastroNome: document.getElementById('registerCadastroNome'),
     nome: document.getElementById('registerNome'),
     login: document.getElementById('registerLogin'),
     senha: document.getElementById('registerSenha'),
@@ -73,6 +74,11 @@
     return String(value || '').trim().toUpperCase().slice(0, 2);
   }
 
+  function normalizeCadastroNome(value, fallback = '') {
+    const normalized = String(value || '').trim();
+    return normalized || String(fallback || '').trim();
+  }
+
   function formatPhoneInput(event) {
     const input = event?.target;
     if (!input) return;
@@ -100,6 +106,7 @@
   async function submitForm(event) {
     event.preventDefault();
 
+    const cadastroNome = normalizeCadastroNome(els.cadastroNome?.value || '', els.nome?.value || '');
     const nome = String(els.nome?.value || '').trim();
     const login = String(els.login?.value || '').trim();
     const senha = String(els.senha?.value || '');
@@ -117,6 +124,10 @@
     const cep = formatCep(els.cep?.value || '');
     const observacao = String(els.observacao?.value || '').trim();
 
+    if (!cadastroNome) {
+      setFeedback('error', 'Informe o nome do cadastro.');
+      return;
+    }
     if (!nome) {
       setFeedback('error', 'Informe o nome completo.');
       return;
@@ -139,6 +150,7 @@
     setFeedback('info', 'Enviando dados para o backend...');
 
     const payload = {
+      cadastro_nome: cadastroNome,
       nome,
       login,
       senha,
@@ -165,6 +177,7 @@
 
       if (window.ProjectMemory) {
         window.ProjectMemory.recordFromEvent('register-user', {
+          cadastroNome,
           nome,
           login,
           cpf,
@@ -176,7 +189,8 @@
       }
 
       if (els.form) els.form.reset();
-      if (els.nome) els.nome.focus();
+      if (els.cadastroNome) els.cadastroNome.focus();
+      else if (els.nome) els.nome.focus();
       const loginUrl = buildBackUrl();
       if (loginUrl) {
         setTimeout(() => {
@@ -227,7 +241,9 @@
     if (els.form) {
       els.form.classList.remove('hidden');
     }
-    if (els.nome) {
+    if (els.cadastroNome) {
+      els.cadastroNome.focus();
+    } else if (els.nome) {
       els.nome.focus();
     }
   });

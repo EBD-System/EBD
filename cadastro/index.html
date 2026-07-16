@@ -6,7 +6,7 @@
   <title>Cadastro • EBD</title>
   <meta
     name="description"
-    content="Área pública para cadastrar uma pessoa e criar o acesso no backend."
+    content="Área pública para criar um cadastro/tenant e o acesso inicial no backend."
   />
   <link rel="stylesheet" href="../src/css/base.css" />
   <link rel="stylesheet" href="../src/css/layout.css" />
@@ -26,7 +26,7 @@
       <div class="panel__head">
         <div>
           <h2>Novo cadastro</h2>
-          <p>Preencha os dados da pessoa e crie o acesso no backend.</p>
+          <p>Crie primeiro o cadastro (tenant) e depois os dados da pessoa e do acesso no backend.</p>
         </div>
 
         <div class="panel__actions">
@@ -39,6 +39,12 @@
       <div id="registerLoading" class="empty-state">Carregando formulário...</div>
 
       <form id="registerForm" class="student-edit-form hidden">
+
+        <div class="field">
+          <label for="registerCadastroNome">Nome do cadastro</label>
+          <input id="registerCadastroNome" type="text" placeholder="Ex.: EBD Centro" autocomplete="organization" required />
+        </div>
+
         <div class="field">
           <label for="registerNome">Nome completo</label>
           <input id="registerNome" type="text" placeholder="Nome completo" autocomplete="name" required />
@@ -126,7 +132,7 @@
 
         <div class="student-edit-form__actions">
           <a id="registerCancel" class="btn btn--ghost" href="../login/">Cancelar</a>
-          <button class="btn btn--primary" type="submit">Registrar</button>
+          <button class="btn btn--primary" type="submit">Criar cadastro</button>
         </div>
       </form>
     </section>

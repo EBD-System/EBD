@@ -21,6 +21,7 @@
 - O botão **Salvar** deve persistir também uma snapshot local da chamada salva, com prioridade de leitura para buscas por data e relatórios.
 - Na chamada, `PRESENÇA`, `ATRASO` e `AUSÊNCIA` devem ser gravados como estados mutuamente exclusivos em cada salvamento; ao corrigir a presença de um aluno, o backend precisa zerar os campos que não correspondem ao novo status.
 - As rotas de autenticação usam JSON: `POST /auth/register` para cadastro e `POST /auth/login` para login. O frontend deve enviar `Accept: application/json` e `Content-Type: application/json` nessas duas chamadas.
+- O cadastro público deve enviar o tenant em `cadastro_nome`; o backend aceita aliases antigos, mas o frontend deve preferir a forma canônica.
 - A ação `init` do backend pode receber `view` para respostas mais leves em telas de listagem, especialmente para `/turma` e `/inativos`.
 - Não existe mais modo fake local no frontend; toda operação passa pelo backend PostgreSQL.
 
