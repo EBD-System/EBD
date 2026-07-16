@@ -50,6 +50,7 @@ function extractCadastroIdFromToken(token) {
 }
 
 function getSessionCadastroId(session = state?.session || null) {
+  const storedSession = typeof getStoredAccessSession === 'function' ? getStoredAccessSession() : null;
   const candidates = [
     session?.idCadastro,
     session?.id_cadastro,
@@ -65,15 +66,28 @@ function getSessionCadastroId(session = state?.session || null) {
     session?.user?.tenantId,
     session?.userIdCadastro,
     session?.user?.userIdCadastro,
+    storedSession?.idCadastro,
+    storedSession?.id_cadastro,
+    storedSession?.cadastroId,
+    storedSession?.cadastro_id,
+    storedSession?.tenantId,
+    storedSession?.tenant_id,
+    storedSession?.data?.id_cadastro,
+    storedSession?.data?.idCadastro,
+    storedSession?.user?.id_cadastro,
+    storedSession?.user?.idCadastro,
+    storedSession?.user?.tenant_id,
+    storedSession?.user?.tenantId,
+    storedSession?.token,
+    storedSession?.accessToken,
     session?.accessToken,
     session?.token,
-    typeof getStoredAccessSession === 'function' ? getStoredAccessSession()?.token : '',
   ];
 
   for (const candidate of candidates) {
     const normalized = normalizeCadastroIdValue(candidate);
-    if (normalized && !/\./.test(normalized)) {
-      if (/^\d+$/.test(normalized)) return normalized;
+    if (normalized && !/\./.test(normalized) && /^\d+$/.test(normalized)) {
+      return normalized;
     }
   }
 
