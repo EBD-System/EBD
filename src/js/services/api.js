@@ -518,19 +518,79 @@ async function authLogin(payload = {}, options = {}) {
 }
 
 
+function pickFirstDefined_() {
+  for (const value of arguments) {
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      return value;
+    }
+  }
+  return '';
+}
+
+function normalizeTurmaRecord(raw = {}) {
+  if (!raw || typeof raw !== 'object') return raw;
+
+  const TurmaID = pickFirstDefined_(
+    raw.TurmaID,
+    raw.turmaId,
+    raw.turmaID,
+    raw.id_classe,
+    raw.idClasse,
+    raw.classId,
+    raw.class_id,
+    raw.id,
+    raw.code,
+  );
+
+  const Nome = pickFirstDefined_(
+    raw.Nome,
+    raw.nome,
+    raw.name,
+    raw.className,
+    raw.class_name,
+    raw.titulo,
+    raw.title,
+  );
+
+  return {
+    ...raw,
+    TurmaID: String(TurmaID || '').trim(),
+    Nome: String(Nome || '').trim(),
+    Descricao: String(raw.Descricao ?? raw.descricao ?? raw.description ?? '').trim(),
+    FaixaEtaria: String(raw.FaixaEtaria ?? raw.faixa_etaria ?? raw.ageRange ?? '').trim(),
+    Ativo: raw.Ativo ?? raw.ativo ?? true,
+    CriadoEm: raw.CriadoEm ?? raw.criado_em ?? raw.criadoEm ?? raw.createdAt ?? '',
+  };
+}
+
+function extractClassesList_(payload = {}) {
+  const candidates = [
+    payload?.classes,
+    payload?.turmas,
+    payload?.data?.classes,
+    payload?.data?.turmas,
+    payload?.data,
+    payload?.data?.data,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate;
+  }
+
+  return [];
+}
+
+function normalizeTurmasList(list = []) {
+  return Array.isArray(list) ? list.map((item) => normalizeTurmaRecord(item)) : [];
+}
+
 function normalizeClassesResponse(payload = {}) {
-  const classes = Array.isArray(payload?.classes)
-    ? payload.classes
-    : Array.isArray(payload?.turmas)
-      ? payload.turmas
-      : Array.isArray(payload?.data)
-        ? payload.data
-        : [];
+  const classes = normalizeTurmasList(extractClassesList_(payload));
 
   return {
     ...payload,
     classes,
-    turmas: Array.isArray(payload?.turmas) ? payload.turmas : classes,
+    turmas: classes,
   };
 }
 

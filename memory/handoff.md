@@ -18,6 +18,8 @@ Pontos centrais:
 - A edição de aluno acontece em uma página dedicada em `aluno/editar-aluno/`.
 - O cadastro de aluno fica em `aluno/adicionar-aluno/` e não inclui cadastro de nova turma.
 - As telas dedicadas de inclusão e edição de aluno passam a buscar a lista de classes diretamente em `GET /api/classes` com Bearer token, normalizando a resposta tanto em `classes` quanto em `turmas`.
+- A resposta de classes pode vir com aliases do schema `ebd_classe`; o frontend normaliza `id_classe`/`nome` para `TurmaID`/`Nome` antes de renderizar os selects.
+- O shell principal faz fallback em `GET /api/classes` quando o `init` não devolve turmas válidas, para evitar seletor vazio após o login.
 - Existe agora uma página pública de cadastro em `cadastro/` para criar acesso sem depender da sessão interna.
 - O cadastro público envia `POST /auth/register` em JSON ao backend e precisa mandar o nome do tenant em `cadastro_nome`.
 - A tela de login usa `POST /auth/login` em JSON e grava a sessão autenticada retornada pelo backend.

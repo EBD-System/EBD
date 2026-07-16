@@ -487,8 +487,33 @@ async function refreshFromBackend(showMessage = false, { silent = false, preferL
     state.baseRowsCount = Number(data.baseRowsCount || state.baseRowsCount || 0);
     state.inativos = Array.isArray(data.inativos) ? data.inativos : state.inativos || [];
 
-    if (Array.isArray(data.turmas)) {
-      state.turmas = data.turmas;
+    const normalizedTurmas = typeof normalizeTurmasList === 'function'
+      ? normalizeTurmasList(data.turmas || data.classes || [])
+      : (Array.isArray(data.turmas) ? data.turmas : Array.isArray(data.classes) ? data.classes : []);
+
+    const hasTurmas = Array.isArray(normalizedTurmas) && normalizedTurmas.length > 0;
+    if (Array.isArray(normalizedTurmas)) {
+      state.turmas = normalizedTurmas;
+    }
+
+    if (!hasTurmas && !view) {
+      try {
+        const classesData = await apiGetClasses({ timeoutMs: 30000 });
+        const fallbackTurmas = typeof normalizeTurmasList === 'function'
+          ? normalizeTurmasList(classesData.turmas || classesData.classes || [])
+          : (Array.isArray(classesData.turmas) ? classesData.turmas : Array.isArray(classesData.classes) ? classesData.classes : []);
+
+        if (Array.isArray(fallbackTurmas) && fallbackTurmas.length) {
+          state.turmas = fallbackTurmas;
+          state.routeData = {
+            ...data,
+            classes: fallbackTurmas,
+            turmas: fallbackTurmas,
+          };
+        }
+      } catch (classesErr) {
+        if (isDebugConsoleEnabled()) console.warn('Fallback de classes indisponível:', classesErr);
+      }
     }
 
     if (Array.isArray(data.alunos)) {

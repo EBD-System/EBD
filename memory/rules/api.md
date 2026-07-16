@@ -24,6 +24,8 @@
 - O cadastro público deve enviar o tenant em `cadastro_nome`; o backend aceita aliases antigos, mas o frontend deve preferir a forma canônica.
 - A ação `init` do backend pode receber `view` para respostas mais leves em telas de listagem, especialmente para `/turma` e `/inativos`.
 - A listagem de classes/turmas em telas dedicadas deve consumir `GET /api/classes` com `Authorization: Bearer <token>` e aceitar respostas que exponham a lista em `classes` ou `turmas`.
+- O frontend deve normalizar registros de turma vindos da API para `TurmaID` e `Nome`, aceitando aliases como `id_classe` e `nome`.
+- Quando `init` não trouxer turmas válidas, o shell principal pode fazer fallback em `GET /api/classes` para preencher o seletor de turmas.
 - Não existe mais modo fake local no frontend; toda operação passa pelo backend PostgreSQL.
 
 - Em GitHub Pages, toda navegação cliente deve preservar o subpath base do projeto (`APP_BASE_PATH`), evitando enviar o usuário para `/<rota>` na raiz do domínio.

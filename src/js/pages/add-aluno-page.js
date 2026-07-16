@@ -108,7 +108,9 @@
 
     try {
       const data = await apiGetClasses({ timeoutMs: 30000 });
-      turmas = Array.isArray(data.turmas) ? data.turmas : [];
+      turmas = typeof normalizeTurmasList === 'function'
+        ? normalizeTurmasList(data.turmas || data.classes || [])
+        : (Array.isArray(data.turmas) ? data.turmas : Array.isArray(data.classes) ? data.classes : []);
       renderTurmaOptions('');
 
       if (window.ProjectMemory && data?.memory) {
