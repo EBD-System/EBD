@@ -2,12 +2,12 @@
 
 ## Decisão
 
-O PostgreSQL é a única fonte oficial de dados do sistema. O frontend consome exclusivamente a API HTTP do backend.
+O Google Sheets continua sendo a fonte oficial do sistema.
 
 ## Motivo
 
-A interface depende do backend para ler e gravar dados. Não há mais camada de banco fake no frontend.
+A interface web consome o backend em Apps Script, que centraliza a leitura e a escrita dos dados.
 
-## Data
+## Observação
 
-2026-07-15
+O navegador não vira a fonte oficial, mas mantém snapshots locais das chamadas já salvas para recuperação rápida, busca por data e geração de relatórios quando o backend falha.

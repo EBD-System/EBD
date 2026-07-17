@@ -1,28 +1,14 @@
-// Configure a URL da API HTTP do backend.
-const APP_BASE_URL = new URL('../../../', document.currentScript?.src || window.location.href).href;
-const APP_BASE_PATH = new URL(APP_BASE_URL).pathname.replace(/\/+$/, '') || '/';
-
-function buildAppRoutePath(path = '/') {
-  const raw = String(path || '/').trim();
-  const normalized = raw.startsWith('/') ? raw : `/${raw}`;
-  const base = APP_BASE_PATH === '/' ? '' : APP_BASE_PATH;
-  return `${base}${normalized}`.replace(/\/+/g, '/');
-}
-
-const BACKEND_API_URL = window.BACKEND_API_URL || window.API_BASE_URL || 'https://ebd-fj9u.onrender.com/api';
-
-window.APP_BASE_URL = APP_BASE_URL;
-window.APP_BASE_PATH = APP_BASE_PATH;
-window.buildAppRoutePath = buildAppRoutePath;
-window.BACKEND_API_URL = BACKEND_API_URL;
-window.API_BASE_URL = BACKEND_API_URL;
+const APPS_SCRIPT_URL =
+  window.APPS_SCRIPT_URL ||
+  'https://script.google.com/macros/s/AKfycbxqqMq1jnkQ3c_5KjEW7i6a0EZgXiy-hqduShtvpeRl-4olRKc6cEKFPAH1C42HZQ2kUw/exec';
 
 const STORAGE_KEY = 'prb_presenca_turmas_v2';
 const ROSTER_CACHE_KEY = 'prb_roster_cache_v1';
 const ROSTER_CACHE_VERSION = 1;
 const DEBUG_CONSOLE_ACCESS_CODE = '50292230';
 
-// O carregamento inicial usa somente o que vem do backend.
+// Se false, o carregamento inicial usa somente o que vem do backend.
+// Se true, o rascunho local pode voltar a ser aplicado quando existir.
 const APPLY_LOCAL_DRAFTS_ON_LOAD = false;
 
 function isDebugConsoleEnabled(accessCode = state.accessCode) {
@@ -66,12 +52,6 @@ const state = {
   accessMode: 'self',
   selfCelularSuffix: '',
   baseRowsCount: 0,
-  routeName: '',
-  routeParams: {},
-  routeData: null,
-  inativos: [],
-  routerStarted: false,
-  session: null,
 };
 
 const ACCESS_CODES = {

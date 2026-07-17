@@ -1,22 +1,8 @@
 (function () {
   const params = new URLSearchParams(window.location.search);
   const alunoKey = String(params.get('alunoId') || '').trim();
-  const session = typeof loadAccessSession === 'function'
-    ? loadAccessSession()
-    : (typeof getStoredAccessSession === 'function' ? getStoredAccessSession() : null);
-  const accessCode = String(
-    session?.legacyAccessCode ||
-    session?.accessCode ||
-    params.get('code') ||
-    state.accessCode ||
-    ''
-  ).trim();
-
-  state.session = session || state.session || null;
+  const accessCode = String(params.get('code') || '').trim();
   state.accessCode = accessCode;
-  state.accessMode = String(session?.accessMode || resolveAccessMode(session || accessCode)).trim().toLowerCase();
-  if (typeof applyAccessMode === 'function') applyAccessMode();
-  if (typeof renderResponsavelLabel === 'function') renderResponsavelLabel();
   syncDebugConsoleVisibility();
 
   const els = {
@@ -47,7 +33,12 @@
   }
 
   function buildBackUrl() {
-    return typeof buildRoutePath === 'function' ? buildRoutePath('/chamada') : '../../index.html';
+    const backParams = new URLSearchParams();
+    if (accessCode) {
+      backParams.set('code', accessCode);
+    }
+    const query = backParams.toString();
+    return query ? `../../index.html?${query}` : '../../index.html';
   }
 
   function applyBackUrl() {
@@ -170,10 +161,8 @@
     showLoading('Carregando aluno...', 25000);
 
     try {
-      const data = await apiGetClasses({ timeoutMs: 30000 });
-      turmas = typeof normalizeTurmasList === 'function'
-        ? normalizeTurmasList(data.turmas || data.classes || [])
-        : (Array.isArray(data.turmas) ? data.turmas : Array.isArray(data.classes) ? data.classes : []);
+      const data = await apiGet({ action: 'init', date: todayKey() });
+      turmas = Array.isArray(data.turmas) ? data.turmas : [];
       const alunos = Array.isArray(data.alunos) ? data.alunos : [];
       const found = alunos.find((item) => String(item.AlunoID || '') === String(alunoKey) || String(item.Nome || '') === String(alunoKey));
 

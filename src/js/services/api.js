@@ -57,183 +57,6 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-function getStoredAccessToken() {
-  const candidates = [
-    typeof state !== 'undefined' ? state.session : null,
-    typeof getStoredAccessSession === 'function' ? getStoredAccessSession() : null,
-    (() => {
-      try {
-        const store = storageState();
-        return store?.accessSession || null;
-      } catch (err) {
-        return null;
-      }
-    })(),
-  ];
-
-  for (const session of candidates) {
-    const token = normalizeAccessText(
-      session?.token ??
-      session?.accessToken ??
-      session?.authToken ??
-      session?.jwt ??
-      ''
-    );
-    if (token) return token;
-  }
-
-  return '';
-}
-
-function readPersistedAccessSession_() {
-  try {
-    return storageState()?.accessSession || null;
-  } catch (err) {
-    return null;
-  }
-}
-
-function decodeJwtPayload_(token) {
-  const raw = String(token || '').trim();
-  if (!raw) return null;
-
-  const parts = raw.split('.');
-  if (parts.length < 2) return null;
-
-  try {
-    const base64Url = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    const padded = base64Url.padEnd(Math.ceil(base64Url.length / 4) * 4, '=');
-    const json = atob(padded);
-    return JSON.parse(json);
-  } catch (err) {
-    return null;
-  }
-}
-
-function normalizeTenantIdValue_(value) {
-  const raw = String(value ?? '').trim();
-  if (!raw) return '';
-
-  const numeric = Number(raw);
-  if (Number.isFinite(numeric) && numeric > 0) {
-    return String(Math.trunc(numeric));
-  }
-
-  return '';
-}
-
-function extractCadastroIdFromToken_(token) {
-  const payload = decodeJwtPayload_(token);
-  if (!payload || typeof payload !== 'object') return '';
-
-  return normalizeTenantIdValue_(
-    payload.id_cadastro ??
-    payload.idCadastro ??
-    payload.cadastro_id ??
-    payload.cadastroId ??
-    payload.tenant_id ??
-    payload.tenantId ??
-    payload.data?.id_cadastro ??
-    payload.data?.idCadastro ??
-    payload.user?.id_cadastro ??
-    payload.user?.idCadastro ??
-    ''
-  );
-}
-
-function resolveCadastroIdForRequest_() {
-  const candidates = [];
-
-  if (typeof getSessionCadastroId === 'function') {
-    try {
-      candidates.push(getSessionCadastroId());
-    } catch (err) {
-      // ignore and continue with local fallbacks
-    }
-  }
-
-  const session = typeof state !== 'undefined' ? state.session : null;
-  const storedSession = readPersistedAccessSession_();
-
-  candidates.push(
-    session?.idCadastro,
-    session?.id_cadastro,
-    session?.cadastroId,
-    session?.cadastro_id,
-    session?.tenantId,
-    session?.tenant_id,
-    session?.data?.id_cadastro,
-    session?.data?.idCadastro,
-    session?.user?.id_cadastro,
-    session?.user?.idCadastro,
-    storedSession?.idCadastro,
-    storedSession?.id_cadastro,
-    storedSession?.cadastroId,
-    storedSession?.cadastro_id,
-    storedSession?.tenantId,
-    storedSession?.tenant_id,
-    storedSession?.data?.id_cadastro,
-    storedSession?.data?.idCadastro,
-    storedSession?.user?.id_cadastro,
-    storedSession?.user?.idCadastro,
-  );
-
-  for (const candidate of candidates) {
-    const normalized = normalizeTenantIdValue_(candidate);
-    if (normalized) return normalized;
-  }
-
-  const tokenCandidates = [
-    session?.token,
-    session?.accessToken,
-    storedSession?.token,
-    storedSession?.accessToken,
-  ];
-
-  for (const candidate of tokenCandidates) {
-    const normalized = extractCadastroIdFromToken_(candidate);
-    if (normalized) return normalized;
-  }
-
-  return '';
-}
-
-function applyTenantQueryParam_(url) {
-  if (!(url instanceof URL)) return '';
-
-  const cadastroId = resolveCadastroIdForRequest_();
-  if (cadastroId && !url.searchParams.has('id_cadastro')) {
-    url.searchParams.set('id_cadastro', String(cadastroId));
-  }
-
-  return cadastroId;
-}
-
-function buildBackendHeaders({
-  contentType = 'application/x-www-form-urlencoded;charset=UTF-8',
-  accept = 'application/json',
-  auth = true,
-} = {}) {
-  const headers = {};
-
-  if (accept) {
-    headers.Accept = accept;
-  }
-
-  if (contentType) {
-    headers['Content-Type'] = contentType;
-  }
-
-  if (auth) {
-    const token = getStoredAccessToken();
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-  }
-
-  return headers;
-}
-
 function createAppError(message, meta = {}) {
   const err = message instanceof Error ? message : new Error(String(message || 'Erro desconhecido.'));
   err.source = String(meta.source || err.source || 'frontend').toLowerCase();
@@ -352,14 +175,7 @@ function showError(message) {
 }
 
 function apiUrl(params = {}) {
-  if (!BACKEND_API_URL || String(BACKEND_API_URL).includes('COLE_AQUI')) {
-    throw createAppError('Configure a URL da API do backend antes de continuar.', {
-      source: 'frontend',
-      stage: 'config',
-    });
-  }
-
-  const url = new URL(BACKEND_API_URL, window.location.href);
+  const url = new URL(APPS_SCRIPT_URL);
   Object.entries(params).forEach(([key, value]) => {
     if (value === undefined || value === null) return;
     const normalizedValue = key === 'action' && typeof value === 'string'
@@ -400,23 +216,14 @@ async function parseJsonResponse(response) {
   return data;
 }
 
-
 async function apiGet(params = {}, { timeoutMs = 30000 } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.max(5000, Number(timeoutMs) || 30000));
-
   try {
-    const requestUrl = new URL(apiUrl(params));
-    applyTenantQueryParam_(requestUrl);
-
-    const response = await fetch(requestUrl.toString(), {
+    const response = await fetch(apiUrl(params), {
       method: 'GET',
       mode: 'cors',
       cache: 'no-store',
-      headers: buildBackendHeaders({
-        contentType: '',
-        auth: true,
-      }),
       signal: controller.signal,
     });
     return await parseJsonResponse(response);
@@ -430,7 +237,7 @@ async function apiGet(params = {}, { timeoutMs = 30000 } = {}) {
 
     const message = String(err?.message || err || '');
     if (/failed to fetch|networkerror|fetch failed/i.test(message)) {
-      throw createAppError(`Falha de comunicação com o backend: ${message || 'Failed to fetch'}`, {
+      throw createAppError(`Falha de comunicação com o Apps Script: ${message || 'Failed to fetch'}`, {
         source: 'frontend',
         stage: 'network',
         raw: message || err,
@@ -446,9 +253,8 @@ async function apiGet(params = {}, { timeoutMs = 30000 } = {}) {
 async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
   const bodyParams = new URLSearchParams();
   const queryParams = {};
-  const cadastroId = resolveCadastroIdForRequest_();
   const actionName = String(params.action || params.acao || '').trim().toLowerCase();
-  const mirrorAllParamsInQuery = ['addaluno', 'addturma', 'updatealuno', 'register'].includes(actionName);
+  const mirrorAllParamsInQuery = ['addaluno', 'addturma', 'updatealuno'].includes(actionName);
 
   Object.entries(params).forEach(([key, value]) => {
     if (value === undefined || value === null) return;
@@ -472,53 +278,41 @@ async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
     }
   });
 
-  if (cadastroId) {
-    bodyParams.set('id_cadastro', cadastroId);
-    queryParams.id_cadastro = cadastroId;
-  }
-
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.max(5000, Number(timeoutMs) || 30000));
 
   const shouldRetryAsGet = (err) => {
     const message = String(err?.message || err || '');
     return (
-      ['addaluno', 'addturma', 'updatealuno', 'register'].includes(actionName) &&
+      ['addaluno', 'addturma', 'updatealuno'].includes(actionName) &&
       /failed to fetch|networkerror|fetch failed|ação inválida|acao inválida|action invalid|aç[aã]o inválida/i.test(message)
     );
   };
 
   const sendGetFallback = async () => {
-    const fallbackUrl = new URL(apiUrl(queryParams));
-    applyTenantQueryParam_(fallbackUrl);
-    const fallbackResponse = await fetch(fallbackUrl.toString(), {
+    const fallbackResponse = await fetch(apiUrl(queryParams), {
       method: 'GET',
       mode: 'cors',
       cache: 'no-store',
-      headers: buildBackendHeaders({
-        contentType: '',
-        auth: true,
-      }),
       signal: controller.signal,
     });
     return parseJsonResponse(fallbackResponse);
   };
 
   try {
-    const requestUrl = new URL(apiUrl({
+    const requestUrl = apiUrl({
       action: queryParams.action,
       acao: queryParams.acao,
       ...(mirrorAllParamsInQuery ? queryParams : {}),
-    }));
-    applyTenantQueryParam_(requestUrl);
+    });
 
-    const response = await fetch(requestUrl.toString(), {
+    const response = await fetch(requestUrl, {
       method: 'POST',
       mode: 'cors',
       cache: 'no-store',
-      headers: buildBackendHeaders({
-        auth: true,
-      }),
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+      },
       body: bodyParams.toString(),
       signal: controller.signal,
     });
@@ -541,7 +335,7 @@ async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
 
     const message = String(err?.message || err || '');
     if (/failed to fetch|networkerror|fetch failed/i.test(message)) {
-      throw createAppError(`Falha de comunicação com o backend: ${message || 'Failed to fetch'}`, {
+      throw createAppError(`Falha de comunicação com o Apps Script: ${message || 'Failed to fetch'}`, {
         source: 'frontend',
         stage: 'network',
         raw: message || err,
@@ -557,226 +351,6 @@ async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
     clearTimeout(timer);
   }
 }
-
-function getBackendOrigin() {
-  try {
-    const backendUrl = new URL(BACKEND_API_URL, window.location.href);
-    return backendUrl.origin || window.location.origin;
-  } catch (err) {
-    return window.location.origin;
-  }
-}
-
-function authApiUrl(path = '/') {
-  const raw = String(path || '/').trim();
-  const normalized = raw.startsWith('/') ? raw : `/${raw}`;
-  return new URL(normalized, `${getBackendOrigin()}/`).toString();
-}
-
-async function authJsonRequest(path = '/', payload = {}, { timeoutMs = 30000 } = {}) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), Math.max(5000, Number(timeoutMs) || 30000));
-
-  try {
-    const response = await fetch(authApiUrl(path), {
-      method: 'POST',
-      mode: 'cors',
-      cache: 'no-store',
-      headers: buildBackendHeaders({
-        contentType: 'application/json',
-        auth: false,
-      }),
-      body: JSON.stringify(payload ?? {}),
-      signal: controller.signal,
-    });
-    return await parseJsonResponse(response);
-  } catch (err) {
-    if (err?.name === 'AbortError') {
-      throw createAppError('A requisição demorou demais. Verifique sua conexão e tente novamente.', {
-        source: 'frontend',
-        stage: 'timeout',
-      });
-    }
-
-    const message = String(err?.message || err || '');
-    if (/failed to fetch|networkerror|fetch failed/i.test(message)) {
-      throw createAppError(`Falha de comunicação com o backend: ${message || 'Failed to fetch'}`, {
-        source: 'frontend',
-        stage: 'network',
-        raw: message || err,
-      });
-    }
-
-    throw normalizeAppError(err, 'frontend');
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-function normalizeRegisterPayload(payload = {}) {
-  const cadastroNome = String(
-    payload.cadastro_nome ??
-    payload.cadastroNome ??
-    payload.tenant_nome ??
-    payload.tenantNome ??
-    payload.nome_cadastro ??
-    payload.nomeCadastro ??
-    payload.nome ??
-    ''
-  ).trim();
-
-  return {
-    cadastro_nome: cadastroNome,
-    nome: String(payload.nome ?? '').trim(),
-    login: String(payload.login ?? '').trim(),
-    senha: String(payload.senha ?? ''),
-    cpf: String(payload.cpf ?? '').trim(),
-    sexo: String(payload.sexo ?? 'nao_informado').trim(),
-    data_nascimento: String(payload.data_nascimento ?? payload.dataNascimento ?? '').trim(),
-    telefone: String(payload.telefone ?? '').trim(),
-    email: String(payload.email ?? '').trim(),
-    logradouro: String(payload.logradouro ?? '').trim(),
-    numero: String(payload.numero ?? '').trim(),
-    bairro: String(payload.bairro ?? '').trim(),
-    cidade: String(payload.cidade ?? '').trim(),
-    uf: String(payload.uf ?? '').trim(),
-    cep: String(payload.cep ?? '').trim(),
-    observacao: String(payload.observacao ?? '').trim(),
-  };
-}
-
-async function authRegister(payload = {}, options = {}) {
-  return await authJsonRequest('/auth/register', normalizeRegisterPayload(payload), options);
-}
-
-async function authLogin(payload = {}, options = {}) {
-  return await authJsonRequest('/auth/login', payload, options);
-}
-
-
-function pickFirstDefined_() {
-  for (const value of arguments) {
-    if (value !== undefined && value !== null && String(value).trim() !== '') {
-      return value;
-    }
-  }
-  return '';
-}
-
-function normalizeTurmaRecord(raw = {}) {
-  if (!raw || typeof raw !== 'object') return raw;
-
-  const TurmaID = pickFirstDefined_(
-    raw.TurmaID,
-    raw.turmaId,
-    raw.turmaID,
-    raw.id_classe,
-    raw.idClasse,
-    raw.classId,
-    raw.class_id,
-    raw.id,
-    raw.code,
-  );
-
-  const Nome = pickFirstDefined_(
-    raw.Nome,
-    raw.nome,
-    raw.name,
-    raw.className,
-    raw.class_name,
-    raw.titulo,
-    raw.title,
-  );
-
-  return {
-    ...raw,
-    TurmaID: String(TurmaID || '').trim(),
-    Nome: String(Nome || '').trim(),
-    Descricao: String(raw.Descricao ?? raw.descricao ?? raw.description ?? '').trim(),
-    FaixaEtaria: String(raw.FaixaEtaria ?? raw.faixa_etaria ?? raw.ageRange ?? '').trim(),
-    Ativo: raw.Ativo ?? raw.ativo ?? true,
-    CriadoEm: raw.CriadoEm ?? raw.criado_em ?? raw.criadoEm ?? raw.createdAt ?? '',
-  };
-}
-
-function extractClassesList_(payload = {}) {
-  const candidates = [
-    payload?.classes,
-    payload?.turmas,
-    payload?.data?.classes,
-    payload?.data?.turmas,
-    payload?.data,
-    payload?.data?.data,
-  ];
-
-  for (const candidate of candidates) {
-    if (Array.isArray(candidate)) return candidate;
-  }
-
-  return [];
-}
-
-function normalizeTurmasList(list = []) {
-  return Array.isArray(list) ? list.map((item) => normalizeTurmaRecord(item)) : [];
-}
-
-function normalizeClassesResponse(payload = {}) {
-  const classes = normalizeTurmasList(extractClassesList_(payload));
-
-  return {
-    ...payload,
-    classes,
-    turmas: classes,
-  };
-}
-
-async function apiGetClasses(params = {}, { timeoutMs = 30000 } = {}) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), Math.max(5000, Number(timeoutMs) || 30000));
-
-  try {
-    const url = new URL(authApiUrl('/api/classes'));
-    Object.entries(params || {}).forEach(([key, value]) => {
-      if (value === undefined || value === null) return;
-      url.searchParams.set(key, String(value));
-    });
-
-    applyTenantQueryParam_(url);
-
-    const response = await fetch(url.toString(), {
-      method: 'GET',
-      mode: 'cors',
-      cache: 'no-store',
-      headers: buildBackendHeaders({
-        contentType: '',
-        auth: true,
-      }),
-      signal: controller.signal,
-    });
-    return normalizeClassesResponse(await parseJsonResponse(response));
-  } catch (err) {
-    if (err?.name === 'AbortError') {
-      throw createAppError('A requisição demorou demais. Verifique sua conexão e tente novamente.', {
-        source: 'frontend',
-        stage: 'timeout',
-      });
-    }
-
-    const message = String(err?.message || err || '');
-    if (/failed to fetch|networkerror|fetch failed/i.test(message)) {
-      throw createAppError(`Falha de comunicação com o backend: ${message || 'Failed to fetch'}`, {
-        source: 'frontend',
-        stage: 'network',
-        raw: message || err,
-      });
-    }
-
-    throw normalizeAppError(err, 'frontend');
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 
 function storageState() {
   try {

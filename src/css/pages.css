@@ -27,14 +27,9 @@ body.access-restricted.access-share-reports #actionsPanel .panel__actions #sendT
 body.access-restricted.access-share-reports #actionsPanel .panel__actions #sendGeralBtn{
   display:inline-flex !important;
 }
-body.access-self:not([data-route-mode="login"]) .app {
+body.access-self .app {
   display: none !important;
 }
-
-body[data-route-mode="login"] .app > *:not(#routePortal) {
-  display: none !important;
-}
-
 
 .shortcut-panel{
   margin-bottom:16px;
@@ -134,127 +129,4 @@ body.access-self #selfAccessPanel {
 
 .feedback--inline {
   margin-top: 14px;
-}
-
-
-.route-portal--login{
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  min-height:calc(100vh - 32px);
-  padding:20px 0;
-  background:transparent;
-  border:none;
-  box-shadow:none;
-}
-
-.route-login-card{
-  width:min(100%, 460px);
-  padding:28px;
-  border-radius:28px;
-  display:grid;
-  gap:14px;
-}
-
-.route-login-card h1{
-  margin:8px 0 0;
-  font-size:clamp(1.8rem, 4vw, 2.6rem);
-  line-height:1.05;
-}
-
-.route-login-card__subtitle{
-  margin:0;
-  color:var(--muted);
-  line-height:1.55;
-}
-
-.route-login-form{
-  display:grid;
-  gap:14px;
-}
-
-.route-login-remember{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  font-weight:700;
-  color:var(--muted);
-}
-
-.route-login-remember input{
-  width:18px;
-  height:18px;
-  margin:0;
-  accent-color:var(--accent);
-}
-
-.route-login-form__links{
-  display:flex;
-  justify-content:flex-end;
-}
-
-.route-login-link{
-  padding:0;
-  border:0;
-  background:transparent;
-  color:var(--accent);
-  font-weight:700;
-  text-decoration:underline;
-  cursor:pointer;
-}
-
-.route-login-form__actions{
-  display:grid;
-  grid-template-columns:repeat(2, minmax(0, 1fr));
-  gap:10px;
-  margin-top:4px;
-}
-
-.route-login-form__actions .btn{
-  width:100%;
-}
-
-.route-login-dialog{
-  border:none;
-  padding:0;
-  background:transparent;
-  width:min(92vw, 420px);
-}
-
-.route-login-dialog::backdrop{
-  background:rgba(11, 20, 37, 0.45);
-  backdrop-filter:blur(2px);
-}
-
-.route-login-dialog__card{
-  padding:24px;
-  border-radius:24px;
-  display:grid;
-  gap:12px;
-}
-
-.route-login-dialog__card h2{
-  margin:0;
-  font-size:1.2rem;
-}
-
-.route-login-dialog__card p{
-  margin:0;
-  color:var(--muted);
-  line-height:1.5;
-}
-
-.route-login-dialog__actions{
-  display:flex;
-  justify-content:flex-end;
-}
-
-@media (max-width: 520px){
-  .route-login-form__actions{
-    grid-template-columns:1fr;
-  }
-  .route-login-card{
-    padding:22px;
-    border-radius:24px;
-  }
 }

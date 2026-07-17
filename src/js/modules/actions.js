@@ -104,6 +104,11 @@ function buildStudentEditPageUrl(alunoId) {
     params.set('alunoId', String(alunoId).trim());
   }
 
+  const accessCode = String(state.accessCode || '').trim();
+  if (accessCode) {
+    params.set('code', accessCode);
+  }
+
   const query = params.toString();
   return query ? `${route}?${query}` : route;
 }
@@ -458,7 +463,7 @@ function bindCallFieldValues() {
 
 
 
-async function refreshFromBackend(showMessage = false, { silent = false, preferLocal = true, view = '', turmaId = '' } = {}) {
+async function refreshFromBackend(showMessage = false, { silent = false, preferLocal = true } = {}) {
   clearAutosaveTimer();
   state.loading = true;
 
@@ -473,59 +478,18 @@ async function refreshFromBackend(showMessage = false, { silent = false, preferL
       {
         action: 'init',
         date: state.dateKey,
-        view,
-        turmaId,
       },
       { timeoutMs: 30000 }
     );
 
+    state.turmas = Array.isArray(data.turmas) ? data.turmas : [];
+    state.alunos = Array.isArray(data.alunos) ? data.alunos : [];
     const backendCalls = data.callsByTurma || {};
-    state.chamadasByTurma = localSnapshot && !view
+    state.chamadasByTurma = localSnapshot
       ? mergeCallsByTurma_(backendCalls, localSnapshot.callsByTurma || {})
       : backendCalls;
     state.resumoGeral = data.resumoGeral || state.resumoGeral || null;
     state.baseRowsCount = Number(data.baseRowsCount || state.baseRowsCount || 0);
-    state.inativos = Array.isArray(data.inativos) ? data.inativos : state.inativos || [];
-
-    const normalizedTurmas = typeof normalizeTurmasList === 'function'
-      ? normalizeTurmasList(data.turmas || data.classes || [])
-      : (Array.isArray(data.turmas) ? data.turmas : Array.isArray(data.classes) ? data.classes : []);
-
-    const hasTurmas = Array.isArray(normalizedTurmas) && normalizedTurmas.length > 0;
-    if (Array.isArray(normalizedTurmas)) {
-      state.turmas = normalizedTurmas;
-    }
-
-    if (!hasTurmas && !view) {
-      try {
-        const classesData = await apiGetClasses({ timeoutMs: 30000 });
-        const fallbackTurmas = typeof normalizeTurmasList === 'function'
-          ? normalizeTurmasList(classesData.turmas || classesData.classes || [])
-          : (Array.isArray(classesData.turmas) ? classesData.turmas : Array.isArray(classesData.classes) ? classesData.classes : []);
-
-        if (Array.isArray(fallbackTurmas) && fallbackTurmas.length) {
-          state.turmas = fallbackTurmas;
-          state.routeData = {
-            ...data,
-            classes: fallbackTurmas,
-            turmas: fallbackTurmas,
-          };
-        }
-      } catch (classesErr) {
-        if (isDebugConsoleEnabled()) console.warn('Fallback de classes indisponível:', classesErr);
-      }
-    }
-
-    if (Array.isArray(data.alunos)) {
-      state.alunos = data.alunos;
-    }
-
-    if (data.selectedTurmaId) {
-      state.selectedTurmaId = String(data.selectedTurmaId);
-    }
-
-
-    state.routeData = data;
 
     if (window.ProjectMemory && data.memory) {
       try {
@@ -555,8 +519,8 @@ async function refreshFromBackend(showMessage = false, { silent = false, preferL
         state.alunos = Array.isArray(rosterCache.alunos) ? rosterCache.alunos : state.alunos;
       }
 
-      state.chamadasByTurma = view ? {} : mergeCallsByTurma_({}, localSnapshot.callsByTurma || {});
-      if (!state.selectedTurmaId && !view) {
+      state.chamadasByTurma = mergeCallsByTurma_({}, localSnapshot.callsByTurma || {});
+      if (!state.selectedTurmaId) {
         state.selectedTurmaId = Object.keys(localSnapshot.callsByTurma || {})[0] || state.turmas[0]?.TurmaID || state.selectedTurmaId;
       }
 

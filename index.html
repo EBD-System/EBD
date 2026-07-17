@@ -6,7 +6,7 @@
   <title>Lista de Presença da EBD</title>
   <meta
     name="description"
-    content="Sistema de presença por turmas, páginas estáticas e relatório para WhatsApp."
+    content="Sistema de presença por turmas com Google Sheets, GitHub Pages e relatório para WhatsApp."
   />
   <link rel="stylesheet" href="src/css/base.css" />
   <link rel="stylesheet" href="src/css/layout.css" />
@@ -35,11 +35,6 @@
         <div class="hero-panel__item">
           <span>Responsável</span>
           <strong id="responsavelLabel">—</strong>
-        </div>
-
-        <div class="hero-panel__item hero-panel__item--logout">
-          <span>Sessão</span>
-          <button id="logoutBtn" class="btn btn--ghost" type="button">Sair</button>
         </div>
       </div>
     </header>
@@ -335,12 +330,11 @@
   <script src="src/js/utils/helpers.js"></script>
   <script src="src/js/utils/format.js"></script>
   <script src="src/js/services/memory.js"></script>
-<script src="src/js/components/access.js"></script>
+  <script src="src/js/components/access.js"></script>
   <script src="src/js/services/api.js"></script>
   <script src="src/js/state/call-state.js"></script>
   <script src="src/js/modules/call-actions.js"></script>
   <script src="src/js/services/pdf.js"></script>
-  <script src="src/js/router.js"></script>
   <script src="src/js/modules/actions.js"></script>
   <script src="src/js/app.js"></script>
 </body>
