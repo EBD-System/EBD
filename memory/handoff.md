@@ -1,55 +1,62 @@
 # Handoff
 
-Antes de responder ou alterar o projeto, consulte primeiro a memória consolidada.
+- A aplicação tem login, dashboard e o módulo de classes como fluxos funcionais principais.
+- O dashboard agora pode operar em `developmentMode`; quando esse flag está desativado, apenas os cards de **Classes** e **Relatórios** permanecem visíveis.
+- A configuração compartilhada do front foi centralizada em `src/app/config/config.js`; em ambiente local, `server.js` pode injetar `process.env.developmentMode` antes do arquivo estático, e `api.js` preserva valores já definidos no objeto global.
+- O front escolhe a base da API automaticamente: localhost em desenvolvimento e Render em produção/GitHub Pages.
+- O login espera um token em campos comuns de resposta (`token`, `accessToken`, `data.token`, `result.token`, `auth.token`).
+- O dashboard protege a entrada: sem token válido na `sessionStorage`, a página volta para a tela de login.
+- A página de classes usa `GET /api/v1/classes`, renderiza as classes recebidas e navega para a tela de chamada levando `classId` e `className` na query string.
+- A tela de chamada carrega alunos ativos e inativos por consultas separadas e preserva `id_aluno_classe` ao mesclar respostas.
+- O salvamento da chamada continua dependendo de `id_aluno_classe` válido e usa `PATCH /attendance/:callId` com `students[]`.
+- A tela de chamada carrega e salva o **Resumo da classe** na API oficial: `GET /attendance/classes/:classId/summary` para hidratar os campos e `PUT /attendance/:callId/summary` para persistir `oferta`, `visitantes`, `biblias` e `revistas`.
+- A seção **Resumo da classe** da tela de chamada reproduz a regra do legado: `Visitantes` é limitado a 50 e `Bíblias`/`Revistas` são limitadas à soma de alunos presentes + visitantes.
+- O fluxo de salvamento da chamada envia primeiro `PATCH /attendance/:callId` para a presença e depois atualiza o resumo da classe; a resposta do backend precisa devolver o resumo salvo com `visitantes` persistido em `ebd_chamada`.
+- O cadastro nominal de visitantes continua separado em `ebd_chamada_visitante`; ele complementa o resumo, mas não substitui o campo consolidado.
+- O módulo de aluno foi conectado ao backend disponível:
+- A tela de chamada agora desfaz o envelope de sucesso da API (`{ ok, message, data }`) antes de aplicar mutações locais, porque o módulo consome os dados úteis diretamente.
+  - criação: `POST /people` → `POST /students/enroll`;
+  - edição cadastral: `PUT /people/:id`;
+  - observação do aluno: `PUT /students/:id/observation`;
+  - status: `PUT /students/:id/activate` e `PUT /students/:id/inactivate`.
+- Não existe DELETE para aluno no backend atual; o botão de excluir do frontend usa inativação como fallback.
+- O campo **Data de início** permanece bloqueado na edição.
+- A normalização da listagem de alunos depende de `extractPersonId(...)`; sem esse helper, o carregamento quebra antes de renderizar os cards.
+- O status de matrícula na edição precisa ser lido do `raw` do aluno, porque o objeto normalizado não carrega `status` no topo; usar só o objeto achatado faz a ativação parecer concluída sem persistir no backend.
+- O formulário de edição de aluno precisa normalizar `sexo` ao preencher o select, porque o payload de aluno pode vir do banco com `M`/`F` e o select da tela trabalha com `masculino`/`feminino`.
+- O token de autenticação deixou de ser salvo como objeto JSON com metadados e passou a ser persistido como string simples em `sessionStorage`, com leitura compatível com sessões antigas.
 
-Pontos centrais:
+- A listagem de alunos usada na edição precisa trazer os campos cadastrais da pessoa, senão a abertura do modal volta a mostrar valores antigos após recarregar.
+- O resumo da classe e o relatório geral agora aceitam `oferta`/`valor_oferta` no payload e exibem o valor formatado em BRL (`R$ ...`) em vez de cair em `Não houve`.
 
-- A fonte oficial continua sendo o Google Sheets via Apps Script.
-- O navegador usa localStorage para rascunhos e também para snapshots consolidadas de chamadas salvas por data/turma.
-- A chamada do dia exige marcação completa antes do salvamento.
-- O endpoint `health` existe para checagem rápida do backend e deve expor `version` e `deployedAt`.
-- Decisões arquiteturais devem ficar em arquivos curtos dentro de `memory/`.
-- A edição de aluno acontece em uma página dedicada em `aluno/editar-aluno/`.
-- O botão **Editar** leva para essa rota com a chave de edição baseada no nome atual do aluno.
-- O fluxo de edição grava alterações diretamente na aba `cadastro` da planilha.
-- As ações enviadas ao Apps Script são normalizadas para minúsculas no cliente.
-- O cliente envia POST como `application/x-www-form-urlencoded`; o espelhamento completo na query string só deve acontecer quando houver fallback real por GET.
-- O salvamento de chamada (`saveCall`) não deve repetir `rowsJson` na URL, porque isso pode quebrar o envio em turmas grandes.
-- O Web App do Apps Script pode redirecionar POST para GET; por isso, salvamentos precisam ter `action` também na query string e o backend deve aceitar a mesma rota em `doGet`.
-- O modo `restricted` também pode editar alunos; apenas o modo `self` segue bloqueado para edição.
-- Na edição de aluno, o campo `Status` está visível, mas fica desativado temporariamente na interface.
-- A página de edição também ganhou ação de exclusão do aluno, confirmada antes do envio ao backend.
-- No layout mobile da edição, **Voltar** fica no canto esquerdo do cabeçalho e **Excluir Aluno** permanece à direita.
+- A página de classes agora recebe copys compartilhadas pelo `config.js` e mantém as frases combinadas em nós ocultos quando o modo reduzido está ativo.
 
-- O carregamento inicial do frontend usa `apiGet` com timeout, e agora também consulta snapshots locais salvas antes de cair para a planilha quando a data já foi salva no navegador.
-- O envio de atualização de aluno só faz fallback automático para GET quando o POST retorna explicitamente `Ação inválida`; outros erros precisam aparecer sem mascaramento.
-- A edição de aluno agora pode preservar turma e status atuais quando esses campos não vierem preenchidos no payload.
 
-- O cadastro de aluno usa a ação `addAluno` e grava diretamente na aba `Cadastro` da planilha.
-- Para testes manuais no Apps Script, existe `adicionarAlunoManual()` como helper editável.
-- O backend resolve a aba de cadastro de forma case-insensitive, então `Cadastro` e `cadastro` passam a apontar para a mesma planilha quando já existir uma delas.
-- O cliente passou a repetir como `GET` as ações `addAluno`, `addTurma` e `updatealuno` quando o `POST` falha com `Failed to fetch` ou `Ação inválida`, porque o Web App do Apps Script responde melhor nesse fallback.
+- O módulo de Relatórios possui consulta por intervalo de datas ligada ao backend real (`GET /reports/period`, com token e tratamento de erro via `api-client.js`/`error-dialog.js`), snapshot imutável e renderização do resultado no card principal da tela.
+- O frontend não deve usar o DOM como fonte do PDF; o payload consolidado da busca é o estado canônico do relatório.
+- O dashboard não exibe mais o texto visível “Navegação” no hero.
+- O botão **Enviar Relatório** baixa o PDF diretamente a partir do snapshot da consulta.
+- O layout do relatório na tela deve ficar no card de resultado; a pré-visualização em `iframe` foi removida.
+- A página de Relatórios depende do carregamento de `jspdf.umd.min.js`; sem esse script o botão **Enviar Relatório** não consegue gerar o arquivo.
 
-- O cadastro de aluno ganhou uma página dedicada em `aluno/adicionar-aluno/`, acessível por um botão na tela principal.
-- Essa tela de inclusão não exibe cadastro de nova turma; apenas nome, celular, data de nascimento opcional e turma.
-- A inclusão de aluno não depende de um código de acesso específico; qualquer modo pode cadastrar aluno.
-- O backend de inclusão agora aceita `dataNascimento` opcional e grava também o mês na planilha.
-- O fluxo de inclusão de aluno continua gravando na aba `Cadastro` e mantém o helper `adicionarAlunoManual()` para testes no Apps Script.
 
-- O dashboard principal não exibe mais o gráfico incorporado do Google Sheets.
-- Na tela de ações da chamada, o botão de salvar ocupa a faixa inteira e os botões de relatório foram renomeados para `Relatório Turma` e `Relatório Geral`.
-- Na página dedicada de inclusão de aluno, a turma fica pré-selecionada quando houver opções e o envio fica bloqueado enquanto não existir turma cadastrada.
+- No módulo de Relatórios, o card de resultado passou a mostrar o relatório completo no próprio painel; o botão **Enviar Relatório** baixa o PDF diretamente.
+- As datas do relatório são normalizadas no frontend: apenas data vira `dd/mm/yyyy`; data com hora vira `dd/mm/yyyy - hh:mm`.
+- O PDF continua sendo montado a partir do snapshot da consulta, sem leitura do DOM, e possui fallback alternativo quando o layout principal falha.
 
-- A página dedicada de inclusão de aluno agora inicia a turma em `< SELECIONE >`, exige escolha explícita antes do envio, mantém **Cancelar** e **Voltar** apontando para a mesma navegação e usa a formatação brasileira de celular via `formatToBrPhone`.
+- O módulo de Relatórios agora agrupa as atividades por turma, consulta o resumo completo de cada turma e renderiza cards individuais + card total no painel de resultado.
+- O total do período é o somatório dos cards renderizados; o período serve como índice para identificar as turmas e sua data mais recente.
+- O envio do relatório continua baixando PDF com fallback, sem ler o DOM.
 
-- Na edição de aluno, o topo perdeu o bloco de código/turma atual; o código interno continua visível apenas no formulário.
-- O botão destrutivo **Excluir Aluno** foi movido para o topo, ao lado de **Voltar**.
-- O campo de celular da edição agora usa `formatToBrPhone` também enquanto o usuário digita, e o botão **Cancelar** do formulário segue a mesma navegação de retorno do **Voltar**.
+- O módulo de Relatórios passou a renderizar cards por turma no painel principal e um card total consolidado, ambos derivados do snapshot imutável da consulta.
+- O envio do PDF continua partindo do snapshot em memória; a interface visual não deve ser usada como fonte de dados.
+- O relatório usa o formato textual padronizado nas linhas dos cards: `Matriculados`, `Ausentes`, `Presentes`, `Visitantes`, `Total`, `Bíblias`, `Revistas` e `Ofertas`.
 
-- Foi adicionado um console de diagnóstico visível na chamada e nas páginas de aluno; ele distingue erros de `FRONTEND` e `BACKEND` para facilitar suporte e depuração.
-- O console de diagnóstico foi ajustado para ficar visível apenas no acesso `50292230`; em outros acessos, os erros continuam aparecendo só no feedback vermelho.
-- Erros sem prefixo no cliente devem ser registrados como `FRONTEND` no console de diagnóstico, enquanto respostas `ok: false` do backend continuam como `BACKEND`.
+- A tela de Chamada teve a cópia introdutória reduzida: o modal de aluno não exibe mais o texto de abertura nem o subtítulo do bloco de dados; o botão de fechar foi fixado no canto superior direito do diálogo.
+- O dashboard perdeu a seção hero vazia no modo de desenvolvimento e o ícone de destaque foi deslocado para o canto superior direito da barra principal.
+- O módulo de Relatórios agora mantém a área de resultado oculta até que uma consulta válida retorne dados; quando há relatório carregado, a seção reaparece.
+- O dashboard perdeu o ícone azul do canto superior direito; o botão **Sair** passou a ocupar esse espaço no topo da página.
+- Na tela de chamada, o botão **Salvar Chamada** do cabeçalho foi removido; o salvamento ficou concentrado no botão do rodapé do resumo da classe.
+- Os botões **Presente**, **Atrasado** e **Ausente** dos cards de aluno seguem o padrão visual do card do David: ficam lado a lado e só exibem a cor forte quando estão selecionados.
 
-- O botão **Salvar** grava uma snapshot local da chamada da turma/data; relatórios e busca por data devem priorizar esse armazenamento e usar a planilha apenas como fallback.
-- O fluxo de salvar chamada depende do helper local `nowIso()` em `src/js/services/api.js`; sem ele, a snapshot local falha com erro de referência.
-- Na gravação da chamada, os campos `PRESENÇA`, `ATRASO` e `AUSÊNCIA` da base precisam ser reescritos como mutuamente exclusivos a cada salvamento; não é mais válido preservar 1 antigo ao mudar o status do aluno.
+- O **Relatório Geral** do módulo de Classes agora usa estado visual por cor: vermelho enquanto houver qualquer chamada pendente e amarelo quando existir classe com `presentes = 0`; a implementação não depende de esconder/exibir elementos.

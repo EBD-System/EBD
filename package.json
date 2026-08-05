@@ -1,0 +1,17 @@
+{
+  "name": "frontend-ebd",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Frontend estático por domínio para consumo de API e publicação no GitHub Pages.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "build": "node scripts/build-gh-pages.mjs",
+    "prepare:gh-pages": "npm run build",
+    "build:pages": "npm run build"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
