@@ -1,0 +1,602 @@
+jkiLCJpZF9wZXNzb2EiOiIyMiIsImlkX2NhZGFzdHJvIjoxLCJsb2dpbiI6InRlc3RlIiwicHJvZmlsZXMiOlsiQWRtaW5pc3RyYWRvciJdLCJpYXQiOjE3ODQ0OTE5NjYsImV4cCI6MTc4NDUzNTE2Nn0.ExkNPCZ4LGmQOJozTwxWJJjEdT-r8cg5SpbU5o-E4Ns"
+~ $ curl -s \
+json.tool>   -H "Authorization: Bearer $TOKEN" \
+>   http://localhost:3000/api/v1/auth/me \
+> | python -m json.tool
+{
+    "ok": true,
+    "message": "Dados do usu\u00e1rio retornados com sucesso.",
+    "data": {
+        "id_usuario": "9",
+        "id_pessoa": "22",
+        "id_cadastro": 1,
+        "login": "teste",
+        "ultimo_login": "2026-07-19T20:12:46.363Z",
+        "ativo": true,
+        "pessoa_nome": "Teste",
+        "email": "",
+        "profiles": [
+            "Administrador"                                                                                       ]
+    }
+}
+~ $ curl -X GET "http://localhost:3000/api/v1/people?page=1&limit=50&search=Maria" \
+  -H "Authorization: Bearer $TOKEN" | python -m json.tool
+  % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+                                 Dload  Upload  Total   Spent   Left   Speed
+100    869 100    869   0      0  10976      0                              0
+{
+    "ok": true,
+    "message": "Consulta de pessoas realizada com sucesso.",
+    "data": [
+        {
+            "id_pessoa": "7",
+            "nome": "Mariana Silva",
+            "sexo": "feminino",
+            "cpf": "77788899900",
+            "data_nascimento": "2010-01-19T02:00:00.000Z",
+            "telefone": "81988880007",
+            "email": "mariana.silva@ebdteste.org",
+            "logradouro": "Rua das Mangueiras",
+            "numero": "40",
+            "bairro": "Torre",
+            "cidade": "Recife",
+            "uf": "PE",
+            "cep": "50710000",
+            "observacao": "Aluna da classe de Crian\u00e7as Maiores",
+            "criado_em": "2026-07-13T12:00:00.000Z",
+            "atualizado_em": "2026-07-19T19:45:48.943Z",
+            "id_cadastro": "1",
+            "possui_usuario": false
+        },
+        {
+            "id_pessoa": "22",
+            "nome": "Teste",
+            "sexo": "nao_informado",
+            "cpf": "",
+            "data_nascimento": null,
+            "telefone": "",
+            "email": "",
+            "logradouro": "",
+            "numero": "",
+            "bairro": "",
+            "cidade": "",
+            "uf": "  ",
+            "cep": "",
+            "observacao": "",
+            "criado_em": "2026-07-19T18:56:35.410Z",
+            "atualizado_em": "2026-07-19T19:45:48.943Z",
+            "id_cadastro": "1",
+            "possui_usuario": true
+        }
+    ]
+}
+~ $
+~ $
+~ $ curl -X GET "http://localhost:3000/api/v1/people/1" \
+>   -H "Authorization: Bearer $TOKEN" | python -m json.tool
+  % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+                                 Dload  Upload  Total   Spent   Left   Speed
+100    526 100    526   0      0   8595      0                              0
+{
+    "ok": true,
+    "message": "Pessoa localizada com sucesso.",
+    "data": {
+        "id_pessoa": "1",
+        "nome": "Ricardo Almeida",
+        "sexo": "masculino",
+        "cpf": "11122233344",
+        "data_nascimento": "1983-02-17T03:00:00.000Z",
+        "telefone": "81988880001",
+        "email": "ricardo.almeida@ebdteste.org",
+        "logradouro": "Rua do Cooperador",
+        "numero": "10",
+        "bairro": "Centro",
+        "cidade": "Recife",
+        "uf": "PE",
+        "cep": "50010000",
+        "observacao": "Diretor e professor da EBD",
+        "criado_em": "2026-07-13T12:00:00.000Z",
+        "atualizado_em": "2026-07-19T19:45:48.943Z",
+        "id_cadastro": "1",
+        "possui_usuario": true
+    }
+}
+~ $
+~ $
+~ $ curl -X GET "http://localhost:3000/api/v1/classes?date=2026-07-19" \
+>   -H "Authorization: Bearer $TOKEN"
+{"ok":true,"message":"Consulta de classes realizada com sucesso.","data":[{"id_classe":"3","nome":"Adolescentes","faixa_etaria":"12 a 17 anos","descricao":"Classe destinada aos adolescentes.","ativo":true,"criado_em":"2026-07-13T11:00:00.000Z","id_cadastro":"1","total_alunos_ativos":"2"},{"id_classe":"2","nome":"Crianças Maiores","faixa_etaria":"8 a 11 anos","descricao":"Classe destinada às crianças maiores.","ativo":true,"criado_em":"2026-07-13T11:00:00.000Z","id_cadastro":"1","total_alunos_ativos":"2"},{"id_classe":"1","nome":"Crianças Menores","faixa_etaria":"4 a 7 anos","descricao":"Classe destinada às crianças menores.","ativo":true,"criado_em":"2026-07-13T11:00:00.000Z","id_cadastro":"1","total_alunos_ativos":"2"},{"id_classe":"4","nome":"Jovens","faixa_etaria":"18 a 29 anos","descricao":"Classe destinada aos jovens.","ativo":true,"criado_em":"2026-07-13T11:00:00.000Z","id_cadastro":"1","total_alunos_ativos":"2"},{"id_classe":"6","nome":"Senhoras","faixa_etaria":"30 anos ou mais","descricao":"Classe destinada às mulheres adultas.","ativo":true,"criado_em":"2026-07-13T11:00:00.000Z","id_cadastro":"1","total_alunos_ativos":"2"},{"id_classe":"5","nome":"Senhores","faixa_etaria":"30 anos ou mais","descricao":"Classe destinada aos homens adultos.","ativo":true,"criado_em":"2~ $ curl -X GET "http://localhost:3000/api/v1/classes?date=2026-07-19" \
+>   -H "Authorization: Bearer $TOKEN" | python -m json.tool
+  % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+                                 Dload  Upload  Total   Spent   Left   Speed
+100   1374 100   1374   0      0  23847      0                              0
+{
+    "ok": true,
+    "message": "Consulta de classes realizada com sucesso.",
+    "data": [
+        {
+            "id_classe": "3",
+            "nome": "Adolescentes",
+            "faixa_etaria": "12 a 17 anos",
+            "descricao": "Classe destinada aos adolescentes.",
+            "ativo": true,
+            "criado_em": "2026-07-13T11:00:00.000Z",
+            "id_cadastro": "1",
+            "total_alunos_ativos": "2"
+        },
+        {
+            "id_classe": "2",
+            "nome": "Crian\u00e7as Maiores",
+            "faixa_etaria": "8 a 11 anos",
+            "descricao": "Classe destinada \u00e0s crian\u00e7as maiores.",
+            "ativo": true,
+            "criado_em": "2026-07-13T11:00:00.000Z",
+            "id_cadastro": "1",
+            "total_alunos_ativos": "2"
+        },
+        {
+            "id_classe": "1",
+            "nome": "Crian\u00e7as Menores",
+            "faixa_etaria": "4 a 7 anos",
+            "descricao": "Classe destinada \u00e0s crian\u00e7as menores.",
+            "ativo": true,
+            "criado_em": "2026-07-13T11:00:00.000Z",
+            "id_cadastro": "1",
+            "total_alunos_ativos": "2"
+        },
+        {
+            "id_classe": "4",
+            "nome": "Jovens",
+            "faixa_etaria": "18 a 29 anos",
+            "descricao": "Classe destinada aos jovens.",
+            "ativo": true,
+            "criado_em": "2026-07-13T11:00:00.000Z",
+            "id_cadastro": "1",
+            "total_alunos_ativos": "2"
+        },
+        {
+            "id_classe": "6",
+            "nome": "Senhoras",
+            "faixa_etaria": "30 anos ou mais",
+            "descricao": "Classe destinada \u00e0s mulheres adultas.",
+            "ativo": true,
+            "criado_em": "2026-07-13T11:00:00.000Z",
+            "id_cadastro": "1",
+            "total_alunos_ativos": "2"
+        },
+        {
+            "id_classe": "5",
+            "nome": "Senhores",
+            "faixa_etaria": "30 anos ou mais",
+            "descricao": "Classe destinada aos homens adultos.",
+            "ativo": true,
+            "criado_em": "2026-07-13T11:00:00.000Z",
+            "id_cadastro": "1",
+            "total_alunos_ativos": "2"
+        }
+    ]
+}
+~ $
+~ $
+~ $
+~ $ curl -X GET "http://localhost:3000/api/v1/classes/1" \
+>   -H "Authorization: Bearer $TOKEN" | python -m json.tool
+  % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+                                 Dload  Upload  Total   Spent   Left   Speed
+100    258 100    258   0      0   4132      0                              0
+{
+    "ok": true,
+    "message": "Classe localizada com sucesso.",
+    "data": {
+        "id_classe": "1",
+        "nome": "Crian\u00e7as Menores",
+        "faixa_etaria": "4 a 7 anos",
+        "descricao": "Classe destinada \u00e0s crian\u00e7as menores.",
+        "ativo": true,
+        "criado_em": "2026-07-13T11:00:00.000Z",
+        "id_cadastro": "1"
+    }
+}
+~ $
+~ $
+~ $ curl -X GET "http://localhost:3000/api/v1/classes/1/students" \
+>   -H "Authorization: Bearer $TOKEN" | python -m json.tool
+  % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+                                 Dload  Upload  Total   Spent   Left   Speed
+100    923 100    923   0      0  11570      0                              0
+{
+    "ok": true,
+    "message": "Alunos da classe retornados com sucesso.",
+    "data": [
+        {
+            "id_aluno": "2",
+            "id_pessoa": "6",
+            "nome": "Elisa Santos",
+            "matricula": "ALU0006",
+            "status": "ativo",
+            "data_cadastro": "2026-07-13T03:00:00.000Z",
+            "data_desligamento": null,
+            "motivo_desligamento": "",
+            "observacao": "Aluna da classe de Crian\u00e7as Menores",
+            "id_aluno_classe": "2",
+            "id_classe": "1",
+            "classe": "Crian\u00e7as Menores",
+            "data_inicio": "2026-07-13T03:00:00.000Z",
+            "data_fim": null,
+            "motivo": "Primeira matr\u00edcula na classe.",
+            "ativo_classe": true
+        },
+        {
+            "id_aluno": "1",
+            "id_pessoa": "5",
+            "nome": "Pedro Santos",
+            "matricula": "ALU0005",
+            "status": "ativo",
+            "data_cadastro": "2026-07-13T03:00:00.000Z",
+            "data_desligamento": null,
+            "motivo_desligamento": "",
+            "observacao": "Aluno da classe de Crian\u00e7as Menores",
+            "id_aluno_classe": "1",
+            "id_classe": "1",
+            "classe": "Crian\u00e7as Menores",
+            "data_inicio": "2026-07-13T03:00:00.000Z",
+            "data_fim": null,
+            "motivo": "Primeira matr\u00edcula na classe.",
+            "ativo_classe": true
+        }
+    ]
+}
+~ $
+~ $
+~ $ curl -X GET "http://localhost:3000/api/v1/classes/1/attendance?date=2026-07-19" \
+>   -H "Authorization: Bearer $TOKEN" | python -m json.tool
+  % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+                                 Dload  Upload  Total   Spent   Left   Speed
+100     74 100     74   0      0   1125      0                              0
+{
+    "ok": true,
+    "message": "Resumo de chamada retornado com sucesso.",
+    "data": []
+}
+~ $
+~ $
+~ $ curl -X GET "http://localhost:3000/api/v1/students?classId=1&status=ativo" \
+>   -H "Authorization: Bearer $TOKEN" | python -m json.tool
+  % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+                                 Dload  Upload  Total   Spent   Left   Speed
+100    924 100    924   0      0  15255      0                              0
+{
+    "ok": true,
+    "message": "Consulta de alunos realizada com sucesso.",
+    "data": [
+        {
+            "id_aluno": "2",
+            "id_pessoa": "6",
+            "nome": "Elisa Santos",
+            "matricula": "ALU0006",
+            "status": "ativo",
+            "data_cadastro": "2026-07-13T03:00:00.000Z",
+            "data_desligamento": null,
+            "motivo_desligamento": "",
+            "observacao": "Aluna da classe de Crian\u00e7as Menores",
+            "id_aluno_classe": "2",
+            "id_classe": "1",
+            "classe": "Crian\u00e7as Menores",
+            "data_inicio": "2026-07-13T03:00:00.000Z",
+            "data_fim": null,
+            "motivo": "Primeira matr\u00edcula na classe.",
+            "ativo_classe": true
+        },
+        {
+            "id_aluno": "1",
+            "id_pessoa": "5",
+            "nome": "Pedro Santos",
+            "matricula": "ALU0005",
+            "status": "ativo",
+            "data_cadastro": "2026-07-13T03:00:00.000Z",
+            "data_desligamento": null,
+            "motivo_desligamento": "",
+            "observacao": "Aluno da classe de Crian\u00e7as Menores",
+            "id_aluno_classe": "1",
+            "id_classe": "1",
+            "classe": "Crian\u00e7as Menores",
+            "data_inicio": "2026-07-13T03:00:00.000Z",
+            "data_fim": null,
+            "motivo": "Primeira matr\u00edcula na classe.",
+            "ativo_classe": true
+        }
+    ]
+}
+~ $ curl -X GET "http://localhost:3000/api/v1/students/inactive" \
+>   -H "Authorization: Bearer $TOKEN" | python -m json.tool
+  % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+                                 Dload  Upload  Total   Spent   Left   Speed
+100     75 100     75   0      0   1205      0                              0
+{
+    "ok": true,
+    "message": "Consulta de alunos realizada com sucesso.",
+    "data": []
+}
+~ $ curl -X GET "http://localhost:3000/api/v1/students/1" \
+>   -H "Authorization: Bearer $TOKEN" | python -m json.tool
+  % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+                                 Dload  Upload  Total   Spent   Left   Speed
+100    591 100    591   0      0  10978      0                              0
+{
+    "ok": true,
+    "message": "Aluno localizado com sucesso.",
+    "data": {
+        "id_aluno": "1",
+        "id_pessoa": "5",
+        "matricula": "ALU0005",
+        "status": "ativo",
+        "data_cadastro": "2026-07-13T03:00:00.000Z",
+        "data_desligamento": null,
+        "motivo_desligamento": "",
+        "observacao": "Aluno da classe de Crian\u00e7as Menores",
+        "nome": "Pedro Santos",
+        "email": "pedro.santos@ebdteste.org",
+        "telefone": "81988880005",
+        "data_nascimento": "2016-03-09T03:00:00.000Z",
+        "id_aluno_classe": "1",
+        "id_classe": "1",
+        "classe": "Crian\u00e7as Menores",
+        "data_inicio": "2026-07-13T03:00:00.000Z",
+        "data_fim": null,
+        "ativo_classe": true,
+        "motivo": "Primeira matr\u00edcula na classe."
+    }
+}
+~ $ curl -X GET "http://localhost:3000/api/v1/students/1/history" \
+>   -H "Authorization: Bearer $TOKEN" | python -m json.tool
+  % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+                                 Dload  Upload  Total   Spent   Left   Speed
+100    361 100    361   0      0   5358      0                              0
+{
+    "ok": true,
+    "message": "Hist\u00f3rico do aluno retornado com sucesso.",
+    "data": [
+        {
+            "id_aluno": "1",
+            "id_pessoa": "5",
+            "nome": "Pedro Santos",
+            "matricula": "ALU0005",
+            "status_aluno": "ativo",
+            "id_aluno_classe": "1",
+            "id_classe": "1",
+            "classe": "Crian\u00e7as Menores",
+            "data_inicio": "2026-07-13T03:00:00.000Z",
+            "data_fim": null,
+            "ativo_classe": true,
+            "motivo": "Primeira matr\u00edcula na classe."
+        }
+    ]
+}
+~ $ curl -X GET "http://localhost:3000/api/v1/students/1/status-history" \
+>   -H "Authorization: Bearer $TOKEN" | python -m json.tool
+  % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+                                 Dload  Upload  Total   Spent   Left   Speed
+100    405 100    405   0      0   5405      0                              0
+{
+    "ok": true,
+    "message": "Hist\u00f3rico de status retornado com sucesso.",
+    "data": [
+        {
+            "id_aluno_status_historico": "9",
+            "id_aluno": "1",
+            "nome": "Pedro Santos",
+            "status_anterior": null,
+            "status_novo": "ativo",
+            "origem": "carga_inicial",
+            "motivo": "",
+            "observacao": "Aluno da classe de Crian\u00e7as Menores",
+            "id_chamada": null,
+            "data_chamada": null,
+            "id_chamada_aluno": null,
+            "criado_em": "2026-07-14T16:44:21.421Z",
+            "criado_por": "u0_a377"
+        }
+    ]
+}
+~ $ curl -X GET "http://localhost:3000/api/v1/students/1/classes" \
+>   -H "Authorization: Bearer $TOKEN" | python -m json.tool
+  % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+                                 Dload  Upload  Total   Spent   Left   Speed
+100    268 100    268   0      0   4152      0                              0
+{
+    "ok": true,
+    "message": "Turmas do aluno retornadas com sucesso.",
+    "data": [
+        {
+            "id_aluno_classe": "1",
+            "id_aluno": "1",
+            "id_classe": "1",
+            "classe": "Crian\u00e7as Menores",
+            "data_inicio": "2026-07-13T03:00:00.000Z",
+            "data_fim": null,
+            "motivo": "Primeira matr\u00edcula na classe.",
+            "ativo": true
+        }
+    ]
+}
+~ $ curl -X POST "http://localhost:3000/api/v1/attendance/open" \
+>   -H "Authorization: Bearer $TOKEN" \
+>   -H "Content-Type: application/json" \
+>   -d '{
+>     "classId": 1,
+>     "date": "2026-07-19"
+>   }' | python -m json.tool
+  % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+                                 Dload  Upload  Total   Spent   Left   Speed
+100    154 100    106 100     48    552    250                              0
+{
+    "ok": true,
+    "message": "Chamada aberta com sucesso.",
+    "data": {
+        "id_chamada": "14",
+        "data_chamada": "2026-07-19"
+    }
+}
+~ $ curl -X POST "http://localhost:3000/api/v1/attendance/1/present-all" \
+>   -H "Authorization: Bearer $TOKEN" | python -m json.tool
+  % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+                                 Dload  Upload  Total   Spent   Left   Speed
+100    130 100    130   0      0   1750      0                              0
+{
+    "ok": false,
+    "source": "backend",
+    "stage": "server",
+    "message": "Erro interno do servidor.",
+    "error": {
+        "statusCode": 500,
+        "stage": "server"
+    }
+}
+~ $ curl -X POST "http://localhost:3000/api/v1/attendance/1/present-all"   -H "Authorization: Bearer $TOKEN" | python -m json.tool
+  % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+                                 Dload  Upload  Total   Spent   Left   Speed
+100    130 100    130   0      0   2031      0                              0
+{
+    "ok": false,
+    "source": "backend",
+    "stage": "server",
+    "message": "Erro interno do servidor.",
+    "error": {
+        "statusCode": 500,
+        "stage": "server"
+    }
+}
+~ $ curl -X POST "http://localhost:3000/api/v1/attendance/14/present-all"   -H "Authorization: Bearer $TOKEN" | python -m json.tool
+  % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+                                 Dload  Upload  Total   Spent   Left   Speed
+100    115 100    115   0      0   1778      0                              0
+{
+    "ok": true,
+    "message": "Todos os alunos foram marcados como presentes.",
+    "data": {
+        "id_chamada": 14,
+        "status": "presente"
+    }
+}
+~ $ curl -X GET "http://localhost:3000/api/v1/attendance/summary?date=2026-07-19" \
+>   -H "Authorization: Bearer $TOKEN" | python -m json.tool
+  % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+                                 Dload  Upload  Total   Spent   Left   Speed
+100    339 100    339   0      0   4164      0                              0
+{
+    "ok": true,
+    "message": "Resumo de chamada retornado com sucesso.",
+    "data": [
+        {
+            "id_chamada": null,
+            "id_classe": null,
+            "classe": "Resumo Geral",
+            "data_chamada": "2026-07-19T03:00:00.000Z",
+            "oferta": "0.00",
+            "visitantes": 0,
+            "biblias": 0,
+            "revistas": 0,
+            "observacao": "",
+            "total_alunos": "2",
+            "presentes": "2",
+            "atrasados": "0",
+            "ausentes": "0",
+            "presenca_turma": "100.0"
+        }
+    ]
+}
+~ $ curl -X GET "http://localhost:3000/api/v1/attendance/classes/1?date=2026-07-19" \
+>   -H "Authorization: Bearer $TOKEN" | python -m json.tool
+  % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+                                 Dload  Upload  Total   Spent   Left   Speed
+100    603 100    603   0      0   8674      0                              0
+{
+    "ok": true,
+    "message": "Dados da chamada retornados com sucesso.",
+    "data": [
+        {
+            "id_chamada": "14",
+            "id_chamada_aluno": "28",
+            "id_classe": "1",
+            "classe": "Crian\u00e7as Menores",
+            "data_chamada": "2026-07-19T03:00:00.000Z",
+            "id_aluno_classe": "2",
+            "id_aluno": "2",
+            "id_pessoa": "6",
+            "matricula": "ALU0006",
+            "aluno": "Elisa Santos",
+            "status": "presente",
+            "observacao": ""
+        },
+        {
+            "id_chamada": "14",
+            "id_chamada_aluno": "27",
+            "id_classe": "1",
+            "classe": "Crian\u00e7as Menores",
+            "data_chamada": "2026-07-19T03:00:00.000Z",
+            "id_aluno_classe": "1",
+            "id_aluno": "1",
+            "id_pessoa": "5",
+            "matricula": "ALU0005",
+            "aluno": "Pedro Santos",
+            "status": "presente",
+            "observacao": ""
+        }
+    ]
+}
+~ $ curl -X GET "http://localhost:3000/api/v1/attendance/classes/1/summary?date=2026-07-19" \
+>   -H "Authorization: Bearer $TOKEN" | python -m json.tool
+  % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+                                 Dload  Upload  Total   Spent   Left   Speed
+100    342 100    342   0      0   5288      0                              0
+{
+    "ok": true,
+    "message": "Resumo da classe retornado com sucesso.",
+    "data": [
+        {
+            "id_chamada": "14",
+            "id_classe": "1",
+            "classe": "Crian\u00e7as Menores",
+            "data_chamada": "2026-07-19T03:00:00.000Z",
+            "oferta": "0.00",
+            "visitantes": 0,
+            "biblias": 0,
+            "revistas": 0,
+            "observacao": "",
+            "total_alunos": "2",
+            "presentes": "2",
+            "atrasados": "0",
+            "ausentes": "0",
+            "presenca_turma": "100.0"
+        }
+    ]
+}
+~ $ curl -X GET "http://localhost:3000/api/v1/reports/presence-ranking?date=2026-07-19" \
+>   -H "Authorization: Bearer $TOKEN" | python -m json.tool
+  % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+                                 Dload  Upload  Total   Spent   Left   Speed
+100    351 100    351   0      0   4946      0                              0
+{
+    "ok": true,
+    "message": "Ranking de presen\u00e7a retornado com sucesso.",
+    "data": {
+        "relatorio": "presenca",
+        "id_cadastro": 1,
+        "data_referencia": "2026-07-19",
+        "total_itens": 1,
+        "itens": [
+            {
+                "id_classe": "1",
+                "classe": "Crian\u00e7as Menores",
+                "total_alunos": "2",
+                "presentes": "2",
+                "atrasados": "0",
+                "ausentes": "0",
+                "percentual_presenca": "100.0",
+                "posicao": 1,
+                "resultado": "vencedora"
+            }
+        ]
+    }
+}
+~ $

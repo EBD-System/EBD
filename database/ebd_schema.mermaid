@@ -1,0 +1,391 @@
+%% =========================================================================
+%% EBD - Escola Bíblica Dominical | Diagrama do banco (schema public)
+%% Gerado a partir de pg_dump (PostgreSQL 18.2) em 2026-07-22
+%% Fora do escopo: schema neon_auth (auth do Neon/Stack Auth) e schema pgrst
+%% =========================================================================
+%% Este arquivo contém DOIS diagramas mermaid, nesta ordem:
+%%   1) erDiagram      -> estrutura relacional real (tabelas, PK, FK, cardinalidade)
+%%   2) flowchart TD   -> funções/triggers (regras de negócio) e as tabelas que
+%%                        cada uma lê/escreve, mesmo quando não existe FK entre elas.
+%% Uma IA lendo este arquivo tem o equivalente ao dump completo em termos de
+%% estrutura (tabelas, colunas-chave, constraints, relações) + comportamento
+%% (o que cada função/trigger faz e sobre quais tabelas ela atua).
+%% =========================================================================
+
+erDiagram
+    ebd_cadastro ||--o{ ebd_classe : "1:N (id_cadastro)"
+    ebd_cadastro ||--o{ ebd_pessoa : "1:N (id_cadastro)"
+    ebd_cadastro ||--o{ ebd_usuario : "1:N (id_cadastro)"
+
+    ebd_pessoa ||--o| ebd_aluno : "1:1 (uq_ebd_aluno_pessoa)"
+    ebd_pessoa ||--o| ebd_usuario : "1:1 (uq_ebd_usuario_pessoa)"
+    ebd_pessoa ||--o{ ebd_pessoa_funcao : "1:N"
+    ebd_funcao ||--o{ ebd_pessoa_funcao : "1:N"
+
+    ebd_classe ||--o{ ebd_aluno_classe : "1:N"
+    ebd_aluno ||--o{ ebd_aluno_classe : "1:N"
+    ebd_aluno_classe ||--o{ ebd_chamada_aluno : "1:N"
+
+    ebd_classe ||--o{ ebd_chamada : "1:N (uq id_classe+data)"
+    ebd_chamada ||--o{ ebd_chamada_aluno : "1:N (uq id_chamada+aluno_classe)"
+    ebd_chamada ||--o{ ebd_chamada_visitante : "1:N"
+
+    ebd_aluno ||--o{ ebd_aluno_status_historico : "1:N"
+    ebd_chamada |o--o{ ebd_aluno_status_historico : "0:N (opcional, SET NULL)"
+    ebd_chamada_aluno |o--o{ ebd_aluno_status_historico : "0:N (opcional, SET NULL)"
+
+    ebd_usuario ||--o{ ebd_usuario_perfil : "1:N (uq usuario+perfil)"
+    ebd_perfil ||--o{ ebd_usuario_perfil : "1:N"
+
+    ebd_cadastro {
+        bigint id_cadastro PK
+        text nome
+        boolean ativo
+        timestamptz criado_em
+    }
+
+    ebd_pessoa {
+        bigint id_pessoa PK
+        bigint id_cadastro FK
+        text nome
+        text sexo "M/F/outro/nao_informado"
+        text cpf UK "11 digitos, opcional"
+        date data_nascimento
+        text telefone
+        text email
+        text logradouro
+        text numero
+        text bairro
+        text cidade
+        char_2 uf
+        text cep
+        text observacao
+        timestamptz criado_em
+        timestamptz atualizado_em "trigger fn_ebd_set_atualizado_em"
+    }
+
+    ebd_aluno {
+        bigint id_aluno PK
+        bigint id_pessoa FK, UK "1:1 com pessoa"
+        text matricula UK "quando preenchida"
+        text status "ativo/transferido/inativo/falecido"
+        date data_cadastro
+        date data_desligamento
+        text motivo_desligamento
+        text observacao
+    }
+
+    ebd_classe {
+        bigint id_classe PK
+        bigint id_cadastro FK
+        text nome UK "por cadastro, case-insensitive"
+        text faixa_etaria
+        text descricao
+        boolean ativo
+        timestamptz criado_em
+    }
+
+    ebd_aluno_classe {
+        bigint id_aluno_classe PK
+        bigint id_aluno FK
+        bigint id_classe FK
+        date data_inicio
+        date data_fim
+        text motivo
+        boolean ativo "matricula ativa: 1 por aluno (uq parcial)"
+    }
+
+    ebd_chamada {
+        bigint id_chamada PK
+        bigint id_classe FK
+        date data_chamada UK "por classe (uq_ebd_chamada)"
+        numeric_10_2 oferta
+        integer biblias
+        integer revistas
+        text observacao
+        timestamptz criado_em
+        boolean fechada
+        timestamptz fechado_em
+        timestamptz reaberta_em
+    }
+
+    ebd_chamada_aluno {
+        bigint id_chamada_aluno PK
+        bigint id_chamada FK
+        bigint id_aluno_classe FK "UK junto com id_chamada"
+        text status "presente/atrasado/ausente"
+        text observacao
+    }
+
+    ebd_chamada_visitante {
+        bigint id_chamada_visitante PK
+        bigint id_chamada FK
+        text nome
+        text observacao
+        timestamptz criado_em
+    }
+
+    ebd_aluno_status_historico {
+        bigint id_aluno_status_historico PK
+        bigint id_aluno FK
+        text status_anterior
+        text status_novo "ativo/inativo"
+        text origem "manual/automatica/carga_inicial"
+        text motivo
+        text observacao
+        bigint id_chamada FK "opcional, ON DELETE SET NULL"
+        bigint id_chamada_aluno FK "opcional, ON DELETE SET NULL"
+        timestamptz criado_em
+        text criado_por
+    }
+
+    ebd_funcao {
+        bigint id_funcao PK
+        text nome UK
+        text descricao
+        boolean ativo
+    }
+
+    ebd_pessoa_funcao {
+        bigint id_pessoa_funcao PK
+        bigint id_pessoa FK
+        bigint id_funcao FK "UK ativa: 1 por pessoa+funcao (uq parcial)"
+        date data_inicio
+        date data_fim
+        boolean ativo
+        text observacao
+    }
+
+    ebd_usuario {
+        bigint id_usuario PK
+        bigint id_pessoa FK, UK "1:1 com pessoa"
+        bigint id_cadastro FK
+        text login UK "case-insensitive"
+        text senha_hash
+        timestamptz ultimo_login
+        boolean ativo
+        timestamptz criado_em
+    }
+
+    ebd_perfil {
+        bigint id_perfil PK
+        text nome UK
+        text descricao
+        boolean ativo
+    }
+
+    ebd_usuario_perfil {
+        bigint id_usuario_perfil PK
+        bigint id_usuario FK "UK junto com id_perfil"
+        bigint id_perfil FK
+    }
+
+
+%% =========================================================================
+%% 2) FUNÇÕES E TRIGGERS x TABELAS
+%% Não são relações de FK — são dependências de COMPORTAMENTO (o que cada
+%% função lê/escreve). Setas tracejadas = leitura (SELECT); setas cheias =
+%% escrita (INSERT/UPDATE/DELETE). Funções agrupadas por domínio.
+%% =========================================================================
+flowchart TD
+
+    %% ---- Tabelas (mesmos nomes do erDiagram acima) ----
+    T_cadastro[("ebd_cadastro")]
+    T_pessoa[("ebd_pessoa")]
+    T_aluno[("ebd_aluno")]
+    T_classe[("ebd_classe")]
+    T_aluno_classe[("ebd_aluno_classe")]
+    T_chamada[("ebd_chamada")]
+    T_chamada_aluno[("ebd_chamada_aluno")]
+    T_chamada_visitante[("ebd_chamada_visitante")]
+    T_aluno_status_hist[("ebd_aluno_status_historico")]
+    T_funcao[("ebd_funcao")]
+    T_pessoa_funcao[("ebd_pessoa_funcao")]
+    T_usuario[("ebd_usuario")]
+    T_perfil[("ebd_perfil")]
+    T_usuario_perfil[("ebd_usuario_perfil")]
+
+    %% ---- Domínio: Cadastro / Pessoas / Papéis ----
+    subgraph DOM_PESSOAS["Cadastro, Pessoas e Funções"]
+        F_criar_classes_padrao{{"fn_ebd_criar_classes_padrao(id_cadastro)\ncria as classes-padrão de um cadastro novo"}}
+        F_aniversariantes{{"fn_ebd_aniversariantes(data[, cadastro])\n2 overloads: lista aniversariantes do período"}}
+        F_data_aniversario{{"fn_ebd_data_aniversario_no_ano(nasc, ano)\nfunção pura de cálculo, sem tabela"}}
+    end
+    T_cadastro -. lê .-> F_aniversariantes
+    T_pessoa -. lê .-> F_aniversariantes
+    F_criar_classes_padrao -- insere --> T_classe
+
+    %% ---- Trigger: cadastro novo cria classes padrão ----
+    TR_cadastro_classes(["TRIGGER trg_ebd_cadastro_criar_classes_padrao\nAFTER INSERT ON ebd_cadastro"])
+    F_trg_cadastro{{"fn_ebd_trg_cadastro_criar_classes_padrao()"}}
+    T_cadastro --> TR_cadastro_classes --> F_trg_cadastro
+    F_trg_cadastro -. chama .-> F_criar_classes_padrao
+
+    %% ---- Trigger: atualizado_em em pessoa ----
+    TR_pessoa_atualizado(["TRIGGER trg_ebd_pessoa_atualizado_em\nBEFORE UPDATE ON ebd_pessoa"])
+    F_set_atualizado{{"fn_ebd_set_atualizado_em()\nseta NEW.atualizado_em = now()"}}
+    T_pessoa --> TR_pessoa_atualizado --> F_set_atualizado -- atualiza --> T_pessoa
+
+    %% ---- Domínio: Matrícula de aluno em classe ----
+    subgraph DOM_MATRICULA["Matrícula e histórico do aluno"]
+        F_matricular{{"fn_ebd_matricular_aluno(pessoa, matricula, classe, ...)\ncria/reaproveita ebd_aluno + abre ebd_aluno_classe"}}
+        F_transferir{{"fn_ebd_transferir_aluno(aluno, classe_destino, ...)\nencerra matrícula atual e abre nova"}}
+        F_ativar{{"fn_ebd_ativar_aluno(aluno, obs)\nchama fn_ebd_registrar_status_aluno"}}
+        F_inativar{{"fn_ebd_inativar_aluno(aluno, motivo, obs)\nchama fn_ebd_registrar_status_aluno"}}
+        F_registrar_status{{"fn_ebd_registrar_status_aluno(aluno, novo_status, origem, ...)\ncoração do histórico de status"}}
+        F_alunos_classe{{"fn_ebd_alunos_classe(classe)\nlista alunos ativos de uma classe"}}
+        F_alunos_inativos{{"fn_ebd_alunos_inativos([classe])\nlista alunos inativos/transferidos"}}
+        F_historico_aluno{{"fn_ebd_historico_aluno(aluno)\nhistórico de matrículas por classe"}}
+        F_historico_status{{"fn_ebd_historico_status_aluno(aluno)\nhistórico de status (ativo/inativo)"}}
+    end
+    F_matricular -- insere/atualiza --> T_aluno
+    F_matricular -- insere --> T_aluno_classe
+    F_matricular -. lê .-> T_pessoa
+    F_transferir -- atualiza --> T_aluno_classe
+    F_transferir -. lê .-> T_classe
+    F_transferir -. lê .-> T_pessoa
+    F_ativar -. chama .-> F_registrar_status
+    F_inativar -. chama .-> F_registrar_status
+    F_registrar_status -- atualiza --> T_aluno
+    F_registrar_status -- insere --> T_aluno_status_hist
+    F_alunos_classe -. lê .-> T_aluno_classe
+    F_alunos_classe -. lê .-> T_aluno
+    F_alunos_classe -. lê .-> T_pessoa
+    F_alunos_inativos -. lê .-> T_aluno_classe
+    F_alunos_inativos -. lê .-> T_aluno
+    F_alunos_inativos -. lê .-> T_classe
+    F_alunos_inativos -. lê .-> T_pessoa
+    F_historico_aluno -. lê .-> T_aluno_classe
+    F_historico_aluno -. lê .-> T_aluno
+    F_historico_aluno -. lê .-> T_classe
+    F_historico_aluno -. lê .-> T_pessoa
+    F_historico_status -. lê .-> T_aluno_status_hist
+    F_historico_status -. lê .-> T_aluno
+    F_historico_status -. lê .-> T_chamada
+    F_historico_status -. lê .-> T_pessoa
+
+    %% ---- Trigger: validação de matrícula ----
+    TR_matricula_valida(["TRIGGER trg_ebd_aluno_classe_validar_cadastro\nBEFORE INSERT/UPDATE ON ebd_aluno_classe"])
+    F_trg_validar{{"fn_ebd_trg_validar_aluno_classe_cadastro()\nvalida que aluno e classe são do mesmo cadastro"}}
+    T_aluno_classe --> TR_matricula_valida --> F_trg_validar
+    F_trg_validar -. lê .-> T_aluno
+    F_trg_validar -. lê .-> T_classe
+    F_trg_validar -. lê .-> T_pessoa
+
+    %% ---- Domínio: Chamada (presença do dia) ----
+    subgraph DOM_CHAMADA["Chamada (presença semanal)"]
+        F_abrir{{"fn_ebd_abrir_chamada(classe, data)\nabre/recupera chamada do dia e cria linhas em chamada_aluno"}}
+        F_fechar{{"fn_ebd_fechar_chamada(chamada)"}}
+        F_reabrir{{"fn_ebd_reabrir_chamada(chamada)\nexige perfil/permissão de usuário"}}
+        F_alterar_status_ch{{"fn_ebd_alterar_status_chamada(chamada, aluno_classe, status)"}}
+        F_todos_presentes{{"fn_ebd_todos_presentes(chamada)"}}
+        F_todos_ausentes{{"fn_ebd_todos_ausentes(chamada)"}}
+        F_registrar_oferta{{"fn_ebd_registrar_oferta(chamada, valor)"}}
+        F_registrar_visitante{{"fn_ebd_registrar_visitante(chamada, nome, obs)"}}
+        F_processar_faltas{{"fn_ebd_processar_inativacao_por_faltas(chamada)\ninativa quem bateu 4 faltas seguidas"}}
+        F_tem_4_faltas{{"fn_ebd_tem_4_faltas_consecutivas(aluno_classe)"}}
+        F_chamada_classe{{"fn_ebd_chamada_classe(classe, data)\ndetalhe de uma chamada"}}
+        F_classes_cadastro{{"fn_ebd_classes_do_cadastro(cadastro[, data])\npainel: classes + status da chamada do dia"}}
+        F_resumo_chamada{{"fn_ebd_resumo_chamada(data)"}}
+        F_resumo_classe{{"fn_ebd_resumo_classe(classe, data)"}}
+    end
+    F_abrir -- insere --> T_chamada
+    F_abrir -- insere --> T_chamada_aluno
+    F_abrir -. lê .-> T_aluno_classe
+    F_abrir -. lê .-> T_aluno
+    F_fechar -- atualiza --> T_chamada
+    F_reabrir -- atualiza --> T_chamada
+    F_reabrir -. lê .-> T_usuario
+    F_reabrir -. lê .-> T_usuario_perfil
+    F_reabrir -. lê .-> T_perfil
+    F_alterar_status_ch -- atualiza --> T_chamada_aluno
+    F_alterar_status_ch -. lê .-> T_chamada
+    F_alterar_status_ch -. lê .-> T_aluno_classe
+    F_alterar_status_ch -. lê .-> T_aluno
+    F_todos_presentes -- atualiza --> T_chamada_aluno
+    F_todos_presentes -. lê .-> T_chamada
+    F_todos_presentes -. lê .-> T_aluno_classe
+    F_todos_presentes -. lê .-> T_aluno
+    F_todos_ausentes -- atualiza --> T_chamada_aluno
+    F_todos_ausentes -. lê .-> T_chamada
+    F_todos_ausentes -. lê .-> T_aluno_classe
+    F_todos_ausentes -. lê .-> T_aluno
+    F_registrar_oferta -- atualiza --> T_chamada
+    F_registrar_visitante -- insere --> T_chamada_visitante
+    F_registrar_visitante -. lê .-> T_chamada
+    F_processar_faltas -. chama .-> F_tem_4_faltas
+    F_processar_faltas -. chama .-> F_registrar_status
+    F_processar_faltas -. lê .-> T_aluno_classe
+    F_processar_faltas -. lê .-> T_aluno
+    F_processar_faltas -. lê .-> T_chamada_aluno
+    F_processar_faltas -. lê .-> T_chamada
+    F_tem_4_faltas -. lê .-> T_chamada_aluno
+    F_tem_4_faltas -. lê .-> T_chamada
+    F_chamada_classe -. lê .-> T_aluno_classe
+    F_chamada_classe -. lê .-> T_aluno
+    F_chamada_classe -. lê .-> T_chamada_aluno
+    F_chamada_classe -. lê .-> T_chamada
+    F_chamada_classe -. lê .-> T_classe
+    F_chamada_classe -. lê .-> T_pessoa
+    F_classes_cadastro -. lê .-> T_aluno_classe
+    F_classes_cadastro -. lê .-> T_aluno
+    F_classes_cadastro -. lê .-> T_chamada_aluno
+    F_classes_cadastro -. lê .-> T_chamada
+    F_classes_cadastro -. lê .-> T_classe
+    F_resumo_chamada -. lê .-> T_aluno_classe
+    F_resumo_chamada -. lê .-> T_aluno
+    F_resumo_chamada -. lê .-> T_chamada_aluno
+    F_resumo_chamada -. lê .-> T_chamada_visitante
+    F_resumo_chamada -. lê .-> T_chamada
+    F_resumo_classe -. lê .-> T_aluno_classe
+    F_resumo_classe -. lê .-> T_aluno
+    F_resumo_classe -. lê .-> T_chamada_aluno
+    F_resumo_classe -. lê .-> T_chamada_visitante
+    F_resumo_classe -. lê .-> T_chamada
+    F_resumo_classe -. lê .-> T_classe
+
+    %% ---- Domínio: Rankings (relatórios) ----
+    subgraph DOM_RANKING["Rankings / relatórios da chamada"]
+        F_rank_oferta{{"fn_ebd_ranking_oferta(data[, cadastro])\n2 overloads"}}
+        F_rank_presenca{{"fn_ebd_ranking_presenca(data[, cadastro])\n2 overloads"}}
+        F_rank_visitantes{{"fn_ebd_ranking_visitantes(data[, cadastro])\n2 overloads"}}
+    end
+    F_rank_oferta -. lê .-> T_chamada
+    F_rank_oferta -. lê .-> T_classe
+    F_rank_presenca -. lê .-> T_aluno_classe
+    F_rank_presenca -. lê .-> T_aluno
+    F_rank_presenca -. lê .-> T_chamada_aluno
+    F_rank_presenca -. lê .-> T_chamada
+    F_rank_presenca -. lê .-> T_classe
+    F_rank_visitantes -. lê .-> T_chamada_visitante
+    F_rank_visitantes -. lê .-> T_chamada
+    F_rank_visitantes -. lê .-> T_classe
+
+    %% ---- Estilos: distinguir tabela x função x trigger ----
+    classDef tabela fill:#1f6feb,color:#fff,stroke:#0d3a75,stroke-width:1px;
+    classDef funcao fill:#f2c94c,color:#3a2e00,stroke:#8a6d00,stroke-width:1px;
+    classDef trigger fill:#eb5757,color:#fff,stroke:#7a1f1f,stroke-width:1px;
+
+    class T_cadastro,T_pessoa,T_aluno,T_classe,T_aluno_classe,T_chamada,T_chamada_aluno,T_chamada_visitante,T_aluno_status_hist,T_funcao,T_pessoa_funcao,T_usuario,T_perfil,T_usuario_perfil tabela;
+    class F_criar_classes_padrao,F_aniversariantes,F_data_aniversario,F_trg_cadastro,F_set_atualizado,F_matricular,F_transferir,F_ativar,F_inativar,F_registrar_status,F_alunos_classe,F_alunos_inativos,F_historico_aluno,F_historico_status,F_trg_validar,F_abrir,F_fechar,F_reabrir,F_alterar_status_ch,F_todos_presentes,F_todos_ausentes,F_registrar_oferta,F_registrar_visitante,F_processar_faltas,F_tem_4_faltas,F_chamada_classe,F_classes_cadastro,F_resumo_chamada,F_resumo_classe,F_rank_oferta,F_rank_presenca,F_rank_visitantes funcao;
+    class TR_cadastro_classes,TR_pessoa_atualizado,TR_matricula_valida trigger;
+
+%% =========================================================================
+%% NOTAS PARA A IA QUE FOR LER ESTE ARQUIVO
+%% - Schema: public (PostgreSQL 18.2). Todas as PKs são bigint IDENTITY.
+%% - Multi-tenant: ebd_cadastro é o "tenant" raiz; classe, pessoa e usuario
+%%   pendem dele via id_cadastro.
+%% - ebd_aluno é 1:1 com ebd_pessoa (uma pessoa pode virar aluno uma vez).
+%% - ebd_aluno_classe é a matrícula (histórico); só 1 pode estar ativo=true
+%%   por aluno ao mesmo tempo (índice único parcial uq_ebd_aluno_classe_ativa).
+%% - ebd_chamada é única por (classe, data); ebd_chamada_aluno é única por
+%%   (chamada, aluno_classe).
+%% - ebd_usuario é 1:1 com ebd_pessoa; permissões via ebd_usuario_perfil -> ebd_perfil.
+%% - ebd_pessoa_funcao é papel eclesiástico da pessoa (ex: professor, diretor),
+%%   NÃO confundir com "função" de banco de dados.
+%% - Funções fn_ebd_* concentram toda a regra de negócio (a API do app fala
+%%   quase só com essas funções via RPC do PostgREST, schema pgrst).
+%% - Fora do escopo deste diagrama: schema neon_auth (tabelas de autenticação
+%%   do provedor Neon/Stack Auth: account, session, user, organization etc.)
+%%   e schema pgrst (apenas função de configuração pre_config()).
+%% =========================================================================

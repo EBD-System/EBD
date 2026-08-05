@@ -1,1 +1,0 @@
-// Chaves de armazenamento compartilhado.

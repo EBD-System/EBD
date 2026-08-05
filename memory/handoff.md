@@ -1,62 +1,70 @@
 # Handoff
 
-- A aplicação tem login, dashboard e o módulo de classes como fluxos funcionais principais.
-- O dashboard agora pode operar em `developmentMode`; quando esse flag está desativado, apenas os cards de **Classes** e **Relatórios** permanecem visíveis.
-- A configuração compartilhada do front foi centralizada em `src/app/config/config.js`; em ambiente local, `server.js` pode injetar `process.env.developmentMode` antes do arquivo estático, e `api.js` preserva valores já definidos no objeto global.
-- O front escolhe a base da API automaticamente: localhost em desenvolvimento e Render em produção/GitHub Pages.
-- O login espera um token em campos comuns de resposta (`token`, `accessToken`, `data.token`, `result.token`, `auth.token`).
-- O dashboard protege a entrada: sem token válido na `sessionStorage`, a página volta para a tela de login.
-- A página de classes usa `GET /api/v1/classes`, renderiza as classes recebidas e navega para a tela de chamada levando `classId` e `className` na query string.
-- A tela de chamada carrega alunos ativos e inativos por consultas separadas e preserva `id_aluno_classe` ao mesclar respostas.
-- O salvamento da chamada continua dependendo de `id_aluno_classe` válido e usa `PATCH /attendance/:callId` com `students[]`.
-- A tela de chamada carrega e salva o **Resumo da classe** na API oficial: `GET /attendance/classes/:classId/summary` para hidratar os campos e `PUT /attendance/:callId/summary` para persistir `oferta`, `visitantes`, `biblias` e `revistas`.
-- A seção **Resumo da classe** da tela de chamada reproduz a regra do legado: `Visitantes` é limitado a 50 e `Bíblias`/`Revistas` são limitadas à soma de alunos presentes + visitantes.
-- O fluxo de salvamento da chamada envia primeiro `PATCH /attendance/:callId` para a presença e depois atualiza o resumo da classe; a resposta do backend precisa devolver o resumo salvo com `visitantes` persistido em `ebd_chamada`.
-- O cadastro nominal de visitantes continua separado em `ebd_chamada_visitante`; ele complementa o resumo, mas não substitui o campo consolidado.
-- O módulo de aluno foi conectado ao backend disponível:
-- A tela de chamada agora desfaz o envelope de sucesso da API (`{ ok, message, data }`) antes de aplicar mutações locais, porque o módulo consome os dados úteis diretamente.
-  - criação: `POST /people` → `POST /students/enroll`;
-  - edição cadastral: `PUT /people/:id`;
-  - observação do aluno: `PUT /students/:id/observation`;
-  - status: `PUT /students/:id/activate` e `PUT /students/:id/inactivate`.
-- Não existe DELETE para aluno no backend atual; o botão de excluir do frontend usa inativação como fallback.
-- O campo **Data de início** permanece bloqueado na edição.
-- A normalização da listagem de alunos depende de `extractPersonId(...)`; sem esse helper, o carregamento quebra antes de renderizar os cards.
-- O status de matrícula na edição precisa ser lido do `raw` do aluno, porque o objeto normalizado não carrega `status` no topo; usar só o objeto achatado faz a ativação parecer concluída sem persistir no backend.
-- O formulário de edição de aluno precisa normalizar `sexo` ao preencher o select, porque o payload de aluno pode vir do banco com `M`/`F` e o select da tela trabalha com `masculino`/`feminino`.
-- O token de autenticação deixou de ser salvo como objeto JSON com metadados e passou a ser persistido como string simples em `sessionStorage`, com leitura compatível com sessões antigas.
+Projeto atual: `ebd-api`.
 
-- A listagem de alunos usada na edição precisa trazer os campos cadastrais da pessoa, senão a abertura do modal volta a mostrar valores antigos após recarregar.
-- O resumo da classe e o relatório geral agora aceitam `oferta`/`valor_oferta` no payload e exibem o valor formatado em BRL (`R$ ...`) em vez de cair em `Não houve`.
+## Estado atual
 
-- A página de classes agora recebe copys compartilhadas pelo `config.js` e mantém as frases combinadas em nós ocultos quando o modo reduzido está ativo.
+- A API oficial expõe somente `/api/v1`.
+- O contrato padrão de resposta segue `ok`, `message` e `data` em sucesso, e `ok`, `message` e `error` em falha.
+- A implementação canônica vive em `src/modules/<modulo>/`, com `controller`, `service`, `repository`, `routes` e `validator`.
+- Os módulos ativos são `auth`, `pessoas`, `classes`, `alunos`, `chamadas` e `relatorios`.
+- A autenticação usa JWT com `id_cadastro` explícito no token e o tenant das rotas autenticadas é resolvido a partir do JWT.
+- O campo `sexo` de pessoa é normalizado na borda: a API aceita `nao_informado`, `masculino`, `feminino` e `outro`, a persistência grava `nao_informado`, `M`, `F` e `outro`, e as respostas voltam em formato textual da API.
+- A suíte automatizada cobre login, autorização, tenant scoping, tratamento global de erros e os módulos de negócio.
+- O fluxo oficial de login em testes usa `teste` / `123456` e grava JWT, usuário e payload compartilhados em `src/shared/flow-context.js` para subtestes sequenciais; o contexto compartilhado também guarda as 6 turmas padrão carregadas após a autenticação.
+- A transferência de aluno entre turmas agora tem fluxo dedicado no backend em `PUT /api/v1/students/:id/transfer`, acoplado à função SQL `fn_ebd_transferir_aluno`.
+- O módulo de alunos ganhou o endpoint `PUT /api/v1/students/:id/observation` para persistir `ebd_aluno.observacao`, separado da edição cadastral em `/api/v1/people/:id`.
+- O módulo de relatórios ganhou `GET /api/v1/reports/period` para consolidar um snapshot de período com `periodo`, `consultedAt`, `summary` e `activities`, sempre escopado por `id_cadastro` do JWT.
+- No relatório de período, `total_alunos` em cada atividade representa a contagem completa de alunos ativos da turma naquela data; não deve ser calculado apenas a partir dos presentes, senão o card fica inconsistente com os ausentes.
+- O card `Total` do relatório de período no frontend deve ser calculado como `presentes + visitantes`; `Matriculados` continua vindo de `total_alunos`.
+- A rota de período deve importar `validateReportsPeriodQuery` do módulo local `./validator`; importar apenas o nome sem binding quebra o boot do servidor com `ReferenceError`.
+- As consultas de aluno usadas pela edição precisam expor também os dados cadastrais da pessoa (sexo, CPF, nascimento, contato e endereço), porque a tela de edição é hidratada a partir do payload de aluno.
+- As consultas de aluno usadas pela edição precisam normalizar `sexo` da pessoa para a forma textual da API (`masculino`, `feminino`, `outro`, `nao_informado`), senão o select da edição fica vazio quando o banco retorna `M`/`F`.
+- A validação de mutação da chamada normaliza `data_chamada` para dia civil em `America/Bahia` antes de comparar com `todayISO()`, porque o PostgreSQL pode devolver `Date`/timestamp e a comparação crua quebrava o PATCH de presença e a reabertura no mesmo dia.
+
+## Estado atual
 
 
-- O módulo de Relatórios possui consulta por intervalo de datas ligada ao backend real (`GET /reports/period`, com token e tratamento de erro via `api-client.js`/`error-dialog.js`), snapshot imutável e renderização do resultado no card principal da tela.
-- O frontend não deve usar o DOM como fonte do PDF; o payload consolidado da busca é o estado canônico do relatório.
-- O dashboard não exibe mais o texto visível “Navegação” no hero.
-- O botão **Enviar Relatório** baixa o PDF diretamente a partir do snapshot da consulta.
-- O layout do relatório na tela deve ficar no card de resultado; a pré-visualização em `iframe` foi removida.
-- A página de Relatórios depende do carregamento de `jspdf.umd.min.js`; sem esse script o botão **Enviar Relatório** não consegue gerar o arquivo.
+- A busca de motivo de inatividade de alunos foi consolidada para evitar uma requisição por aluno: `GET /api/v1/students/inactive-reasons?ids=...` responde em lote e as listagens de alunos também expõem `inactive_reason` com fallback do histórico.
+
+- O endpoint `POST /api/v1/students/enroll` agora devolve o aluno enriquecido, incluindo `id_aluno_classe` e campos principais do vínculo, mantendo `id_aluno` no topo.
+
+## Pontos de atenção
+
+- Não reintroduzir superfície legada em `/` ou `/api`.
+- Não depender de tenant vindo do frontend em rotas autenticadas.
+- Tokens antigos sem `id_cadastro` devem ser tratados como inválidos.
+- Novos testes autenticados devem reaproveitar o estado compartilhado de `src/shared/flow-context.js` quando houver sequência de subtestes, inclusive para `auth` e para as turmas padrão.
+- Qualquer novo controller assíncrono deve continuar usando `asyncHandler(...)`.
+- Qualquer novo fluxo que persista `sexo` de pessoa deve reutilizar a normalização canônica para não reintroduzir a divergência entre API e banco.
+- Qualquer novo fluxo de transferência de aluno deve preservar o vínculo ativo anterior, abrir um novo vínculo e manter o histórico via SQL dedicado.
+- Qualquer fluxo que persista `telefone` de pessoa deve normalizar para dígitos antes de gravar e respeitar o limite de 11 dígitos do banco.
+- A mutação de presença e a reabertura de chamada dependem de comparação por dia civil; não reintroduzir igualdade direta entre `Date` e string ISO.
+- Os resumos de chamada (`/attendance/summary` e `/attendance/classes/:classId/summary`) e o ranking de presença passaram a contar `atrasado` dentro de `presentes`; o campo `atrasados` continua existindo apenas como contagem separada, sem novo campo agregado.
+- `visitantes` passou a ser uma coluna persistida em `ebd_chamada`; o resumo da chamada escreve `oferta`, `visitantes`, `biblias` e `revistas`, enquanto `ebd_chamada_visitante` continua guardando o detalhe nominal dos visitantes.
+- Queries de atualização do resumo precisam manter placeholders contínuos e não enviar parâmetros órfãos ao `pg`, senão o PostgreSQL pode falhar com inferência de tipo.
+
+- A atualização de presença agora deve localizar a linha histórica da chamada sem depender de `ebd_aluno_classe.ativo = TRUE`; o bloqueio continua apenas para chamadas fechadas, fora do dia civil atual ou alunos inativos.
+- Qualquer nova resposta HTTP deve manter o envelope oficial centralizado no helper de resposta.
+- O salvamento oficial da chamada agora tem endpoint em lote em `PATCH /api/v1/attendance/:callId`, com `students[]` e transação única no repository; a rota legada `PATCH /api/v1/attendance/:callId/students/:studentClassId` continua disponível por compatibilidade.
+- A validação do payload em lote rejeita lista vazia, itens não-objeto e `studentClassId` duplicado antes de entrar no service.
+
+## Próximos passos
+
+- Continuar novos fluxos de teste a partir do auth armazenado no contexto compartilhado.
+- Manter novas rotas e serviços estritamente dentro de `src/modules` e `src/routes/v1`.
+- Expandir a cobertura apenas com conhecimento consolidado que mereça ficar na memória viva.
+
+## Classes
+
+- A listagem de classes passou a vir de `public.fn_ebd_classes_do_cadastro(id_cadastro, date)` para incluir `chamada_ja_feita`, `id_chamada` e `chamada_fechada` sem perder os campos já existentes.
+- O endpoint `GET /api/v1/classes` continua autenticado e agora pode receber `date` opcional na query; quando ausente, a função SQL usa a data atual.
 
 
-- No módulo de Relatórios, o card de resultado passou a mostrar o relatório completo no próprio painel; o botão **Enviar Relatório** baixa o PDF diretamente.
-- As datas do relatório são normalizadas no frontend: apenas data vira `dd/mm/yyyy`; data com hora vira `dd/mm/yyyy - hh:mm`.
-- O PDF continua sendo montado a partir do snapshot da consulta, sem leitura do DOM, e possui fallback alternativo quando o layout principal falha.
+- O PATCH em lote de presença agora tolera linhas ausentes em `ebd_chamada_aluno` para alunos ativos da turma atual, criando o vínculo na hora da atualização antes de aplicar o status.
 
-- O módulo de Relatórios agora agrupa as atividades por turma, consulta o resumo completo de cada turma e renderiza cards individuais + card total no painel de resultado.
-- O total do período é o somatório dos cards renderizados; o período serve como índice para identificar as turmas e sua data mais recente.
-- O envio do relatório continua baixando PDF com fallback, sem ler o DOM.
+- O módulo de chamadas ganhou escrita dedicada para o resumo da chamada em `PUT`/`PATCH /api/v1/attendance/:callId/summary`.
+- O dump SQL foi alinhado com a função `fn_ebd_registrar_oferta`, que estava ausente e quebrava a persistência da oferta.
+- As consultas de resumo usam `ebd_chamada.visitantes` como total consolidado; o detalhe nominal dos visitantes continua em `ebd_chamada_visitante`.
 
-- O módulo de Relatórios passou a renderizar cards por turma no painel principal e um card total consolidado, ambos derivados do snapshot imutável da consulta.
-- O envio do PDF continua partindo do snapshot em memória; a interface visual não deve ser usada como fonte de dados.
-- O relatório usa o formato textual padronizado nas linhas dos cards: `Matriculados`, `Ausentes`, `Presentes`, `Visitantes`, `Total`, `Bíblias`, `Revistas` e `Ofertas`.
-
-- A tela de Chamada teve a cópia introdutória reduzida: o modal de aluno não exibe mais o texto de abertura nem o subtítulo do bloco de dados; o botão de fechar foi fixado no canto superior direito do diálogo.
-- O dashboard perdeu a seção hero vazia no modo de desenvolvimento e o ícone de destaque foi deslocado para o canto superior direito da barra principal.
-- O módulo de Relatórios agora mantém a área de resultado oculta até que uma consulta válida retorne dados; quando há relatório carregado, a seção reaparece.
-- O dashboard perdeu o ícone azul do canto superior direito; o botão **Sair** passou a ocupar esse espaço no topo da página.
-- Na tela de chamada, o botão **Salvar Chamada** do cabeçalho foi removido; o salvamento ficou concentrado no botão do rodapé do resumo da classe.
-- Os botões **Presente**, **Atrasado** e **Ausente** dos cards de aluno seguem o padrão visual do card do David: ficam lado a lado e só exibem a cor forte quando estão selecionados.
-
-- O **Relatório Geral** do módulo de Classes agora usa estado visual por cor: vermelho enquanto houver qualquer chamada pendente e amarelo quando existir classe com `presentes = 0`; a implementação não depende de esconder/exibir elementos.
+- O servidor executa uma migração de startup para garantir a coluna `visitantes` em `ebd_chamada` quando ainda não existir.

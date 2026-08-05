@@ -1,17 +1,14 @@
 # Sessão 2026-08-04
 
 ## O que foi alterado
-- A tela de chamada continua enviando o resumo consolidado em `PUT /attendance/:callId/summary`.
-- O frontend agora depende do backend devolver `visitantes` persistido para manter o valor exibido após salvar.
-- Os cards de classe passaram a ler `visitantes` como parte do resumo consolidado.
+- A chamada passou a persistir `visitantes` em `public.ebd_chamada.visitantes` junto com `oferta`, `biblias` e `revistas`.
+- O backend ganhou uma migração de startup para criar a coluna `visitantes` quando ela ainda não existir.
+- O resumo da chamada e o ranking de visitantes passaram a ler o total consolidado da coluna persistida.
+- O cadastro nominal de visitantes continua em `ebd_chamada_visitante`.
 
 ## Conhecimento consolidado
-- O campo `visitantes` do resumo não deve ser tratado como valor descartável; ele precisa voltar no payload salvo.
-- O detalhe nominal de visitantes continua separado no backend, mas não substitui o resumo consolidado.
+- O resumo da chamada precisa preservar o valor digitado em `visitantes` após o salvamento.
+- `ebd_chamada_visitante` segue como tabela de detalhe; a coluna `visitantes` é a fonte consolidada para leitura do resumo.
 
 ## Próximos passos
-- Manter o contrato de leitura e escrita do resumo alinhado ao backend.
-
-
-## Atualização
-- A tela de classes passou a reconhecer `oferta`/`valor_oferta` no resumo consolidado e a exibir o valor formatado em BRL no card e no relatório geral.
+- Manter os endpoints de resumo e os dumps SQL alinhados com a coluna `visitantes`.
