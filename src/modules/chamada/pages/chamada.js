@@ -78,7 +78,7 @@ const state = {
   inactiveReasonsLoading: false,
   inactiveReasonsLoaded: false,
   loadingStudents: false,
-  attendanceDate: getRecifeISODate(),
+  attendanceDate: getBusinessISODate(),
   attendanceCallId: '',
   attendanceLoading: false,
   attendanceSaving: false,
@@ -2097,7 +2097,7 @@ function applyLocalStudentMutation(student, mutationResult, formData) {
       const inactiveReason = formData.observacao || 'Inativação manual na edição';
       state.inactiveReasonMap.set(String(student.id), inactiveReason);
       student.raw.motivo_desligamento = inactiveReason;
-      student.raw.data_desligamento = getRecifeISODate();
+      student.raw.data_desligamento = getBusinessISODate();
     } else {
       state.inactiveReasonMap.delete(String(student.id));
       student.raw.motivo_desligamento = '';
@@ -2644,12 +2644,27 @@ function formatDisplayDate(value) {
     .join('/');
 }
 
-function getRecifeISODate() {
+function getBusinessISODate() {
   try {
-    return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Recife' }).format(new Date());
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Bahia',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(new Date());
+
+    const year = parts.find((part) => part.type === 'year')?.value;
+    const month = parts.find((part) => part.type === 'month')?.value;
+    const day = parts.find((part) => part.type === 'day')?.value;
+
+    if (year && month && day) {
+      return `${year}-${month}-${day}`;
+    }
   } catch {
-    return new Date().toISOString().slice(0, 10);
+    // fallback below
   }
+
+  return new Date().toISOString().slice(0, 10);
 }
 
 function escapeHtml(value) {
