@@ -62,8 +62,8 @@ const LEGACY_SHEETS = [
 ];
 
 const AUTO_CUTOFF_MINUTES = 9 * 60 + 25;
-const BACKEND_VERSION = '2026.07.11-3';
-const BACKEND_DEPLOYED_AT = '2026-07-11T00:00:00-03:00';
+const BACKEND_VERSION = '2026.08.04-1';
+const BACKEND_DEPLOYED_AT = '2026-08-04T00:00:00-03:00';
 
 function normalizeStudentStatus_(value) {
   const v = String(value || '').trim().toLowerCase();
@@ -1018,7 +1018,7 @@ function buildBaseRow_(opts) {
   };
 }
 
-function buildTurmasReportText_(dateKey, turma, turmaCall, alunos) {
+function buildTurmaReportText_(dateKey, turma, turmaCall, alunos) {
   if (!turma || !turmaCall) return 'Nenhuma turma selecionada.';
   const stats = turmaCall || {};
   const activeRows = (turmaCall.rows || []).filter(r =>
