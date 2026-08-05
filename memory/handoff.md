@@ -50,7 +50,7 @@ Pontos centrais:
 - O console de diagnóstico foi ajustado para ficar visível apenas no acesso `50292230`; em outros acessos, os erros continuam aparecendo só no feedback vermelho.
 - Erros sem prefixo no cliente devem ser registrados como `FRONTEND` no console de diagnóstico, enquanto respostas `ok: false` do backend continuam como `BACKEND`.
 
-- O botão **Salvar** grava uma snapshot local da chamada da turma/data; a busca por data pode priorizar esse armazenamento, mas os relatórios em PDF devem revalidar no backend antes de montar.
-- A geração de PDF agora revalida a chamada diretamente na planilha via backend (`refreshFromBackend` com `preferLocal: false`) antes de montar o relatório; snapshots locais servem só como recuperação, não como fonte do PDF.
+- O botão **Salvar** grava uma snapshot local da chamada da turma/data; a busca por data pode priorizar esse armazenamento, mas os relatórios em PDF devem vir do relatório oficial gerado pelo backend a partir da planilha.
+- A geração de PDF agora consulta `action=reporttext` no backend e monta o documento a partir do texto oficial da planilha; snapshots locais servem só como recuperação, não como fonte do PDF.
 - O fluxo de salvar chamada depende do helper local `nowIso()` em `src/js/services/api.js`; sem ele, a snapshot local falha com erro de referência.
 - Na gravação da chamada, os campos `PRESENÇA`, `ATRASO` e `AUSÊNCIA` da base precisam ser reescritos como mutuamente exclusivos a cada salvamento; não é mais válido preservar 1 antigo ao mudar o status do aluno.

@@ -25,4 +25,4 @@
 
 - O botão **Salvar** deve persistir também uma snapshot local da chamada salva, com prioridade de leitura para buscas por data.
 - Na aba base, `PRESENÇA`, `ATRASO` e `AUSÊNCIA` devem ser gravados como flags mutuamente exclusivas em cada salvamento; ao corrigir a presença de um aluno, o backend precisa zerar as colunas que não correspondem ao novo status.
-- Os relatórios em PDF devem ser montados após uma revalidação direta do backend/planilha, sem depender de snapshot local quando a planilha estiver acessível.
+- Os relatórios em PDF devem ser montados a partir do texto oficial retornado pelo backend com `action=reporttext`; o estado do frontend e o snapshot local não podem ser a fonte do documento quando a planilha estiver disponível.
