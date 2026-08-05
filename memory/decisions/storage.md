@@ -11,7 +11,3 @@ Isso preserva o preenchimento quando o envio ao Apps Script falha e permite reab
 ## Data
 
 2026-07-12
-
-## Observação
-
-Snapshots locais não devem ser usadas como origem para geração de relatório; essa leitura precisa vir do Apps Script para refletir exatamente o que está na planilha.
