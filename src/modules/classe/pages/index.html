@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Classes" />
+    <title>Classes</title>
+    <link rel="stylesheet" href="./classes.css" />
+  </head>
+  <body>
+    <main class="classes-shell">
+      <header class="classes-header">
+        <div>
+          <p class="eyebrow">Módulo</p>
+          <h1>Classes</h1>
+          <p class="subtitle" id="classesSubtitle">Selecione uma classe para continuar.</p>
+          <p id="classesHiddenCopy" class="visually-hidden" aria-hidden="true"></p>
+        </div>
+        <a class="back-link" href="../../dashboard/pages/home/index.html">Voltar ao dashboard</a>
+      </header>
+
+      <section class="classes-panel">
+        <div class="panel-head">
+          <h2>Selecione uma classe</h2>
+          <p id="statusText">Carregando classes...</p>
+        </div>
+
+        <div id="classesGrid" class="classes-grid" aria-live="polite"></div>
+      </section>
+
+      <section class="classes-report" aria-labelledby="reportTitle">
+        <div class="panel-head">
+          <div>
+            <h2 id="reportTitle">Relatório Geral</h2>
+            <p id="reportStatusText">Aguardando a primeira chamada para liberar o relatório geral.</p>
+          </div>
+        </div>
+
+        <div class="report-grid">
+          <article class="report-card report-card--summary">
+            <h3 class="report-card__title">Relatório Geral</h3>
+            <pre id="reportSummaryText" class="report-card__content">Faça a primeira chamada para exibir o relatório geral.</pre>
+          </article>
+
+          <article class="report-card">
+            <h3 class="report-card__title">Top 3 em presença</h3>
+            <div id="presenceRankingList" class="report-card__body">
+              <p class="report-card__placeholder">Os rankings aparecem depois da primeira chamada.</p>
+            </div>
+          </article>
+
+          <article class="report-card">
+            <h3 class="report-card__title">Top 3 em ofertas</h3>
+            <div id="offersRankingList" class="report-card__body">
+              <p class="report-card__placeholder">Os rankings aparecem depois da primeira chamada.</p>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <script src="../../../app/config/config.js"></script>
+    <script src="../../../app/config/api.js"></script>
+    <script src="../../../app/config/storage.js"></script>
+    <script src="../../../shared/services/api-client.js"></script>
+    <script src="../../../app/config/error.js"></script>
+    <script src="../../../shared/ui/error-dialog.js"></script>
+    <script src="./classes.js" defer></script>
+  </body>
+</html>

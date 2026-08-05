@@ -1,24 +1,17 @@
 {
-  "name": "ebd-api",
+  "name": "frontend-ebd",
   "version": "1.0.0",
   "private": true,
-  "description": "API Node.js para a aplicação EBD, com Express, PostgreSQL e deploy no Render.",
+  "description": "Frontend estático por domínio para consumo de API e publicação no GitHub Pages.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js",
-    "test": "node --test"
-  },
-  "engines": {
-    "node": ">=20"
+    "dev": "node server.js",
+    "build": "node scripts/build-gh-pages.mjs",
+    "prepare:gh-pages": "npm run build",
+    "build:pages": "npm run build"
   },
   "dependencies": {
-    "bcryptjs": "^2.4.3",
-    "cors": "^2.8.5",
-    "dotenv": "^17.2.1",
-    "express": "^4.21.2",
-    "helmet": "^8.1.0",
-    "jsonwebtoken": "^9.0.2",
-    "pg": "^8.16.3"
+    "express": "^4.19.2"
   }
 }

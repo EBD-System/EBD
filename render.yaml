@@ -1,7 +1,0 @@
-services:
-  - type: web
-    name: ebd-api
-    env: node
-    buildCommand: npm install
-    startCommand: node server.js
-    autoDeploy: true
