@@ -396,10 +396,9 @@ function syncStudentAttendanceKey(student, attendanceKey) {
 
 
 async function fetchAttendanceSnapshot() {
-  const query = `date=${encodeURIComponent(state.attendanceDate)}`;
   const paths = [
-    `/classes/${classId}/attendance?${query}`,
-    `/attendance/classes/${classId}?${query}`
+    `/classes/${classId}/attendance`,
+    `/attendance/classes/${classId}`
   ];
 
   let lastError = null;
@@ -435,8 +434,7 @@ async function ensureAttendanceCall() {
     const result = await apiRequest('/attendance/open', {
       method: 'POST',
       body: {
-        classId,
-        date: state.attendanceDate
+        classId
       }
     });
 
@@ -1726,7 +1724,7 @@ async function fetchClassSummary() {
     const url = buildUrl(classId);
 
     try {
-      const { payload } = await apiRequest(`${url}${url.includes('?') ? '&' : '?'}date=${encodeURIComponent(state.attendanceDate)}`);
+      const { payload } = await apiRequest(url);
       const summary = normalizeClassSummaryPayload(payload);
       if (summary) {
         return summary;
@@ -2664,7 +2662,11 @@ function getBusinessISODate() {
     // fallback below
   }
 
-  return new Date().toISOString().slice(0, 10);
+  const shifted = new Date(Date.now() - 3 * 60 * 60 * 1000);
+  const year = shifted.getUTCFullYear();
+  const month = String(shifted.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(shifted.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function escapeHtml(value) {
