@@ -10,6 +10,4 @@ A interface web consome o backend em Apps Script, que centraliza a leitura e a e
 
 ## Observação
 
-O navegador não vira a fonte oficial, mas mantém snapshots locais das chamadas já salvas para recuperação rápida e busca por data.
-
-Os relatórios em PDF devem ser gerados a partir do texto oficial retornado pelo backend (`action=reporttext`), sempre com a planilha como origem dos dados. O snapshot local continua apenas como contingência de navegação e recuperação.
+O navegador não vira a fonte oficial, mas mantém snapshots locais das chamadas já salvas para recuperação rápida, busca por data e geração de relatórios quando o backend falha.

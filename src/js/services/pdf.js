@@ -20,8 +20,18 @@ async function sendReport(scope) {
   showLoading(`Gerando ${scopeLabel} em PDF...`, 40000);
 
   try {
-    const reportSource = await fetchSheetReportText(scope);
-    const report = buildPdfReportModel(scope, reportSource);
+    const localSnapshot = loadLocalSavedCallsSnapshot(state.dateKey);
+    if (localSnapshot) {
+      state.chamadasByTurma = mergeCallsByTurma_(state.chamadasByTurma || {}, localSnapshot.callsByTurma || {});
+    }
+
+    let report;
+    try {
+      report = buildPdfReportModel(scope);
+    } catch (localErr) {
+      await refreshFromBackend(false, { silent: true, preferLocal: true });
+      report = buildPdfReportModel(scope);
+    }
 
     const doc = new window.jspdf.jsPDF({
       orientation: 'portrait',
@@ -59,43 +69,14 @@ async function sendReport(scope) {
   }
 }
 
-async function fetchSheetReportText(scope) {
+function buildPdfReportModel(scope) {
   const selectedDate = String(state.dateKey || todayKey());
-  const turma = scope === 'turma' ? getCurrentTurma() : null;
-  const params = {
-    action: 'reporttext',
-    scope,
-    date: selectedDate,
-  };
-
-  if (scope === 'turma' && turma?.TurmaID) {
-    params.turmaId = turma.TurmaID;
-  }
-
-  const data = await apiGet(params, { timeoutMs: 30000 });
-  const text = String(data?.text || '').trim();
-  if (!text) {
-    throw new Error('O backend retornou um relatório vazio.');
-  }
-
-  return {
-    text,
-    selectedDate,
-    turma,
-  };
-}
-
-function buildPdfReportModel(scope, reportSource) {
-  const selectedDate = String(reportSource?.selectedDate || state.dateKey || todayKey());
   const dateLabel = formatDateBR(selectedDate);
-  const lines = String(reportSource?.text || '').replace(/\r/g, '').split('\n');
-  const firstMeaningfulIndex = lines.findIndex((line) => String(line || '').trim());
-  const firstMeaningfulLine = firstMeaningfulIndex >= 0 ? String(lines[firstMeaningfulIndex] || '').trim() : '';
-  const bodyLines = firstMeaningfulIndex >= 0 ? lines.slice(firstMeaningfulIndex + 1) : lines;
-  const title = firstMeaningfulLine || (scope === 'geral' ? 'RELATÓRIO GERAL' : 'RELATÓRIO DA TURMA');
+  const turmas = getTurmasSorted();
 
   if (scope === 'turma') {
-    const turma = reportSource?.turma || getCurrentTurma();
+    const turma = getCurrentTurma();
+    const call = getCurrentCall();
     if (!turma) throw new Error('Selecione uma turma.');
 
     return {
@@ -103,92 +84,24 @@ function buildPdfReportModel(scope, reportSource) {
       fileName: `relatorio-turma-${slugifyForFileName(turma.Nome)}-${selectedDate}.pdf`,
       shareText: `Relatório em PDF da turma ${turma.Nome} (${dateLabel}).`,
       successMessage: 'PDF da turma pronto para compartilhar.',
-      pages: paginateSheetReportLines({
-        headerTitle: title,
-        headerSubtitle: `Data: ${dateLabel}`,
-        headerNote: `Fonte: relatório da planilha • Turma ${turma.Nome}`,
-        lines: bodyLines,
-      }),
+      pages: [
+        buildPdfTurmaPage(turma, call, dateLabel),
+        ...buildPdfTurmaRosterPages(turma, call, dateLabel),
+      ],
     };
   }
+
+  const pages = turmas.map((turma) => buildPdfTurmaPage(turma, state.chamadasByTurma?.[turma.TurmaID] || null, dateLabel));
+  pages.push(buildPdfGeneralPage(dateLabel));
+  pages.push(buildPdfRankingsPage(dateLabel));
 
   return {
     title: 'Relatório geral consolidado',
     fileName: `relatorio-geral-${selectedDate}.pdf`,
     shareText: `Relatório geral consolidado em PDF (${dateLabel}).`,
     successMessage: 'PDF geral pronto para compartilhar.',
-    pages: paginateSheetReportLines({
-      headerTitle: title,
-      headerSubtitle: `Data: ${dateLabel}`,
-      headerNote: 'Fonte: relatório da planilha',
-      lines: bodyLines,
-    }),
+    pages,
   };
-}
-
-function paginateSheetReportLines({ headerTitle, headerSubtitle, headerNote, lines }) {
-  const doc = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
-  const width = doc.internal.pageSize.getWidth();
-  const height = doc.internal.pageSize.getHeight();
-  const margin = 12;
-  const contentWidth = width - margin * 2;
-  const bodyTop = margin + 44;
-  const bodyBottom = height - 18;
-  const bodyFontSize = 10;
-  const lineGap = 1.55;
-  const lineHeight = bodyFontSize * 0.36 + lineGap;
-  const pages = [];
-  let currentLines = [];
-  let currentHeight = 0;
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(bodyFontSize);
-
-  const pushPage = () => {
-    pages.push({
-      type: 'sheet-text',
-      title: String(headerTitle || '').trim(),
-      subtitle: String(headerSubtitle || '').trim(),
-      note: String(headerNote || '').trim(),
-      lines: currentLines,
-    });
-    currentLines = [];
-    currentHeight = 0;
-  };
-
-  const flushPageIfNeeded = (neededHeight) => {
-    if (currentLines.length && currentHeight + neededHeight > (bodyBottom - bodyTop)) {
-      pushPage();
-    }
-  };
-
-  const sourceLines = Array.isArray(lines) ? lines : [];
-  for (const rawLine of sourceLines) {
-    const line = String(rawLine ?? '');
-    if (!line.trim()) {
-      flushPageIfNeeded(lineHeight * 0.8);
-      currentLines.push('');
-      currentHeight += lineHeight * 0.8;
-      continue;
-    }
-
-    const wrapped = doc.splitTextToSize(line, contentWidth) || [line];
-    const wrappedLines = Array.isArray(wrapped) ? wrapped : [String(wrapped)];
-    const neededHeight = wrappedLines.length * lineHeight;
-
-    flushPageIfNeeded(neededHeight);
-
-    for (const wrappedLine of wrappedLines) {
-      currentLines.push(String(wrappedLine));
-      currentHeight += lineHeight;
-    }
-  }
-
-  if (!pages.length || currentLines.length) {
-    pushPage();
-  }
-
-  return pages;
 }
 
 function buildPdfTurmaPage(turma, call, dateLabel) {
@@ -660,11 +573,6 @@ function drawRankingLabel_(doc, x, y, row) {
 }
 
 function drawReportPage(doc, page, meta) {
-  if (page?.type === 'sheet-text' || page?.lines) {
-    drawSheetTextPage(doc, page, meta);
-    return;
-  }
-
   if (page?.items) {
     drawRosterPage(doc, page, meta);
     return;
@@ -728,69 +636,6 @@ function drawReportPage(doc, page, meta) {
     if (!pos) return;
     drawMetricCard(doc, pos[0], pos[1], pos[2], cardH, metric.label, metric.value, index < 3);
   });
-
-  doc.setDrawColor(221, 228, 239);
-  doc.line(margin, height - 16, width - margin, height - 16);
-  doc.setFont('helvetica', 'italic');
-  doc.setFontSize(8.5);
-  doc.text('O maior entre vocês é aquele que serve. - Mateus 23:11', margin, height - 10);
-}
-
-
-function drawSheetTextPage(doc, page, meta) {
-  const width = doc.internal.pageSize.getWidth();
-  const height = doc.internal.pageSize.getHeight();
-  const margin = 12;
-  const contentWidth = width - margin * 2;
-  const bodyTop = margin + 44;
-  const bodyBottom = height - 18;
-  const bodyFontSize = 10;
-  const bodyLineGap = 1.55;
-  const lineHeight = bodyFontSize * 0.36 + bodyLineGap;
-
-  doc.setFillColor(247, 249, 252);
-  doc.rect(0, 0, width, height, 'F');
-
-  doc.setFillColor(23, 43, 77);
-  doc.roundedRect(margin, margin, contentWidth, 28, 4, 4, 'F');
-
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  const titleLines = doc.splitTextToSize(String(page.title || ''), contentWidth - 24);
-  doc.text(titleLines, margin + 8, margin + 11);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10.5);
-  doc.text(String(page.subtitle || ''), margin + 8, margin + 20);
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.text(`Página ${meta.pageNumber}/${meta.totalPages}`, width - margin - 3, margin + 9, { align: 'right' });
-
-  doc.setTextColor(45, 55, 72);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.text(String(page.note || ''), margin, margin + 38);
-
-  const lines = Array.isArray(page.lines) ? page.lines : [];
-  let y = bodyTop;
-  for (const line of lines) {
-    const value = String(line || '');
-    if (!value.trim()) {
-      y += lineHeight * 0.8;
-      continue;
-    }
-
-    const wrapped = doc.splitTextToSize(value, contentWidth) || [value];
-    const wrappedLines = Array.isArray(wrapped) ? wrapped : [String(wrapped)];
-    for (const wrappedLine of wrappedLines) {
-      if (y > bodyBottom) return;
-      doc.text(String(wrappedLine), margin, y);
-      y += lineHeight;
-    }
-    y += 0.3;
-  }
 
   doc.setDrawColor(221, 228, 239);
   doc.line(margin, height - 16, width - margin, height - 16);
