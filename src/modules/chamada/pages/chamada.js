@@ -78,7 +78,6 @@ const state = {
   inactiveReasonsLoading: false,
   inactiveReasonsLoaded: false,
   loadingStudents: false,
-  attendanceDate: getBusinessISODate(),
   attendanceCallId: '',
   attendanceLoading: false,
   attendanceSaving: false,
@@ -396,9 +395,10 @@ function syncStudentAttendanceKey(student, attendanceKey) {
 
 
 async function fetchAttendanceSnapshot() {
+  const query = `date=${encodeURIComponent(getBusinessISODate())}`;
   const paths = [
-    `/classes/${classId}/attendance`,
-    `/attendance/classes/${classId}`
+    `/classes/${classId}/attendance?${query}`,
+    `/attendance/classes/${classId}?${query}`
   ];
 
   let lastError = null;
@@ -1724,7 +1724,7 @@ async function fetchClassSummary() {
     const url = buildUrl(classId);
 
     try {
-      const { payload } = await apiRequest(url);
+      const { payload } = await apiRequest(`${url}${url.includes('?') ? '&' : '?'}date=${encodeURIComponent(getBusinessISODate())}`);
       const summary = normalizeClassSummaryPayload(payload);
       if (summary) {
         return summary;
@@ -2644,29 +2644,10 @@ function formatDisplayDate(value) {
 
 function getBusinessISODate() {
   try {
-    const parts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Bahia',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    }).formatToParts(new Date());
-
-    const year = parts.find((part) => part.type === 'year')?.value;
-    const month = parts.find((part) => part.type === 'month')?.value;
-    const day = parts.find((part) => part.type === 'day')?.value;
-
-    if (year && month && day) {
-      return `${year}-${month}-${day}`;
-    }
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bahia' });
   } catch {
-    // fallback below
+    return new Date().toLocaleDateString('en-CA');
   }
-
-  const shifted = new Date(Date.now() - 3 * 60 * 60 * 1000);
-  const year = shifted.getUTCFullYear();
-  const month = String(shifted.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(shifted.getUTCDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
 }
 
 function escapeHtml(value) {

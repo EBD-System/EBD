@@ -10,7 +10,6 @@
 - A tela de chamada carrega alunos ativos e inativos por consultas separadas e preserva `id_aluno_classe` ao mesclar respostas.
 - O salvamento da chamada continua dependendo de `id_aluno_classe` válido e usa `PATCH /attendance/:callId` com `students[]`.
 - A tela de chamada carrega e salva o **Resumo da classe** na API oficial: `GET /attendance/classes/:classId/summary` para hidratar os campos e `PUT /attendance/:callId/summary` para persistir `oferta`, `visitantes`, `biblias` e `revistas`.
-- O fluxo padrão da chamada atual não depende mais de `date` enviado pelo navegador; as consultas e a abertura usam o dia de negócio resolvido pelo backend em `America/Bahia`, e a data do front ficou apenas para exibição/apoio visual.
 - A seção **Resumo da classe** da tela de chamada reproduz a regra do legado: `Visitantes` é limitado a 50 e `Bíblias`/`Revistas` são limitadas à soma de alunos presentes + visitantes.
 - O fluxo de salvamento da chamada envia primeiro `PATCH /attendance/:callId` para a presença e depois atualiza o resumo da classe; a resposta do backend precisa devolver o resumo salvo com `visitantes` persistido em `ebd_chamada`.
 - O cadastro nominal de visitantes continua separado em `ebd_chamada_visitante`; ele complementa o resumo, mas não substitui o campo consolidado.
@@ -61,3 +60,7 @@
 - Os botões **Presente**, **Atrasado** e **Ausente** dos cards de aluno seguem o padrão visual do card do David: ficam lado a lado e só exibem a cor forte quando estão selecionados.
 
 - O **Relatório Geral** do módulo de Classes agora usa estado visual por cor: vermelho enquanto houver qualquer chamada pendente e amarelo quando existir classe com `presentes = 0`; a implementação não depende de esconder/exibir elementos.
+
+- A tela de chamada recalcula a data de negócio por request e não deve voltar a congelar `attendanceDate` no estado inicial.
+- O fluxo de abertura da chamada não envia mais data pelo cliente; o backend define a data válida do dia.
+
