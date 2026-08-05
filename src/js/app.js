@@ -201,8 +201,22 @@ document.addEventListener('keydown', (event) => {
 });
 els.markAllPresentBtn.addEventListener('click', () => setAllPresence('sim'));
 els.markAllAbsentBtn.addEventListener('click', () => setAllPresence('nao'));
-els.copyTurmaBtn.addEventListener('click', () => copyText(buildTurmaReportText()));
-els.copyGeralBtn.addEventListener('click', () => copyText(buildGeneralReportText()));
+els.copyTurmaBtn.addEventListener('click', async () => {
+  try {
+    const text = await fetchReportText('turma', getCurrentTurma()?.TurmaID || '');
+    copyText(text || 'Nenhum relatório disponível.');
+  } catch (err) {
+    showError(formatAppError(err, 'Copiar turma'));
+  }
+});
+els.copyGeralBtn.addEventListener('click', async () => {
+  try {
+    const text = await fetchReportText('geral');
+    copyText(text || 'Nenhum relatório disponível.');
+  } catch (err) {
+    showError(formatAppError(err, 'Copiar geral'));
+  }
+});
 if (els.addAlunoPageBtn) {
   els.addAlunoPageBtn.addEventListener('click', () => {
     window.location.href = buildAddAlunoPageUrl();

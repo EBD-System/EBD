@@ -20,18 +20,9 @@ async function sendReport(scope) {
   showLoading(`Gerando ${scopeLabel} em PDF...`, 40000);
 
   try {
-    const localSnapshot = loadLocalSavedCallsSnapshot(state.dateKey);
-    if (localSnapshot) {
-      state.chamadasByTurma = mergeCallsByTurma_(state.chamadasByTurma || {}, localSnapshot.callsByTurma || {});
-    }
+    await refreshFromBackend(false, { silent: true, preferLocal: false });
 
-    let report;
-    try {
-      report = buildPdfReportModel(scope);
-    } catch (localErr) {
-      await refreshFromBackend(false, { silent: true, preferLocal: true });
-      report = buildPdfReportModel(scope);
-    }
+    const report = buildPdfReportModel(scope);
 
     const doc = new window.jspdf.jsPDF({
       orientation: 'portrait',

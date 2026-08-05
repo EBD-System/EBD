@@ -352,6 +352,22 @@ async function apiPost(params = {}, { timeoutMs = 30000 } = {}) {
   }
 }
 
+async function fetchReportText(scope = 'geral', turmaId = '') {
+  const params = {
+    action: 'reportText',
+    scope: String(scope || 'geral').trim().toLowerCase(),
+    date: state.dateKey || todayKey(),
+  };
+
+  if (String(scope || '').trim().toLowerCase() === 'turma' && turmaId) {
+    params.turmaId = String(turmaId).trim();
+  }
+
+  const response = await apiGet(params, { timeoutMs: 30000 });
+  return String(response?.text || '');
+}
+
+
 function storageState() {
   try {
     return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') || {};

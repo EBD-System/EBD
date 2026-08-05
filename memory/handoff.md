@@ -11,6 +11,7 @@ Pontos centrais:
 - Decisões arquiteturais devem ficar em arquivos curtos dentro de `memory/`.
 - A edição de aluno acontece em uma página dedicada em `aluno/editar-aluno/`.
 - O botão **Editar** leva para essa rota com a chave de edição baseada no nome atual do aluno.
+- Os relatórios em PDF e os textos de compartilhamento precisam consultar o Apps Script diretamente; snapshots locais só servem como rascunho/recuperação e não como fonte final do relatório.
 - O fluxo de edição grava alterações diretamente na aba `cadastro` da planilha.
 - As ações enviadas ao Apps Script são normalizadas para minúsculas no cliente.
 - O cliente envia POST como `application/x-www-form-urlencoded`; o espelhamento completo na query string só deve acontecer quando houver fallback real por GET.
@@ -21,7 +22,7 @@ Pontos centrais:
 - A página de edição também ganhou ação de exclusão do aluno, confirmada antes do envio ao backend.
 - No layout mobile da edição, **Voltar** fica no canto esquerdo do cabeçalho e **Excluir Aluno** permanece à direita.
 
-- O carregamento inicial do frontend usa `apiGet` com timeout, e agora também consulta snapshots locais salvas antes de cair para a planilha quando a data já foi salva no navegador.
+- O carregamento inicial do frontend usa `apiGet` com timeout, e pode mesclar snapshots locais salvas apenas para recuperação de rascunho quando isso fizer sentido; relatórios devem ignorar essa camada local.
 - O envio de atualização de aluno só faz fallback automático para GET quando o POST retorna explicitamente `Ação inválida`; outros erros precisam aparecer sem mascaramento.
 - A edição de aluno agora pode preservar turma e status atuais quando esses campos não vierem preenchidos no payload.
 
