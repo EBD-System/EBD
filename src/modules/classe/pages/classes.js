@@ -1029,6 +1029,10 @@ function refreshReportPresentation() {
   reportStatusText.classList.toggle('is-danger', incompleteCalls && !zeroPresentClass);
   reportStatusText.classList.toggle('is-warning', zeroPresentClass);
   reportStatusText.classList.toggle('is-success', reportReady && !incompleteCalls && !zeroPresentClass);
+
+  if (incompleteCalls) {
+    reportStatusText.textContent = 'Existe classe com alunos sem presenças.';
+  }
 }
 
 function hasIncompleteCalls() {

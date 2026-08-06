@@ -89,6 +89,22 @@ h1 {
   background: rgba(21, 87, 192, 0.08);
 }
 
+.floating-back-button {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.floating-back-button:hover,
+.floating-back-button:focus-visible {
+  transform: translateY(-1px);
+  outline: none;
+}
+
 .chamada-panel {
   margin-top: 22px;
   padding: 24px;

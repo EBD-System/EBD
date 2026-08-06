@@ -28,3 +28,6 @@ No módulo de Classes, o bloco do **Relatório Geral** deve ficar em vermelho en
 
 ## Atualização (2026-08-05 — total da turma)
 O campo `Total` dos cards do relatório deve representar `Presentes + Visitantes`. O campo `Matriculados` continua representando a base ativa da turma (`total_alunos`) e não deve ser reutilizado para calcular o total exibido.
+
+## Atualização (2026-08-06 — alerta do Relatório Geral)
+Quando o bloco **Relatório Geral** ficar em vermelho por existir alguma classe sem chamada registrada, o texto de status deve informar exatamente: `Existe classe com alunos sem presenças.`
