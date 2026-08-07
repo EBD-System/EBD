@@ -2361,6 +2361,8 @@ async function handleSaveAttendance() {
       renderAttendanceFeedback('Chamada salva, mas o resumo da classe não pôde ser atualizado.', true);
     } else {
       renderAttendanceFeedback('Chamada salva com sucesso.', false);
+      window.location.href = '../../classe/pages/index.html';
+      return;
     }
     updateAttendanceSummary();
   } catch (error) {
