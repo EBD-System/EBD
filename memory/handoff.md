@@ -37,14 +37,14 @@
 - O módulo de Relatórios possui consulta por intervalo de datas ligada ao backend real (`GET /reports/period`, com token e tratamento de erro via `api-client.js`/`error-dialog.js`), snapshot imutável e renderização do resultado no card principal da tela.
 - O frontend não deve usar o DOM como fonte do PDF; o payload consolidado da busca é o estado canônico do relatório.
 - O dashboard não exibe mais o texto visível “Navegação” no hero.
-- O botão **Enviar Relatório** baixa o PDF diretamente a partir do snapshot da consulta.
+- O botão **Enviar Relatório** continua baixando o PDF diretamente, mas agora faz uma chamada ao backend (`GET /reports/period/pdf`) no momento do download para acrescentar as páginas diárias detalhadas. O snapshot continua sendo a base dos cartões/resumo já existentes.
 - O layout do relatório na tela deve ficar no card de resultado; a pré-visualização em `iframe` foi removida.
 - A página de Relatórios depende do carregamento de `jspdf.umd.min.js`; sem esse script o botão **Enviar Relatório** não consegue gerar o arquivo.
 
 
 - No módulo de Relatórios, o card de resultado passou a mostrar o relatório completo no próprio painel; o botão **Enviar Relatório** baixa o PDF diretamente.
 - As datas do relatório são normalizadas no frontend: apenas data vira `dd/mm/yyyy`; data com hora vira `dd/mm/yyyy - hh:mm`.
-- O PDF continua sendo montado a partir do snapshot da consulta, sem leitura do DOM, e possui fallback alternativo quando o layout principal falha.
+- O PDF continua preservando as páginas de resumo já existentes, sem leitura do DOM como fonte; as páginas detalhadas por data/classe vêm do backend e o layout principal mantém fallback alternativo quando falha.
 
 - O módulo de Relatórios agora agrupa as atividades por turma, consulta o resumo completo de cada turma e renderiza cards individuais + card total no painel de resultado.
 - O total do período é o somatório dos cards renderizados; o período serve como índice para identificar as turmas e sua data mais recente.

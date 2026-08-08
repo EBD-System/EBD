@@ -3,7 +3,7 @@
 ## Regra
 Datas exibidas no módulo de Relatórios devem ser normalizadas antes de aparecer na tela ou no PDF. Valores apenas com data devem ser exibidos como `dd/mm/yyyy`. Valores com data e hora devem ser exibidos como `dd/mm/yyyy - hh:mm`. Se a origem não trouxer hora, o hífen não deve ser exibido.
 
-O botão **Enviar Relatório** deve baixar o PDF diretamente, sem pré-visualização em `iframe`.
+O botão **Enviar Relatório** deve baixar o PDF diretamente, sem pré-visualização em `iframe`. No momento do download, ele deve consultar o backend para enriquecer o arquivo com as páginas detalhadas do período.
 
 ## Aplicação
 Aplica-se ao painel de resultado do frontend e ao arquivo PDF gerado a partir do snapshot da consulta.

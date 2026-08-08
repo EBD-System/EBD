@@ -21,7 +21,8 @@ const state = {
   token: '',
   snapshot: null,
   lastCriteria: null,
-  loading: false
+  loading: false,
+  pdfDetails: null
 };
 
 const session = readSession();
@@ -186,7 +187,7 @@ function resetSendState() {
   }
 }
 
-function handleSend() {
+async function handleSend() {
   if (!state.snapshot) {
     setStatus('Busque um relatório antes de enviar o PDF.', 'warning');
     return;
@@ -198,11 +199,40 @@ function handleSend() {
   }
 
   const fileName = buildPdfFileName(state.snapshot);
+  let pdfDetails = state.pdfDetails;
 
   try {
-    const doc = buildPeriodPdf(state.snapshot);
+    setStatus('Buscando os dados detalhados do PDF no backend...', 'info');
+    const detailResult = await APP_REPORTS_SERVICE.fetchPeriodPdfDetails({
+      startDate: state.lastCriteria?.startDate,
+      endDate: state.lastCriteria?.endDate,
+      token: state.token
+    });
+
+    if (detailResult?.found) {
+      pdfDetails = detailResult.report;
+      state.pdfDetails = pdfDetails;
+    } else {
+      setStatus(
+        detailResult?.reason || 'Os dados detalhados não foram encontrados; o PDF seguirá com o resumo já carregado.',
+        'warning'
+      );
+    }
+  } catch (error) {
+    if (error?.requiresRelogin) {
+      setStatus(error.message, 'warning');
+      setResultsMeta('Sessão expirada.');
+      goToLogin();
+      return;
+    }
+
+    setStatus('Não foi possível carregar as páginas detalhadas; o PDF será baixado com o resumo atual.', 'warning');
+  }
+
+  try {
+    const doc = buildPeriodPdf(state.snapshot, pdfDetails);
     downloadPdfDocument(doc, fileName);
-    setStatus('Relatório enviado e baixado em PDF.', 'success');
+    setStatus('Relatório baixado em PDF.', 'success');
     setResultsMeta(`PDF baixado: ${fileName}.`);
     return;
   } catch (error) {
@@ -808,7 +838,7 @@ function buildPdfFileName(report) {
   return `${title}-${start}-ate-${end}.pdf`;
 }
 
-function buildPeriodPdf(report) {
+function buildPeriodPdf(report, pdfDetails = null) {
   const details = normalizeReportDetails(report);
   const doc = new window.jspdf.jsPDF({
     orientation: 'portrait',
@@ -818,6 +848,10 @@ function buildPeriodPdf(report) {
   });
 
   const pages = buildPeriodCardsPdfPages(details);
+  const attendancePages = buildAttendancePdfPages(pdfDetails);
+  if (attendancePages.length) {
+    pages.push(...attendancePages);
+  }
   const title = String(details.title || 'Relatório de período');
   const subject = String(details.subtitle || buildPeriodSubtitle(details.period));
 
@@ -833,10 +867,17 @@ function buildPeriodPdf(report) {
       doc.addPage();
     }
 
-    drawPeriodCardsPage(doc, page, {
+    const meta = {
       pageNumber: index + 1,
       totalPages: pages.length
-    });
+    };
+
+    if (page.type === 'attendance') {
+      drawAttendancePage(doc, page, meta);
+      return;
+    }
+
+    drawPeriodCardsPage(doc, page, meta);
   });
 
   return doc;
@@ -898,6 +939,221 @@ function buildFallbackPeriodPdf(report, error) {
   }
 
   return doc;
+}
+
+
+function buildAttendancePdfPages(pdfDetails = null) {
+  const sourceRows = collectAttendanceRows(pdfDetails);
+  if (!sourceRows.length) {
+    return [];
+  }
+
+  const groups = new Map();
+  sourceRows.forEach((row) => {
+    const normalized = normalizeAttendanceRow(row);
+    const key = `${normalized.dateKey}::${normalized.classKey}`;
+    const current = groups.get(key) || {
+      dateKey: normalized.dateKey,
+      dateLabel: normalized.dateLabel,
+      classKey: normalized.classKey,
+      className: normalized.className,
+      rows: []
+    };
+
+    current.rows.push(normalized);
+    groups.set(key, current);
+  });
+
+  const pages = [];
+  Array.from(groups.values())
+    .sort((a, b) => {
+      const dateCompare = String(a.dateKey || '').localeCompare(String(b.dateKey || ''));
+      if (dateCompare !== 0) return dateCompare;
+      return String(a.className || '').localeCompare(String(b.className || ''));
+    })
+    .forEach((group) => {
+      const pageChunks = paginateAttendanceRows(group.rows);
+      pageChunks.forEach((chunk, index) => {
+        const summary = chunk.reduce(
+          (acc, row) => {
+            acc.total += 1;
+            if (row.presence === 'presente' || row.presence === 'atrasado') acc.presentes += 1;
+            if (row.presence === 'atrasado') acc.atrasados += 1;
+            if (row.presence === 'ausente') acc.ausentes += 1;
+            if (row.studentStatus === 'ativo') acc.ativos += 1;
+            if (row.studentStatus === 'inativo') acc.inativos += 1;
+            return acc;
+          },
+          {
+            total: 0,
+            presentes: 0,
+            atrasados: 0,
+            ausentes: 0,
+            ativos: 0,
+            inativos: 0
+          }
+        );
+
+        pages.push({
+          type: 'attendance',
+          title: `${group.className} • ${group.dateLabel}`,
+          subtitle: 'Presentes e ausentes da classe',
+          note: `Presentes: ${summary.presentes} • Atrasados: ${summary.atrasados} • Ausentes: ${summary.ausentes} • Ativos: ${summary.ativos} • Inativos: ${summary.inativos}`,
+          summary,
+          rows: chunk,
+          pageNote:
+            index === 0
+              ? `Detalhamento de presença e status do aluno • ${group.rows.length} registro(s)`
+              : `Continuação do detalhamento de presença • página ${index + 1}`
+        });
+      });
+    });
+
+  return pages;
+}
+
+function collectAttendanceRows(pdfDetails = null) {
+  if (!pdfDetails || typeof pdfDetails !== 'object') {
+    return [];
+  }
+
+  if (Array.isArray(pdfDetails.rows) && pdfDetails.rows.length) {
+    return pdfDetails.rows.slice();
+  }
+
+  if (Array.isArray(pdfDetails.dailyPages)) {
+    return pdfDetails.dailyPages.flatMap((page) => (Array.isArray(page?.rows) ? page.rows : []));
+  }
+
+  if (Array.isArray(pdfDetails.itens)) {
+    return pdfDetails.itens.flatMap((page) => (Array.isArray(page?.rows) ? page.rows : []));
+  }
+
+  return [];
+}
+
+function normalizeAttendanceRow(row = {}) {
+  const dateKey = String(firstDefined(row, ['data_chamada', 'date']) || '').trim();
+  const className = String(firstDefined(row, ['classe', 'className', 'title']) || 'Classe').trim() || 'Classe';
+  return {
+    dateKey,
+    dateLabel: normalizeDisplayDate(dateKey) || dateKey || 'Data indisponível',
+    classKey: String(firstDefined(row, ['id_classe', 'classId']) || className).trim() || className,
+    className,
+    studentName: String(firstDefined(row, ['nome', 'studentName']) || 'Aluno').trim() || 'Aluno',
+    presence: String(firstDefined(row, ['status_presenca', 'presence']) || '').trim().toLowerCase() || 'ausente',
+    studentStatus: String(firstDefined(row, ['status_aluno', 'studentStatus']) || '').trim().toLowerCase() || 'ativo'
+  };
+}
+
+function paginateAttendanceRows(rows = []) {
+  const width = 210;
+  const height = 297;
+  const margin = 12;
+  const contentWidth = width - margin * 2;
+  const headerTop = margin + 44;
+  const listBottom = height - 18;
+  const availableHeight = listBottom - headerTop;
+  const nameWidth = 88;
+  const presenceWidth = 48;
+  const statusWidth = contentWidth - nameWidth - presenceWidth - 2;
+  const fontSize = 8.6;
+  const lineHeight = 3.4;
+
+  const pages = [];
+  let currentRows = [];
+  let currentHeight = 0;
+
+  rows.forEach((row) => {
+    const nameLines = measurePdfLines(row.studentName, nameWidth, fontSize);
+    const rowHeight = Math.max(9.5, Math.max(nameLines.length, 1) * lineHeight + 4);
+
+    if (currentRows.length && currentHeight + rowHeight > availableHeight) {
+      pages.push(currentRows);
+      currentRows = [];
+      currentHeight = 0;
+    }
+
+    currentRows.push({
+      ...row,
+      nameLines,
+      rowHeight
+    });
+    currentHeight += rowHeight;
+  });
+
+  if (currentRows.length || !pages.length) {
+    pages.push(currentRows);
+  }
+
+  return pages;
+}
+
+function drawAttendancePage(doc, page, meta) {
+  const shell = drawPdfShell(doc, page, meta);
+  const rows = Array.isArray(page.rows) ? page.rows : [];
+  const nameWidth = 88;
+  const presenceWidth = 48;
+  const statusWidth = shell.contentWidth - nameWidth - presenceWidth - 2;
+  const rowTop = shell.margin + 44;
+  const rowBottom = shell.height - 18;
+  const headerY = rowTop - 4;
+
+  doc.setDrawColor(217, 224, 235);
+  doc.setLineWidth(0.2);
+  doc.line(shell.margin, headerY, shell.width - shell.margin, headerY);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.4);
+  doc.setTextColor(91, 102, 122);
+  doc.text('Aluno', shell.margin, headerY - 1.5);
+  doc.text('Presença', shell.margin + nameWidth + 2, headerY - 1.5);
+  doc.text('Status do aluno', shell.width - shell.margin, headerY - 1.5, { align: 'right' });
+  doc.line(shell.margin, headerY + 2, shell.width - shell.margin, headerY + 2);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.6);
+  doc.setTextColor(23, 43, 77);
+
+  let y = rowTop;
+  rows.forEach((row, index) => {
+    const fill = index % 2 === 0 ? [255, 255, 255] : [248, 251, 255];
+    doc.setFillColor(fill[0], fill[1], fill[2]);
+    doc.roundedRect(shell.margin, y - 1, shell.contentWidth, row.rowHeight, 2, 2, 'F');
+
+    doc.setTextColor(21, 39, 66);
+    doc.text(row.nameLines || [row.studentName], shell.margin + 1, y + 3.2);
+
+    const presenceText = formatAttendancePresenceLabel(row.presence);
+    const statusText = formatStudentStatusLabel(row.studentStatus);
+    doc.text(presenceText, shell.margin + nameWidth + 1, y + 3.2);
+    doc.text(statusText, shell.width - shell.margin - 1, y + 3.2, { align: 'right' });
+
+    doc.setDrawColor(230, 236, 244);
+    doc.line(shell.margin + 1, Math.min(y + row.rowHeight, rowBottom), shell.width - shell.margin - 1, Math.min(y + row.rowHeight, rowBottom));
+    y += row.rowHeight + 1;
+  });
+
+  doc.setDrawColor(221, 228, 239);
+  doc.line(shell.margin, shell.height - 16, shell.width - shell.margin, shell.height - 16);
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(8.4);
+  doc.text('O detalhe diário foi baixado a partir do backend e acrescentado ao PDF consolidado.', shell.margin, shell.height - 10);
+}
+
+function formatAttendancePresenceLabel(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'presente') return 'Presente';
+  if (raw === 'atrasado') return 'Atrasado';
+  if (raw === 'ausente') return 'Ausente';
+  return raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : 'Ausente';
+}
+
+function formatStudentStatusLabel(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'ativo') return 'Ativo';
+  if (raw === 'inativo') return 'Inativo';
+  return raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : 'Ativo';
 }
 
 
