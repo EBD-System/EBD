@@ -7,6 +7,7 @@
 - O login espera um token em campos comuns de resposta (`token`, `accessToken`, `data.token`, `result.token`, `auth.token`).
 - O dashboard protege a entrada: sem token válido na `sessionStorage`, a página volta para a tela de login.
 - A página de classes usa `GET /api/v1/classes`, renderiza as classes recebidas e navega para a tela de chamada levando `classId` e `className` na query string.
+- A página de classes aplica uma ordem visual fixa para o cadastro 1 antes de renderizar os cards: `Cordeirinhos de Cristo`, `Shalon`, `Filhos de Asáfe`, `Mensageiros de Cristo`, `Filhos de Sião` e `Rosas de Saron`; essa prioridade não depende da ordenação alfabética da API.
 - A tela de chamada carrega alunos ativos e inativos por consultas separadas e preserva `id_aluno_classe` ao mesclar respostas.
 - O salvamento da chamada continua dependendo de `id_aluno_classe` válido e usa `PATCH /attendance/:callId` com `students[]`.
 - A tela de chamada carrega e salva o **Resumo da classe** na API oficial: `GET /attendance/classes/:classId/summary` para hidratar os campos e `PUT /attendance/:callId/summary` para persistir `oferta`, `visitantes`, `biblias` e `revistas`.

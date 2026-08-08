@@ -111,7 +111,7 @@ async function loadClasses(token) {
       });
     }
 
-    const classes = normalizeClasses(payload);
+    const classes = sortClassesForDisplay(normalizeClasses(payload));
     renderClasses(classes);
 
     if (classes.some((classItem) => hasAttendanceSummary(classItem))) {
@@ -276,12 +276,80 @@ async function requestJson(url, token, fallbackMessage) {
   return payload;
 }
 
+const CLASS_DISPLAY_ORDER = new Map(
+  [
+    'Cordeirinhos de Cristo',
+    'Shalon',
+    'Filhos de Asáfe',
+    'Mensageiros de Cristo',
+    'Filhos de Sião',
+    'Rosas de Saron'
+  ].map((name, index) => [normalizeClassOrderKey(name), index])
+);
+
 function normalizeClasses(payload) {
   if (Array.isArray(payload)) return payload;
   if (Array.isArray(payload?.data)) return payload.data;
   if (Array.isArray(payload?.result)) return payload.result;
   if (Array.isArray(payload?.items)) return payload.items;
   return [];
+}
+
+function sortClassesForDisplay(classes) {
+  if (!Array.isArray(classes)) {
+    return [];
+  }
+
+  return classes
+    .map((classItem, index) => ({ classItem, index }))
+    .sort((left, right) => {
+      const leftPriority = getClassDisplayPriority(left.classItem);
+      const rightPriority = getClassDisplayPriority(right.classItem);
+
+      if (leftPriority !== rightPriority) {
+        if (leftPriority === null) return 1;
+        if (rightPriority === null) return -1;
+        return leftPriority - rightPriority;
+      }
+
+      const leftId = getClassNumericId(left.classItem);
+      const rightId = getClassNumericId(right.classItem);
+
+      if (leftId !== rightId) {
+        if (leftId === null) return 1;
+        if (rightId === null) return -1;
+        return leftId - rightId;
+      }
+
+      const leftTitle = normalizeTextValue(getClassTitle(left.classItem, left.index));
+      const rightTitle = normalizeTextValue(getClassTitle(right.classItem, right.index));
+      const titleComparison = leftTitle.localeCompare(rightTitle, 'pt-BR', { sensitivity: 'base' });
+
+      if (titleComparison !== 0) {
+        return titleComparison;
+      }
+
+      return left.index - right.index;
+    })
+    .map(({ classItem }) => classItem);
+}
+
+function getClassDisplayPriority(classItem) {
+  const title = normalizeClassOrderKey(getClassTitle(classItem, 0));
+  return CLASS_DISPLAY_ORDER.has(title) ? CLASS_DISPLAY_ORDER.get(title) : null;
+}
+
+function getClassNumericId(classItem) {
+  const rawId = classItem?.id_classe ?? classItem?.idClasse ?? classItem?.classId ?? classItem?.id;
+  const parsed = Number(rawId);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeClassOrderKey(value) {
+  return normalizeTextValue(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
 }
 
 function renderClasses(classes) {
