@@ -166,7 +166,9 @@
 - `src/modules/relatorios/services/relatorios.service.js` e sua cópia em `docs/` permanecem sincronizados.
 - Testes e build validados: frontend 8 testes + build; backend 79 testes.
 
-## Atualização 2026-08-11 — layout da listagem do Relatório do Aluno
+## Atualização 2026-08-11 — layout final da listagem do Relatório do Aluno
 
-- A tabela da listagem do `Relatório do Aluno` agora mostra somente `Nome do aluno` e `BAIXAR`.
-- A classe continua preservada nos dados e na prévia/PDF; a mudança é somente de layout e não altera endpoints.
+- A tabela da listagem do `Relatório do Aluno` deve mostrar somente `Nome do aluno` e `BAIXAR`.
+- Nenhuma linha da tabela pode renderizar a classe como célula ou texto adicional.
+- A classe continua disponível no relatório individual/prévia/PDF; a mudança é exclusivamente visual e não altera endpoints.
+- Foi adicionado teste de regressão para impedir o retorno da célula de classe na listagem.

@@ -1,11 +1,11 @@
-# Sessão 2026-08-11 — layout da listagem do Relatório do Aluno
+# Sessão 2026-08-11 — Relatório do Aluno: listagem sem classe
 
 ## O que foi alterado
-- A tabela da listagem do `Relatório do Aluno` passou a renderizar somente `Nome do aluno` e `BAIXAR`.
-- A coluna `Classe` foi removida apenas da apresentação da lista.
-- O campo de classe continua preservado no objeto do aluno e nas rotinas de prévia/PDF.
-- A largura mínima da tabela foi reduzida para acomodar o novo layout de duas colunas.
-- Endpoints, parâmetros, busca por aluno e fluxo de download não foram alterados.
+- Confirmada a listagem com apenas `Nome do aluno` e `BAIXAR`.
+- Removido do contrato visual qualquer espaço para célula de classe nas linhas.
+- Adicionado teste de regressão verificando os dois cabeçalhos e a ausência de `student.classe` em célula da listagem.
+- Build `docs/` regenerado para manter a publicação sincronizada.
 
 ## Conhecimento consolidado
-- A remoção da classe é exclusivamente visual: o relatório individual continua usando `student.classe` para a prévia e para o PDF.
+- A classe não pode aparecer por linha na tabela inicial; ela permanece apenas no relatório individual/prévia/PDF.
+- Nenhum endpoint ou contrato de API foi alterado.
