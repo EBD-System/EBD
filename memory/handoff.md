@@ -165,3 +165,8 @@
 - O fallback agora identifica as linhas principalmente por `id_aluno`, reconstrói todos os meses do período (incluindo meses zerados) e, para períodos de um único mês sem linhas detalhadas, usa o resumo para preencher a única linha mensal.
 - `src/modules/relatorios/services/relatorios.service.js` e sua cópia em `docs/` permanecem sincronizados.
 - Testes e build validados: frontend 8 testes + build; backend 79 testes.
+
+## Atualização 2026-08-11 — layout da listagem do Relatório do Aluno
+
+- A tabela da listagem do `Relatório do Aluno` agora mostra somente `Nome do aluno` e `BAIXAR`.
+- A classe continua preservada nos dados e na prévia/PDF; a mudança é somente de layout e não altera endpoints.

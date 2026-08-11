@@ -125,7 +125,7 @@
 
 .student-table {
   width: 100%;
-  min-width: 640px;
+  min-width: 420px;
   border-collapse: collapse;
 }
 
@@ -155,10 +155,6 @@
   font-weight: 850;
 }
 
-.student-class {
-  color: var(--rel-muted);
-  font-weight: 700;
-}
 
 .student-download {
   min-width: 110px;

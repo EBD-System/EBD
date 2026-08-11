@@ -237,15 +237,11 @@
       .map((student) => {
         const id = escapeHtml(student.id);
         const name = escapeHtml(student.nome || 'Aluno sem nome');
-        const className = escapeHtml(
-          student.classe || getSelectedClassName(state.selectedClassId) || '—'
-        );
         const isDownloading = state.downloadingStudentId === String(student.id);
 
         return `
           <tr>
             <td class="student-name">${name}</td>
-            <td class="student-class">${className}</td>
             <td>
               <button
                 class="student-download${isDownloading ? ' report-loading' : ''}"
