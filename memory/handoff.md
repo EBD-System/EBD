@@ -127,3 +127,41 @@
 
 - `Melhores Classes` agora exibe a participação de cada classe no total de presenças das classes retornadas, em duas casas decimais e total de 100,00%; o cálculo usa `presentes`/`alunos_presentes` já fornecido pelo endpoint e não exige mudança no SQL.
 
+
+
+## Atualização 2026-08-11 — Relatório do Aluno no frontend
+
+- O novo submódulo `relatorios/relatorio-aluno` está disponível logo abaixo de **Melhor da Classe**.
+- A página carrega as turmas ao abrir, consulta os alunos ao selecionar a turma, oferece busca por nome e usa `BAIXAR` para gerar o PDF individual.
+- O frontend consome `GET /api/v1/classes/:id/students` para a lista e `GET /api/v1/reports/student-report` para o relatório.
+- Nenhum arquivo do backend ou SQL foi alterado nesta etapa.
+- O PDF é gerado no frontend a partir do payload do relatório, com resumo e detalhamento mensal.
+
+## Atualização 2026-08-11 — download resiliente do Relatório do Aluno
+
+- O endpoint individual `GET /reports/student-report` deixou de ser ponto único de falha para o botão **BAIXAR**.
+- Em `404/405/500/502/503` ou payload sem `aluno`, o frontend reconstrói o relatório usando `GET /reports/period/pdf` e as linhas do aluno.
+- O cálculo preserva a regra de que `atrasado` conta como presença.
+- O PDF possui fallback nativo quando `jsPDF` não estiver disponível.
+- Testes: 4/4; build do GitHub Pages concluído.
+
+## Atualização 2026-08-11 — frequência mensal do Relatório do Aluno
+
+- O frontend agora considera incompleto um payload com `resumo.total_chamadas > 0` e `meses` vazio.
+- Nesse cenário, reutiliza `/reports/period/pdf` para reconstruir a série mensal antes de gerar o PDF.
+- O fallback continua sendo construído a partir do snapshot JSON e não do DOM.
+
+## Atualização 2026-08-11 — correção da frequência mensal no Relatório do Aluno
+
+- O frontend agora trata uma resposta individual incompleta como reparável: quando `reports/student-report` chega sem `meses`, consulta `reports/period/pdf` e usa esse detalhamento para reconstruir o relatório.
+- O fallback passa a corrigir **resumo e série mensal** juntos; isso evita PDF com `0` presenças no resumo e tabela mensal vazia quando o detalhamento possui a presença real.
+- Foi criado teste de regressão específico com `Aux André` (`id_aluno=78`, `id_classe=5`) simulando uma presença real e resposta individual inconsistente.
+- `npm test` do backend (79 testes) e do frontend (6 testes) passaram; o build do GitHub Pages também foi regenerado.
+
+
+## Atualização 2026-08-11 — correção final da série mensal do Relatório do Aluno
+
+- O cenário observado no PDF de João Henrik tinha `1` presença no resumo, mas nenhuma linha em `Frequência por mês`; o problema estava no caminho de recuperação do frontend para respostas individuais sem `meses`.
+- O fallback agora identifica as linhas principalmente por `id_aluno`, reconstrói todos os meses do período (incluindo meses zerados) e, para períodos de um único mês sem linhas detalhadas, usa o resumo para preencher a única linha mensal.
+- `src/modules/relatorios/services/relatorios.service.js` e sua cópia em `docs/` permanecem sincronizados.
+- Testes e build validados: frontend 8 testes + build; backend 79 testes.

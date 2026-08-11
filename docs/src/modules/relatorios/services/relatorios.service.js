@@ -11,6 +11,7 @@
   const REPORTS_ENDPOINT = `${API_BASE_URL}/reports/period`;
   const REPORT_PDF_ENDPOINT = `${API_BASE_URL}/reports/period/pdf`;
   const REPORT_FINANCIAL_ENDPOINT = `${API_BASE_URL}/reports/financial-period`;
+  const REPORT_STUDENT_ENDPOINT = `${API_BASE_URL}/reports/student-report`;
   const REPORT_CLASS_STUDENTS_ENDPOINTS = Object.freeze([
     `${API_BASE_URL}/reports/class-students-ranking`,
     `${API_BASE_URL}/reports/best-class-ranking`,
@@ -29,6 +30,7 @@
       report: REPORTS_ENDPOINT,
       pdf: REPORT_PDF_ENDPOINT,
       financial: REPORT_FINANCIAL_ENDPOINT,
+      studentReport: REPORT_STUDENT_ENDPOINT,
       classStudentsRanking: REPORT_CLASS_STUDENTS_ENDPOINTS[0],
       classStudentsRankingAliases: Object.freeze([...REPORT_CLASS_STUDENTS_ENDPOINTS.slice(1)]),
       classesRanking: REPORT_CLASSES_ENDPOINTS[0],
@@ -211,6 +213,162 @@
       return {
         found: true,
         report: deepFreeze(cloneValue(report))
+      };
+    },
+
+
+    async fetchStudentReport({
+      studentId,
+      studentName,
+      classId,
+      startDate,
+      endDate,
+      token
+    } = {}) {
+      const normalizedStudentId = String(studentId ?? '').trim();
+      const normalizedStudentName = String(studentName ?? '').trim();
+      const normalizedClassId = String(classId ?? '').trim();
+      const normalizedStartDate = isIsoDate(startDate) ? startDate : '';
+      const normalizedEndDate = isIsoDate(endDate) ? endDate : '';
+
+      if (!/^\d+$/.test(normalizedStudentId) || Number(normalizedStudentId) <= 0) {
+        return {
+          found: false,
+          reason: 'Aluno inválido para gerar o relatório.'
+        };
+      }
+
+      if (!normalizedStartDate || !normalizedEndDate) {
+        return {
+          found: false,
+          reason: 'Informe uma data inicial e uma data final válidas.'
+        };
+      }
+
+      if (normalizedStartDate > normalizedEndDate) {
+        return {
+          found: false,
+          reason: 'A data inicial não pode ser maior que a data final.'
+        };
+      }
+
+      if (!token) {
+        const sessionError = new Error('Sua sessão expirou. Faça login novamente.');
+        sessionError.status = 401;
+        sessionError.requiresRelogin = true;
+        throw sessionError;
+      }
+
+      const searchParams = new URLSearchParams({
+        studentId: normalizedStudentId,
+        startDate: normalizedStartDate,
+        endDate: normalizedEndDate
+      });
+
+      const response = await fetch(`${REPORT_STUDENT_ENDPOINT}?${searchParams.toString()}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      const payload = await APP_API_CLIENT.safeJson(response);
+      if (!response.ok || APP_API_CLIENT.isFailurePayload?.(payload) || payload?.ok === false) {
+        const apiError = APP_API_CLIENT.createApiError(response, payload, {
+          fallbackMessage: 'Não foi possível gerar o relatório do aluno.'
+        });
+
+        if (shouldFallbackStudentReport(apiError)) {
+          const fallbackReport = await buildStudentReportFromPeriodPdf({
+            studentId: normalizedStudentId,
+            studentName: normalizedStudentName,
+            classId: normalizedClassId,
+            startDate: normalizedStartDate,
+            endDate: normalizedEndDate,
+            token
+          });
+
+          if (fallbackReport?.aluno) {
+            return {
+              found: true,
+              report: deepFreeze(cloneValue(fallbackReport))
+            };
+          }
+        }
+
+        throw apiError;
+      }
+
+      const report =
+        payload?.data ??
+        payload?.result ??
+        payload?.payload ??
+        payload?.body ??
+        payload?.response ??
+        null;
+
+      if (report?.aluno) {
+        const monthlyRows = Array.isArray(report.meses) ? report.meses : [];
+        const totalChamadas = Number(report.resumo?.total_chamadas || 0);
+
+        if (monthlyRows.length > 0) {
+          return {
+            found: true,
+            report: deepFreeze(cloneValue(report))
+          };
+        }
+
+        const fallbackReport = await buildStudentReportFromPeriodPdf({
+          studentId: normalizedStudentId,
+          studentName: normalizedStudentName,
+          classId: firstText(report.aluno, ['id_classe']) || normalizedClassId,
+          startDate: normalizedStartDate,
+          endDate: normalizedEndDate,
+          token
+        });
+
+        if (fallbackReport?.aluno) {
+          const repairedReport = mergeStudentReportFallback(report, fallbackReport);
+          if (repairedReport) {
+            return {
+              found: true,
+              report: deepFreeze(cloneValue(ensureStudentMonthlySeries(repairedReport)))
+            };
+          }
+        }
+
+        const repairedReport = ensureStudentMonthlySeries(report);
+        if (repairedReport.meses.length > 0 || totalChamadas === 0) {
+          return {
+            found: true,
+            report: deepFreeze(cloneValue(repairedReport))
+          };
+        }
+
+        return {
+          found: true,
+          report: deepFreeze(cloneValue(report))
+        };
+      }
+
+      const fallbackReport = await buildStudentReportFromPeriodPdf({
+        studentId: normalizedStudentId,
+        studentName: normalizedStudentName,
+        classId: normalizedClassId,
+        startDate: normalizedStartDate,
+        endDate: normalizedEndDate,
+        token
+      });
+
+      if (fallbackReport?.aluno) {
+        return {
+          found: true,
+          report: deepFreeze(cloneValue(fallbackReport))
+        };
+      }
+
+      return {
+        found: false,
+        reason: 'Não foram encontrados dados para o relatório deste aluno.'
       };
     },
 
@@ -430,6 +588,372 @@
 
   globalObject.APP_REPORTS_SERVICE = Object.freeze(service);
 
+
+
+function shouldFallbackStudentReport(error) {
+  const status = Number(error?.status || error?.response?.status || 0);
+  return status === 404 || status === 405 || status === 500 || status === 502 || status === 503;
+}
+
+function mergeStudentReportFallback(report, fallbackReport) {
+  if (!report?.aluno || !fallbackReport?.aluno) return null;
+
+  const fallbackHasAttendance = Number(fallbackReport.resumo?.total_chamadas || 0) > 0;
+  const fallbackHasMonthlyRows = Array.isArray(fallbackReport.meses) && fallbackReport.meses.length > 0;
+
+  if (!fallbackHasAttendance && !fallbackHasMonthlyRows) {
+    return null;
+  }
+
+  return {
+    ...report,
+    aluno: {
+      ...(report.aluno || {}),
+      ...(fallbackReport.aluno || {})
+    },
+    periodo: {
+      ...(report.periodo || {}),
+      ...(fallbackReport.periodo || {})
+    },
+    resumo: fallbackHasAttendance
+      ? {
+          ...(report.resumo || {}),
+          ...(fallbackReport.resumo || {})
+        }
+      : report.resumo,
+    meses: fallbackHasMonthlyRows ? fallbackReport.meses : (report.meses || [])
+  };
+}
+
+async function buildStudentReportFromPeriodPdf({
+  studentId,
+  studentName,
+  classId,
+  startDate,
+  endDate,
+  token
+} = {}) {
+  const normalizedStudentId = String(studentId ?? '').trim();
+  const normalizedStudentName = String(studentName ?? '').trim();
+  const normalizedClassId = String(classId ?? '').trim();
+
+  if (!normalizedStudentId || !isIsoDate(startDate) || !isIsoDate(endDate) || !token) {
+    return null;
+  }
+
+  let details;
+  try {
+    details = await service.fetchPeriodPdfDetails({
+      startDate,
+      endDate,
+      token
+    });
+  } catch {
+    return null;
+  }
+
+  if (!details?.found || !details.report) {
+    return null;
+  }
+
+  const rows = collectPeriodRows(details.report);
+  const matchingRows = rows.filter((row) =>
+    isSameStudentRow(row, {
+      studentId: normalizedStudentId,
+      studentName: normalizedStudentName,
+      classId: normalizedClassId
+    })
+  );
+
+  if (!matchingRows.length) {
+    return null;
+  }
+
+  const studentClassName =
+    firstTextFromRows(matchingRows, ['classe', 'className', 'class_name', 'nome_classe', 'turma']) ||
+    '';
+
+  const student = {
+    id_aluno: Number(normalizedStudentId),
+    nome: normalizedStudentName || firstTextFromRows(matchingRows, ['nome', 'studentName', 'student_name']) || 'Aluno',
+    classe: studentClassName || '—'
+  };
+
+  const totals = matchingRows.reduce(
+    (acc, row) => {
+      acc.total_chamadas += 1;
+      const presence = normalizePresenceStatus(row);
+      if (presence === 'presente' || presence === 'atrasado') {
+        acc.presencas += 1;
+      }
+      if (presence === 'atrasado') {
+        acc.atrasos += 1;
+      }
+      if (presence === 'ausente') {
+        acc.ausencias += 1;
+      }
+      return acc;
+    },
+    {
+      total_chamadas: 0,
+      presencas: 0,
+      atrasos: 0,
+      ausencias: 0
+    }
+  );
+
+  const meses = buildStudentMonthlyRows(matchingRows, startDate, endDate);
+
+  return {
+    relatorio: 'aluno',
+    title: 'Relatório do Aluno',
+    periodo: {
+      startDate,
+      endDate
+    },
+    aluno: student,
+    resumo: {
+      total_chamadas: totals.total_chamadas,
+      presencas: totals.presencas,
+      atrasos: totals.atrasos,
+      ausencias: totals.ausencias,
+      percentual_presenca:
+        totals.total_chamadas > 0
+          ? (totals.presencas / totals.total_chamadas) * 100
+          : 0
+    },
+    meses
+  };
+}
+
+function collectPeriodRows(report) {
+  if (!report || typeof report !== 'object') return [];
+
+  if (Array.isArray(report.rows) && report.rows.length) {
+    return report.rows.slice();
+  }
+
+  if (Array.isArray(report.dailyPages)) {
+    return report.dailyPages.flatMap((page) => (Array.isArray(page?.rows) ? page.rows : []));
+  }
+
+  if (Array.isArray(report.itens)) {
+    return report.itens.flatMap((page) => (Array.isArray(page?.rows) ? page.rows : []));
+  }
+
+  return [];
+}
+
+function isSameStudentRow(row, { studentId, studentName, classId }) {
+  if (!row || typeof row !== 'object') return false;
+
+  const rowStudentIds = [
+    row.id_aluno,
+    row.idAluno,
+    row.studentId,
+    row.student_id,
+    row.alunoId,
+    row.id_student
+  ]
+    .filter((value) => value !== undefined && value !== null && String(value).trim() !== '')
+    .map((value) => String(value).trim());
+
+  if (rowStudentIds.includes(String(studentId))) {
+    return true;
+  }
+
+  const normalizedExpectedName = normalizeComparableText(studentName);
+  if (!normalizedExpectedName) return false;
+
+  const rowName = firstTextFromRows([row], ['nome', 'studentName', 'student_name', 'aluno']);
+  if (normalizeComparableText(rowName) !== normalizedExpectedName) {
+    return false;
+  }
+
+  if (!classId) return true;
+
+  const rowClassIds = [
+    row.id_classe,
+    row.idClasse,
+    row.classId,
+    row.class_id,
+    row.turmaId
+  ]
+    .filter((value) => value !== undefined && value !== null && String(value).trim() !== '')
+    .map((value) => String(value).trim());
+
+  return !rowClassIds.length || rowClassIds.includes(String(classId));
+}
+
+function normalizePresenceStatus(row) {
+  return String(
+    row?.status_presenca ??
+    row?.statusPresenca ??
+    row?.presence ??
+    row?.presenca ??
+    ''
+  ).trim().toLowerCase();
+}
+
+function buildStudentMonthlyRows(rows, startDate = '', endDate = '') {
+  const groups = new Map();
+
+  const startMonth = String(startDate || '').slice(0, 7);
+  const endMonth = String(endDate || '').slice(0, 7);
+  if (/^\d{4}-\d{2}$/.test(startMonth) && /^\d{4}-\d{2}$/.test(endMonth)) {
+    let cursor = startMonth;
+    while (cursor <= endMonth) {
+      groups.set(cursor, {
+        mes: cursor,
+        mes_nome: formatMonthName(cursor),
+        total_chamadas: 0,
+        presencas: 0,
+        atrasos: 0,
+        ausencias: 0
+      });
+
+      const [year, month] = cursor.split('-').map(Number);
+      const nextDate = new Date(Date.UTC(year, month, 1));
+      cursor = `${nextDate.getUTCFullYear()}-${String(nextDate.getUTCMonth() + 1).padStart(2, '0')}`;
+    }
+  }
+
+  rows.forEach((row) => {
+    const rawDate = String(
+      row?.data_chamada ??
+      row?.dataChamada ??
+      row?.date ??
+      row?.attendanceDate ??
+      ''
+    ).trim();
+
+    const date = rawDate.slice(0, 10);
+    const match = date.match(/^(\d{4})-(\d{2})/);
+    if (!match) return;
+
+    const monthKey = `${match[1]}-${match[2]}`;
+    const current = groups.get(monthKey) || {
+      mes: monthKey,
+      mes_nome: formatMonthName(monthKey),
+      total_chamadas: 0,
+      presencas: 0,
+      atrasos: 0,
+      ausencias: 0
+    };
+
+    current.total_chamadas += 1;
+
+    const presence = normalizePresenceStatus(row);
+    if (presence === 'presente' || presence === 'atrasado') {
+      current.presencas += 1;
+    }
+    if (presence === 'atrasado') {
+      current.atrasos += 1;
+    }
+    if (presence === 'ausente') {
+      current.ausencias += 1;
+    }
+
+    groups.set(monthKey, current);
+  });
+
+  return Array.from(groups.values())
+    .sort((a, b) => a.mes.localeCompare(b.mes))
+    .map((month) => ({
+      ...month,
+      percentual_presenca:
+        month.total_chamadas > 0
+          ? (month.presencas / month.total_chamadas) * 100
+          : 0
+    }));
+}
+
+function ensureStudentMonthlySeries(report) {
+  if (!report || typeof report !== 'object') {
+    return {
+      ...(report || {}),
+      meses: []
+    };
+  }
+
+  const existingMonths = Array.isArray(report.meses) ? report.meses : [];
+  if (existingMonths.length > 0) {
+    return report;
+  }
+
+  const startDate = String(report.periodo?.startDate || '').trim();
+  const endDate = String(report.periodo?.endDate || '').trim();
+  const totalChamadas = Number(report.resumo?.total_chamadas || 0);
+
+  if (!isIsoDate(startDate) || !isIsoDate(endDate)) {
+    return {
+      ...report,
+      meses: []
+    };
+  }
+
+  const startMonth = startDate.slice(0, 7);
+  const endMonth = endDate.slice(0, 7);
+  if (startMonth !== endMonth && totalChamadas > 0) {
+    return {
+      ...report,
+      meses: []
+    };
+  }
+
+  const summary = report.resumo || {};
+  const months = buildStudentMonthlyRows([], startDate, endDate);
+  if (months.length === 1) {
+    months[0] = {
+      ...months[0],
+      total_chamadas: Number(summary.total_chamadas || 0),
+      presencas: Number(summary.presencas || 0),
+      atrasos: Number(summary.atrasos || 0),
+      ausencias: Number(summary.ausencias || 0),
+      percentual_presenca: Number(summary.percentual_presenca || 0)
+    };
+  }
+
+  return {
+    ...report,
+    meses: months
+  };
+}
+
+function formatMonthName(value) {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})$/);
+  if (!match) return String(value || '—');
+
+  const names = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  ];
+
+  return `${names[Number(match[2]) - 1] || match[2]} ${match[1]}`;
+}
+
+function firstTextFromRows(rows, keys) {
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue;
+    for (const key of keys) {
+      const value = row[key];
+      if (value !== undefined && value !== null && String(value).trim()) {
+        return String(value).trim();
+      }
+    }
+  }
+
+  return '';
+}
+
+function normalizeComparableText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\\s+/g, ' ')
+    .trim();
+}
 
 function extractReport(payload) {
   return payload?.data ?? payload?.result ?? payload?.payload ?? payload?.body ?? payload?.response ?? payload ?? null;
