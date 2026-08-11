@@ -1,0 +1,1021 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Módulo de relatórios: Financeiro." />
+    <title>Financeiro</title>
+    <link rel="stylesheet" href="../pages/relatorios-module.css" />
+    <style>
+      .module-intro {
+        display: grid;
+        gap: 14px;
+        margin-bottom: 18px;
+      }
+
+      .module-note {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 16px;
+        border-radius: 18px;
+        background: rgba(21, 87, 192, 0.06);
+        border: 1px solid rgba(21, 87, 192, 0.12);
+      }
+
+      .module-note strong {
+        font-weight: 800;
+      }
+
+      .filter-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr minmax(220px, 320px);
+        gap: 14px;
+        align-items: end;
+        margin-top: 18px;
+      }
+
+      .field-label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 0.82rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--rel-primary);
+      }
+
+      .field-input,
+      .field-select {
+        width: 100%;
+        min-height: 52px;
+        padding: 0 16px;
+        border-radius: 16px;
+        border: 1px solid rgba(21, 87, 192, 0.16);
+        background: #fff;
+        color: var(--rel-text);
+        font: inherit;
+        font-weight: 700;
+        outline: none;
+        box-shadow: 0 10px 22px rgba(15, 35, 64, 0.05);
+      }
+
+      .field-input:focus,
+      .field-select:focus {
+        border-color: rgba(21, 87, 192, 0.5);
+        box-shadow: 0 0 0 4px rgba(21, 87, 192, 0.1);
+      }
+
+      .search-row {
+        display: flex;
+        justify-content: flex-start;
+        margin-top: 16px;
+      }
+
+      .search-button {
+        min-width: 180px;
+        min-height: 52px;
+        padding: 0 20px;
+        border: 0;
+        border-radius: 16px;
+        background: linear-gradient(135deg, #1557c0 0%, #0f8f7c 100%);
+        color: #fff;
+        font: inherit;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        cursor: pointer;
+        box-shadow: 0 16px 30px rgba(21, 87, 192, 0.24);
+      }
+
+      .download-row {
+        display: flex;
+        justify-content: flex-start;
+        margin-top: 12px;
+      }
+
+      .download-button {
+        min-width: 180px;
+        min-height: 50px;
+        padding: 0 20px;
+        border: 1px solid rgba(21, 87, 192, 0.18);
+        border-radius: 16px;
+        background: linear-gradient(135deg, rgba(21, 87, 192, 0.1), rgba(15, 143, 124, 0.18));
+        color: #0f3f8f;
+        font: inherit;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        cursor: pointer;
+        box-shadow: 0 14px 26px rgba(21, 87, 192, 0.12);
+      }
+
+      .download-button:disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+        box-shadow: none;
+      }
+
+      .search-button:hover {
+        transform: translateY(-1px);
+      }
+
+      .search-button:active {
+        transform: translateY(0);
+      }
+
+      .summary-strip {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        margin-top: 18px;
+      }
+
+      .summary-card {
+        padding: 18px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.8);
+        border: 1px solid rgba(21, 87, 192, 0.12);
+      }
+
+      .summary-card__label {
+        margin: 0 0 8px;
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-weight: 800;
+        color: var(--rel-primary);
+      }
+
+      .summary-card__value {
+        margin: 0;
+        font-size: clamp(1.2rem, 2vw, 1.8rem);
+        font-weight: 900;
+        color: var(--rel-text);
+      }
+
+      .summary-card__hint {
+        margin: 6px 0 0;
+        color: var(--rel-muted);
+        line-height: 1.5;
+      }
+
+      .results-head {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border-radius: 999px;
+        background: var(--rel-primary-soft);
+        color: var(--rel-primary);
+        font-weight: 800;
+      }
+
+      .pill--green {
+        background: rgba(16, 185, 129, 0.12);
+        color: #0f7a57;
+      }
+
+      .table-wrap {
+        margin-top: 18px;
+        overflow: auto;
+      }
+
+      .ranking-table--financial thead th:first-child,
+      .ranking-table--financial tbody td:first-child {
+        width: 42%;
+      }
+
+      .ranking-table--financial thead th:nth-child(2),
+      .ranking-table--financial tbody td:nth-child(2) {
+        width: 28%;
+      }
+
+      .ranking-table--financial thead th:last-child,
+      .ranking-table--financial tbody td:last-child {
+        width: 30%;
+        text-align: right;
+      }
+
+      .offer-value {
+        color: #0f7a57;
+        font-weight: 900;
+      }
+
+      .offer-value--total {
+        font-size: 1.05em;
+      }
+
+      .empty-state {
+        display: grid;
+        gap: 8px;
+        justify-items: start;
+        padding: 18px;
+        border-radius: 18px;
+        border: 1px dashed rgba(21, 87, 192, 0.22);
+        background: rgba(255, 255, 255, 0.72);
+        margin-top: 18px;
+      }
+
+      .empty-state strong {
+        font-size: 1rem;
+      }
+
+      .empty-state p {
+        margin: 0;
+        color: var(--rel-muted);
+        line-height: 1.6;
+      }
+
+      .period-note {
+        margin: 12px 0 0;
+        color: var(--rel-muted);
+        line-height: 1.6;
+      }
+
+      @media (max-width: 960px) {
+        .filter-grid,
+        .summary-strip {
+          grid-template-columns: 1fr;
+        }
+
+        .search-row {
+          justify-content: stretch;
+        }
+
+        .search-button {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="module-shell">
+      <header class="module-header">
+        <a class="back-link" href="../pages/index.html">Voltar</a>
+
+        <div>
+          <p class="eyebrow">Relatórios</p>
+          <h1>Financeiro</h1>
+          <p class="subtitle">
+            Consulta por período com total consolidado e valores individuais das ofertas.
+          </p>
+        </div>
+      </header>
+
+      <section class="module-panel">
+        <div class="module-panel__box">
+          <div class="module-intro">
+            <div class="module-note" aria-live="polite">
+              <div>
+                <strong>Financeiro por período</strong>
+                <p class="summary-text">
+                  Consulte o total do período e os lançamentos individuais, com opção de filtrar por turma.
+                </p>
+              </div>
+              <span class="summary-pill" id="loadedCount">0 lançamentos</span>
+            </div>
+
+            <div class="filter-grid">
+              <label>
+                <span class="field-label">Data inicial</span>
+                <input class="field-input" id="startDate" type="date" />
+              </label>
+
+              <label>
+                <span class="field-label">Data final</span>
+                <input class="field-input" id="endDate" type="date" />
+              </label>
+
+              <label>
+                <span class="field-label">Turma</span>
+                <select class="field-select" id="classSelect" aria-label="Selecionar turma">
+                  <option value="" selected>&lt; SELECIONE &gt;</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="search-row">
+              <button class="search-button" id="searchButton" type="button">Buscar</button>
+            </div>
+
+            <div class="download-row">
+              <button class="download-button" id="downloadButton" type="button" disabled>Baixar Extrato</button>
+            </div>
+          </div>
+
+          <div id="emptyState" class="empty-state">
+            <strong>Informe um período para continuar</strong>
+            <p>
+              Escolha uma data inicial, uma data final e, se quiser, uma turma específica. O total do período aparece acima e os lançamentos individuais ficam listados abaixo, com o valor em verde.
+            </p>
+          </div>
+
+          <div id="resultsArea" hidden>
+            <div class="summary-strip" aria-live="polite">
+              <article class="summary-card">
+                <p class="summary-card__label">Total do período</p>
+                <p class="summary-card__value" id="periodTotal">R$ 0,00</p>
+                <p class="summary-card__hint" id="periodRange">Nenhum período selecionado.</p>
+              </article>
+
+              <article class="summary-card">
+                <p class="summary-card__label">Lançamentos filtrados</p>
+                <p class="summary-card__value" id="itemsCount">0</p>
+                <p class="summary-card__hint">Valores individuais para conferência.</p>
+              </article>
+
+              <article class="summary-card">
+                <p class="summary-card__label">Turma ativa</p>
+                <p class="summary-card__value" id="selectedClassLabel">&lt; SELECIONE &gt;</p>
+                <p class="summary-card__hint">A lista de turmas é preenchida a partir do resultado da consulta.</p>
+              </article>
+            </div>
+
+            <p class="period-note">
+              O total acima é calculado a partir dos valores listados abaixo. Se o
+              usuário quiser conferir a soma “solta”, basta ler os itens em verde.
+            </p>
+
+            <div class="table-wrap">
+              <table class="ranking-table ranking-table--financial" aria-label="Lançamentos financeiros por classe">
+                <thead>
+                  <tr>
+                    <th scope="col">Nome da classe</th>
+                    <th scope="col">Data</th>
+                    <th scope="col">Oferta</th>
+                  </tr>
+                </thead>
+                <tbody id="rowsBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    
+    <script src="../../../app/config/config.js"></script>
+    <script src="../../../app/config/api.js"></script>
+    <script src="../../../app/config/storage.js"></script>
+    <script src="../../../shared/services/api-client.js"></script>
+    <script src="../../../shared/ui/access-denied-dialog.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="../services/relatorios.service.js"></script>
+    <script>
+      const STORAGE_KEYS = window.APP_STORAGE_KEYS;
+      const AUTH_STORAGE = window.APP_AUTH_STORAGE;
+      const APP_REPORTS_SERVICE = window.APP_REPORTS_SERVICE;
+      const APP_ACCESS_DENIED_DIALOG = window.APP_ACCESS_DENIED_DIALOG;
+
+      const classSelect = document.getElementById('classSelect');
+      const startDateInput = document.getElementById('startDate');
+      const endDateInput = document.getElementById('endDate');
+      const searchButton = document.getElementById('searchButton');
+      const downloadButton = document.getElementById('downloadButton');
+      const rowsBody = document.getElementById('rowsBody');
+      const emptyState = document.getElementById('emptyState');
+      const resultsArea = document.getElementById('resultsArea');
+      const loadedCount = document.getElementById('loadedCount');
+      const periodTotal = document.getElementById('periodTotal');
+      const periodRange = document.getElementById('periodRange');
+      const itemsCount = document.getElementById('itemsCount');
+      const selectedClassLabel = document.getElementById('selectedClassLabel');
+
+      const currencyFormatter = new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      });
+
+      const state = {
+        token: '',
+        loading: false,
+        report: null,
+        entries: [],
+        classesById: new Map()
+      };
+
+      const session = readSession();
+      if (!session.token) {
+        goToLogin();
+      } else {
+        state.token = session.token;
+        setDefaultDates();
+        setStatus('Informe um período e clique em Buscar para consultar o financeiro.', 'info');
+        wireEvents();
+      }
+
+      function readSession() {
+        try {
+          return {
+            token: AUTH_STORAGE.readToken(STORAGE_KEYS.token)
+          };
+        } catch {
+          return { token: '' };
+        }
+      }
+
+      function goToLogin() {
+        window.location.href = '../../../../index.html';
+      }
+
+      function setStatus(message, tone = 'info') {
+        const tones = {
+          info: 'rgba(21, 87, 192, 0.08)',
+          success: 'rgba(16, 185, 129, 0.12)',
+          warning: 'rgba(245, 158, 11, 0.14)',
+          danger: 'rgba(239, 68, 68, 0.12)'
+        };
+
+        emptyState.querySelector('strong').textContent = message;
+        emptyState.querySelector('p').textContent =
+          tone === 'warning'
+            ? 'Revise as datas ou selecione uma turma válida antes de buscar novamente.'
+            : tone === 'danger'
+              ? 'Não foi possível concluir a consulta. Tente novamente.'
+              : 'Os resultados da consulta aparecem abaixo.';
+
+        emptyState.style.borderColor = tone === 'warning'
+          ? 'rgba(245, 158, 11, 0.3)'
+          : tone === 'danger'
+            ? 'rgba(239, 68, 68, 0.3)'
+            : 'rgba(21, 87, 192, 0.22)';
+        emptyState.style.background = tones[tone] || tones.info;
+      }
+
+      function setDefaultDates() {
+        const today = new Date();
+        const start = new Date(today);
+        start.setDate(today.getDate() - 7);
+
+        startDateInput.value = toInputDate(start);
+        endDateInput.value = toInputDate(today);
+      }
+
+      function wireEvents() {
+        searchButton.addEventListener('click', handleSearch);
+        downloadButton.addEventListener('click', handleDownloadExtrato);
+        classSelect.addEventListener('change', () => {
+          if (resultsArea.hidden === false && state.entries.length > 0) {
+            selectedClassLabel.textContent =
+              classSelect.options[classSelect.selectedIndex]?.textContent || '< SELECIONE >';
+          }
+        });
+      }
+
+      function toInputDate(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+
+      function formatDate(date) {
+        if (!date) {
+          return '';
+        }
+
+        const [year, month, day] = String(date).split('-');
+        if (!year || !month || !day) {
+          return String(date);
+        }
+
+        return `${day}/${month}/${year}`;
+      }
+
+      function formatCurrency(value) {
+        const numericValue = Number(value) || 0;
+        return currencyFormatter.format(numericValue);
+      }
+
+      function isIsoDate(value) {
+        return /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''));
+      }
+
+      function uniqueClassesFromEntries(entries) {
+        const byId = new Map();
+
+        entries.forEach((entry) => {
+          if (!entry) return;
+          const classId = String(entry.id_classe ?? '').trim();
+          const className = String(entry.classe ?? '').trim();
+          if (!classId || !className) return;
+          if (!byId.has(classId)) {
+            byId.set(classId, className);
+          }
+        });
+
+        return Array.from(byId.entries())
+          .map(([id, name]) => ({ id, name }))
+          .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+      }
+
+      function syncClassOptions(entries, selectedValue = '') {
+        const uniqueClasses = uniqueClassesFromEntries(entries);
+        state.classesById = new Map(uniqueClasses.map((item) => [item.id, item.name]));
+
+        classSelect.innerHTML = '<option value="" selected>&lt; SELECIONE &gt;</option>';
+
+        uniqueClasses.forEach((item) => {
+          const option = document.createElement('option');
+          option.value = item.id;
+          option.textContent = item.name;
+          classSelect.appendChild(option);
+        });
+
+        if (selectedValue) {
+          classSelect.value = String(selectedValue);
+        }
+      }
+
+      function renderRows(entries) {
+        rowsBody.innerHTML = entries
+          .map(
+            (entry) => `
+              <tr>
+                <td>${entry.classe || ''}</td>
+                <td>${formatDate(entry.date)}</td>
+                <td><span class="offer-value">${formatCurrency(entry.value)}</span></td>
+              </tr>
+            `
+          )
+          .join('');
+      }
+
+      function renderEmpty(messageTitle, messageBody) {
+        rowsBody.innerHTML = '';
+        emptyState.hidden = false;
+        resultsArea.hidden = true;
+        emptyState.querySelector('strong').textContent = messageTitle;
+        emptyState.querySelector('p').textContent = messageBody;
+        emptyState.style.borderColor = 'rgba(21, 87, 192, 0.22)';
+        emptyState.style.background = 'rgba(255, 255, 255, 0.72)';
+      }
+
+      function applySummary(report, selectedClassId) {
+        const entries = Array.isArray(report?.entries) ? report.entries : [];
+        const summary = report?.summary || {};
+        const periodo = report?.periodo || {};
+        const classLabel = report?.class_label || (selectedClassId ? state.classesById.get(String(selectedClassId)) : '') || classSelect.options[classSelect.selectedIndex]?.textContent || '< SELECIONE >';
+        const totalOffers = Number(summary.total_ofertas ?? 0);
+        const totalEntries = Number(summary.total_lancamentos ?? entries.length);
+
+        periodTotal.textContent = formatCurrency(totalOffers);
+        periodRange.textContent = `${formatDate(periodo.startDate)} até ${formatDate(periodo.endDate)}`;
+        itemsCount.textContent = String(totalEntries);
+        selectedClassLabel.textContent = classLabel;
+        loadedCount.textContent = `${entries.length} lançamento${entries.length === 1 ? '' : 's'}`;
+      }
+
+      async function handleSearch() {
+        if (state.loading) {
+          return;
+        }
+
+        const startDate = startDateInput.value;
+        const endDate = endDateInput.value;
+        const classId = classSelect.value || null;
+
+        if (!isIsoDate(startDate) || !isIsoDate(endDate)) {
+          setStatus('Preencha uma data inicial e uma data final válidas.', 'warning');
+          renderEmpty(
+            'Informe um período para continuar',
+            'Escolha uma data inicial, uma data final e clique em Buscar para carregar os lançamentos financeiros.'
+          );
+          return;
+        }
+
+        if (startDate > endDate) {
+          setStatus('A data inicial não pode ser maior que a data final.', 'warning');
+          renderEmpty(
+            'Período inválido',
+            'A data inicial precisa ser anterior ou igual à data final.'
+          );
+          return;
+        }
+
+        state.loading = true;
+        state.report = null;
+        if (downloadButton) {
+          downloadButton.disabled = true;
+        }
+        searchButton.disabled = true;
+        setStatus('Consultando o financeiro...', 'info');
+        renderEmpty(
+          'Consultando o período selecionado',
+          'Aguarde enquanto carregamos o consolidado e os lançamentos do período.'
+        );
+
+        try {
+          const result = await APP_REPORTS_SERVICE.searchFinancialPeriod({
+            startDate,
+            endDate,
+            classId,
+            token: state.token
+          });
+
+          if (!result?.found) {
+            state.report = null;
+            state.entries = [];
+            syncClassOptions([], '');
+            setStatus(result?.reason || 'Nenhum lançamento encontrado para o período informado.', 'warning');
+            renderEmpty(
+              'Nenhum lançamento encontrado',
+              result?.reason || 'Nenhum lançamento foi encontrado para o filtro informado.'
+            );
+            return;
+          }
+
+          const report = result.report || {};
+          const entries = Array.isArray(report.entries) ? report.entries : [];
+          const requestedClassId = classId || '';
+
+          state.report = report;
+          state.entries = entries;
+          syncClassOptions(entries, requestedClassId);
+          applySummary(report, requestedClassId);
+          renderRows(entries);
+          resultsArea.hidden = false;
+          emptyState.hidden = true;
+          if (downloadButton) {
+            downloadButton.disabled = false;
+          }
+          setStatus('Financeiro carregado com sucesso.', 'success');
+        } catch (error) {
+          state.report = null;
+          state.entries = [];
+          syncClassOptions([], '');
+
+          if (Number(error?.status) === 403) {
+            const message = resolveAccessDeniedMessage(error);
+            setStatus(message, 'warning');
+            renderEmpty(
+              'Usuário sem permissão',
+              'Seu perfil só pode acessar o submódulo Financeiro.'
+            );
+            openAccessDeniedDialog({
+              message,
+              backHref: '../pages/index.html'
+            });
+            return;
+          }
+
+          if (error?.requiresRelogin) {
+            setStatus(error.message, 'warning');
+            renderEmpty(
+              'Sessão expirada',
+              'Sua sessão expirou. Faça login novamente para consultar o financeiro.'
+            );
+            goToLogin();
+            return;
+          }
+
+          setStatus(error?.message || 'Falha ao consultar o financeiro.', 'danger');
+          renderEmpty(
+            'Falha na consulta',
+            error?.message || 'Não foi possível concluir a consulta do financeiro.'
+          );
+        } finally {
+          state.loading = false;
+          searchButton.disabled = false;
+        }
+      }
+
+      if (downloadButton) {
+        downloadButton.disabled = true;
+      }
+
+      function handleDownloadExtrato() {
+        const report = state.report;
+        if (!report) {
+          setStatus('Busque o financeiro antes de baixar o extrato.', 'warning');
+          return;
+        }
+
+        if (!window.jspdf?.jsPDF) {
+          setStatus('A biblioteca de PDF não foi carregada.', 'warning');
+          return;
+        }
+
+        try {
+          const doc = buildFinancePdf(report);
+          const fileName = buildFinancePdfFileName(report);
+          downloadPdfDocument(doc, fileName);
+          setStatus('Extrato baixado em PDF.', 'success');
+        } catch (error) {
+          setStatus(error?.message || 'Não foi possível gerar o extrato em PDF.', 'warning');
+        }
+      }
+
+      function buildFinancePdf(report = {}) {
+        const doc = new window.jspdf.jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: 'a4',
+          compress: true
+        });
+
+        const rows = normalizeFinanceRows(report);
+        if (!rows.length) {
+          throw new Error('Não há lançamentos para gerar o extrato.');
+        }
+
+        const title = 'Extrato Financeiro EBD';
+        const periodLabel = buildFinancePeriodLabel(report);
+        const classLabel = buildFinanceClassLabel(report);
+        const summary = normalizeFinanceSummary(report, rows);
+
+        doc.setProperties({
+          title: `${title} - ${periodLabel || 'Período selecionado'}`,
+          subject: `${title} com consolidação do período`,
+          author: 'EBD',
+          creator: 'EBD'
+        });
+
+        const pages = paginateFinanceRows(doc, rows);
+        pages.forEach((pageRows, index) => {
+          if (index > 0) {
+            doc.addPage();
+          }
+
+          drawFinancePage(doc, {
+            title,
+            periodLabel,
+            classLabel,
+            summary,
+            rows: pageRows
+          }, {
+            pageNumber: index + 1,
+            totalPages: pages.length
+          });
+        });
+
+        return doc;
+      }
+
+      function buildFinancePeriodLabel(report = {}) {
+        const startDate =
+          report?.periodo?.startDate ||
+          state.report?.periodo?.startDate ||
+          startDateInput?.value ||
+          '';
+        const endDate =
+          report?.periodo?.endDate ||
+          state.report?.periodo?.endDate ||
+          endDateInput?.value ||
+          '';
+
+        const startLabel = formatPdfDate(startDate);
+        const endLabel = formatPdfDate(endDate);
+
+        if (startLabel && endLabel) {
+          return `${startLabel} a ${endLabel}`;
+        }
+
+        return startLabel || endLabel || 'Período selecionado';
+      }
+
+      function buildFinanceClassLabel(report = {}) {
+        const explicit = String(report?.class_label || '').trim();
+        if (explicit) {
+          return explicit;
+        }
+
+        const selected = classSelect?.options?.[classSelect.selectedIndex]?.textContent || '';
+        return String(selected).trim() || 'Todas as turmas';
+      }
+
+      function normalizeFinanceSummary(report = {}, rows = []) {
+        const summary = report?.summary || {};
+        const totalOfertas = Number(summary.total_ofertas ?? summary.totalOfertas ?? 0) || 0;
+        const totalLancamentos = Number(summary.total_lancamentos ?? summary.totalLancamentos ?? rows.length) || rows.length;
+        const classes = Number(summary.classes ?? 0) || 0;
+
+        return {
+          totalOfertas,
+          totalLancamentos,
+          classes
+        };
+      }
+
+      function normalizeFinanceRows(report = {}) {
+        const entries = Array.isArray(report?.entries) ? report.entries : [];
+        return entries
+          .map((entry) => {
+            const rawDate = String(entry?.date || entry?.data_chamada || entry?.data || '').trim();
+            const date = formatPdfDate(rawDate);
+            const classe = String(entry?.classe || entry?.className || 'Turma').trim() || 'Turma';
+            const value = formatCurrency(entry?.value ?? entry?.valor_oferta ?? entry?.oferta ?? 0);
+            return { rawDate, date, classe, value };
+          })
+          .sort((a, b) => {
+            const dateCompare = String(a.rawDate || a.date || '').localeCompare(String(b.rawDate || b.date || ''));
+            if (dateCompare !== 0) return dateCompare;
+            return String(a.classe || '').localeCompare(String(b.classe || ''));
+          });
+      }
+
+      function paginateFinanceRows(doc, rows) {
+        const width = doc.internal.pageSize.getWidth();
+        const height = doc.internal.pageSize.getHeight();
+        const margin = 12;
+        const headerHeight = 52;
+        const footerHeight = 14;
+        const rowHeightBase = 8.5;
+        const pageContentHeight = height - margin * 2 - headerHeight - footerHeight;
+        const pages = [];
+        let currentRows = [];
+        let currentHeight = 0;
+
+        rows.forEach((row) => {
+          const classLines = doc.splitTextToSize(row.classe, width - margin * 2 - 58).length || 1;
+          const rowHeight = Math.max(rowHeightBase, classLines * 4 + 4);
+
+          if (currentRows.length && currentHeight + rowHeight > pageContentHeight) {
+            pages.push(currentRows);
+            currentRows = [];
+            currentHeight = 0;
+          }
+
+          currentRows.push({ ...row, rowHeight });
+          currentHeight += rowHeight;
+        });
+
+        if (currentRows.length || !pages.length) {
+          pages.push(currentRows);
+        }
+
+        return pages;
+      }
+
+      function drawFinancePage(doc, page, meta = {}) {
+        const width = doc.internal.pageSize.getWidth();
+        const height = doc.internal.pageSize.getHeight();
+        const margin = 12;
+        const contentWidth = width - margin * 2;
+        const headerY = margin + 2;
+        const boxY = margin + 18;
+        const tableY = margin + 42;
+
+        doc.setFillColor(247, 249, 252);
+        doc.rect(0, 0, width, height, 'F');
+
+        doc.setFillColor(23, 43, 77);
+        doc.roundedRect(margin, margin, contentWidth, 16, 4, 4, 'F');
+
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(15);
+        doc.text(page.title, margin + 6, margin + 10);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.6);
+        doc.text(page.periodLabel, margin + 6, margin + 14.5);
+
+        const summaryBoxHeight = 18;
+        doc.setFillColor(234, 242, 255);
+        doc.setDrawColor(214, 224, 240);
+        doc.roundedRect(margin, boxY, contentWidth, summaryBoxHeight, 4, 4, 'FD');
+
+        doc.setTextColor(23, 43, 77);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.text('Total Geral', margin + 5, boxY + 6);
+
+        doc.setFontSize(12.5);
+        doc.setTextColor(15, 103, 90);
+        doc.text(formatCurrency(page.summary.totalOfertas), margin + 5, boxY + 13);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(91, 102, 122);
+        doc.setFontSize(8.4);
+        const summaryText = `Lançamentos: ${page.summary.totalLancamentos} • Classes: ${page.summary.classes} • Turma: ${page.classLabel}`;
+        const summaryLines = doc.splitTextToSize(summaryText, contentWidth - 72);
+        doc.text(summaryLines, margin + 70, boxY + 6);
+
+        doc.setDrawColor(217, 224, 235);
+        doc.setLineWidth(0.2);
+        doc.line(margin, tableY - 2, width - margin, tableY - 2);
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8.5);
+        doc.setTextColor(91, 102, 122);
+        doc.text('Data', margin + 2, tableY - 4);
+        doc.text('Classe', margin + 34, tableY - 4);
+        doc.text('Oferta', width - margin - 2, tableY - 4, { align: 'right' });
+        doc.line(margin, tableY, width - margin, tableY);
+
+        let y = tableY + 5;
+        const classWidth = contentWidth - 52;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.7);
+        doc.setTextColor(23, 43, 77);
+
+        page.rows.forEach((row, index) => {
+          const rowFill = index % 2 === 0 ? [255, 255, 255] : [248, 251, 255];
+          doc.setFillColor(rowFill[0], rowFill[1], rowFill[2]);
+          doc.roundedRect(margin, y - 3, contentWidth, row.rowHeight, 2, 2, 'F');
+
+          const classLines = doc.splitTextToSize(row.classe, classWidth);
+          doc.text(row.date || '—', margin + 2, y + 1.5);
+          doc.text(classLines, margin + 34, y + 1.5);
+          doc.text(row.value || formatCurrency(0), width - margin - 2, y + 1.5, { align: 'right' });
+
+          y += row.rowHeight + 1;
+        });
+
+        doc.setDrawColor(221, 228, 239);
+        doc.line(margin, height - 16, width - margin, height - 16);
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(8.2);
+        doc.setTextColor(91, 102, 122);
+        doc.text(`Página ${meta.pageNumber || 1} de ${meta.totalPages || 1}`, width - margin, height - 10, { align: 'right' });
+      }
+
+      function buildFinancePdfFileName(report = {}) {
+        const title = 'extrato-financeiro-ebd';
+        const start = normalizeFileDate(report?.periodo?.startDate || startDateInput?.value || '');
+        const end = normalizeFileDate(report?.periodo?.endDate || endDateInput?.value || '');
+        return `${title}-${start || 'periodo'}-ate-${end || 'periodo'}.pdf`;
+      }
+
+      function normalizeFileDate(value) {
+        const raw = String(value || '').trim();
+        if (!raw) return '';
+        if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+          return raw;
+        }
+        const normalized = formatPdfDate(raw);
+        if (!normalized) return '';
+        return normalized.replace(/\//g, '-');
+      }
+
+      function formatPdfDate(value) {
+        const raw = String(value || '').trim();
+        if (!raw) return '';
+        if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+          const [year, month, day] = raw.split('-');
+          return `${day}/${month}/${year}`;
+        }
+        return raw;
+      }
+
+      function resolveAccessDeniedMessage(error) {
+        return String(error?.backendMessage || error?.primaryMessage || error?.message || 'Usuário sem permissão').trim() || 'Usuário sem permissão';
+      }
+
+      function openAccessDeniedDialog(options = {}) {
+        const dialog = window.APP_ACCESS_DENIED_DIALOG;
+        if (dialog?.open) {
+          dialog.open({
+            title: 'Usuário sem permissão',
+            message: String(options.message || 'Seu perfil não tem permissão para executar esta ação.').trim() || 'Seu perfil não tem permissão para executar esta ação.',
+            backHref: options.backHref || '../pages/index.html'
+          });
+          return;
+        }
+
+        window.alert(String(options.message || 'Usuário sem permissão'));
+      }
+
+      function downloadPdfDocument(doc, fileName) {
+        const blob = doc.output('blob');
+        if (!blob) {
+          throw new Error('Não foi possível criar o arquivo PDF.');
+        }
+
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = fileName;
+        link.rel = 'noopener';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        window.setTimeout(() => {
+          try {
+            URL.revokeObjectURL(blobUrl);
+          } catch {
+            // ignore
+          }
+        }, 1000);
+      }
+
+      loadedCount.textContent = '0 lançamentos';
+      renderEmpty(
+        'Informe um período para continuar',
+        'Escolha uma data inicial, uma data final e clique em Buscar para mostrar o total do período e os lançamentos individuais.'
+      );
+    </script>
+  </body>
+</html>

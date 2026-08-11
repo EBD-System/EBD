@@ -1,0 +1,218 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  --rel-bg: #f4f8fd;
+  --rel-surface: rgba(255, 255, 255, 0.92);
+  --rel-border: rgba(18, 42, 79, 0.1);
+  --rel-text: #12304f;
+  --rel-muted: #64748b;
+  --rel-primary: #1557c0;
+  --rel-primary-soft: rgba(21, 87, 192, 0.08);
+  --rel-shadow: 0 24px 60px rgba(11, 30, 63, 0.12);
+}
+
+html {
+  background:
+    radial-gradient(circle at top left, rgba(21, 87, 192, 0.12), transparent 30%),
+    radial-gradient(circle at top right, rgba(12, 174, 132, 0.12), transparent 26%),
+    linear-gradient(180deg, #f8fbff 0%, var(--rel-bg) 100%);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: Inter, Arial, sans-serif;
+  color: var(--rel-text);
+}
+
+a {
+  font: inherit;
+}
+
+.module-shell {
+  width: min(980px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 24px 0 40px;
+}
+
+.module-header,
+.module-panel {
+  border: 1px solid var(--rel-border);
+  border-radius: 28px;
+  background: var(--rel-surface);
+  box-shadow: var(--rel-shadow);
+  backdrop-filter: blur(18px);
+}
+
+.module-header {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 20px;
+  align-items: start;
+  padding: 22px;
+}
+
+.back-link {
+  align-self: start;
+  justify-self: start;
+  text-decoration: none;
+  color: var(--rel-primary);
+  font-weight: 700;
+  padding: 12px 16px;
+  border-radius: 999px;
+  background: var(--rel-primary-soft);
+  white-space: nowrap;
+}
+
+.module-header h1,
+.module-panel h2 {
+  margin: 0;
+}
+
+.module-header h1 {
+  font-size: clamp(2rem, 4vw, 2.6rem);
+  margin-bottom: 4px;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--rel-primary);
+}
+
+.subtitle,
+.panel-hint,
+.placeholder {
+  margin: 0;
+  color: var(--rel-muted);
+  line-height: 1.6;
+}
+
+.module-panel {
+  margin-top: 22px;
+  padding: 24px;
+}
+
+.module-panel__box {
+  padding: 20px;
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(243, 247, 252, 0.94) 100%);
+  border: 1px solid rgba(21, 87, 192, 0.12);
+  box-shadow: 0 16px 32px rgba(17, 39, 66, 0.08);
+}
+
+@media (max-width: 960px) {
+  .module-header {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .module-shell {
+    width: min(100% - 20px, 980px);
+  }
+}
+
+
+.module-panel__box--tight {
+  padding: 16px;
+}
+
+.ranking-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.ranking-table thead th {
+  padding: 12px 14px;
+  text-align: left;
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--rel-primary);
+  border-bottom: 1px solid rgba(21, 87, 192, 0.14);
+}
+
+.ranking-table tbody td {
+  padding: 14px;
+  border-bottom: 1px solid rgba(100, 116, 139, 0.12);
+  color: var(--rel-text);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ranking-table thead th:first-child,
+.ranking-table tbody td:first-child {
+  width: 56%;
+}
+
+.ranking-table thead th:nth-child(2),
+.ranking-table tbody td:nth-child(2) {
+  width: 28%;
+}
+
+.ranking-table thead th:last-child,
+.ranking-table tbody td:last-child {
+  width: 16%;
+  text-align: center;
+}
+
+.ranking-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+@media (max-width: 640px) {
+  .ranking-table thead th,
+  .ranking-table tbody td {
+    padding-left: 10px;
+    padding-right: 10px;
+    font-size: 0.92rem;
+  }
+
+  .ranking-table thead th:first-child,
+  .ranking-table tbody td:first-child {
+    width: 52%;
+  }
+
+  .ranking-table thead th:nth-child(2),
+  .ranking-table tbody td:nth-child(2) {
+    width: 30%;
+  }
+
+  .ranking-table thead th:last-child,
+  .ranking-table tbody td:last-child {
+    width: 18%;
+  }
+}
+
+.ranking-table--classes thead th:first-child,
+.ranking-table--classes tbody td:first-child {
+  width: 78%;
+}
+
+.ranking-table--classes thead th:last-child,
+.ranking-table--classes tbody td:last-child {
+  width: 22%;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .ranking-table--classes thead th:first-child,
+  .ranking-table--classes tbody td:first-child {
+    width: 70%;
+  }
+
+  .ranking-table--classes thead th:last-child,
+  .ranking-table--classes tbody td:last-child {
+    width: 30%;
+  }
+}

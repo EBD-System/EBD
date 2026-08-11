@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Módulo de relatórios: Melhor da Classe."
+    />
+    <title>Melhor da Classe</title>
+    <link rel="stylesheet" href="../pages/relatorios-module.css" />
+    <style>
+      .module-intro {
+        display: grid;
+        gap: 14px;
+        margin-bottom: 18px;
+      }
+
+      .module-note {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 16px;
+        border-radius: 18px;
+        background: rgba(21, 87, 192, 0.06);
+        border: 1px solid rgba(21, 87, 192, 0.12);
+      }
+
+      .module-note strong {
+        font-weight: 800;
+      }
+
+      .filter-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr minmax(220px, 320px);
+        gap: 14px;
+        align-items: end;
+        margin-top: 18px;
+      }
+
+      .field-label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 0.82rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--rel-primary);
+      }
+
+      .field-input,
+      .field-select {
+        width: 100%;
+        min-height: 52px;
+        padding: 0 16px;
+        border-radius: 16px;
+        border: 1px solid rgba(21, 87, 192, 0.16);
+        background: #fff;
+        color: var(--rel-text);
+        font: inherit;
+        font-weight: 700;
+        outline: none;
+        box-shadow: 0 10px 22px rgba(15, 35, 64, 0.05);
+      }
+
+      .field-input:focus,
+      .field-select:focus {
+        border-color: rgba(21, 87, 192, 0.5);
+        box-shadow: 0 0 0 4px rgba(21, 87, 192, 0.1);
+      }
+
+      .search-row {
+        display: flex;
+        justify-content: flex-start;
+        margin-top: 16px;
+      }
+
+      .search-button {
+        min-width: 180px;
+        min-height: 52px;
+        padding: 0 20px;
+        border: 0;
+        border-radius: 16px;
+        background: linear-gradient(135deg, #1557c0 0%, #0f8f7c 100%);
+        color: #fff;
+        font: inherit;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        cursor: pointer;
+        box-shadow: 0 16px 30px rgba(21, 87, 192, 0.24);
+      }
+
+      .search-button:disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+        box-shadow: none;
+      }
+
+      .filter-summary {
+        display: grid;
+        gap: 8px;
+        justify-items: start;
+      }
+
+      .summary-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 14px;
+        border-radius: 999px;
+        background: var(--rel-primary-soft);
+        color: var(--rel-primary);
+        font-weight: 800;
+      }
+
+      .summary-text {
+        margin: 0;
+        color: var(--rel-muted);
+        line-height: 1.55;
+      }
+
+      .table-wrap {
+        margin-top: 18px;
+        overflow: auto;
+      }
+
+      .ranking-table--students thead th:first-child,
+      .ranking-table--students tbody td:first-child {
+        width: 68%;
+      }
+
+      .ranking-table--students thead th:last-child,
+      .ranking-table--students tbody td:last-child {
+        width: 32%;
+        text-align: center;
+      }
+
+      .summary-strip {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        margin-top: 18px;
+      }
+
+      .summary-card {
+        padding: 18px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.8);
+        border: 1px solid rgba(21, 87, 192, 0.12);
+      }
+
+      .summary-card__label {
+        margin: 0 0 8px;
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        font-weight: 800;
+        color: var(--rel-primary);
+      }
+
+      .summary-card__value {
+        margin: 0;
+        font-size: clamp(1.05rem, 2vw, 1.45rem);
+        font-weight: 900;
+        color: var(--rel-text);
+      }
+
+      .summary-card__hint {
+        margin: 6px 0 0;
+        color: var(--rel-muted);
+        line-height: 1.5;
+      }
+
+      .empty-state {
+        display: grid;
+        gap: 8px;
+        justify-items: start;
+        padding: 18px;
+        border-radius: 18px;
+        border: 1px dashed rgba(21, 87, 192, 0.22);
+        background: rgba(255, 255, 255, 0.72);
+        margin-top: 18px;
+      }
+
+      .empty-state strong {
+        font-size: 1rem;
+      }
+
+      .empty-state p {
+        margin: 0;
+        color: var(--rel-muted);
+        line-height: 1.6;
+      }
+
+      @media (max-width: 820px) {
+        .filter-grid,
+        .summary-strip {
+          grid-template-columns: 1fr;
+        }
+
+        .search-row {
+          justify-content: stretch;
+        }
+
+        .search-button {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="module-shell">
+      <header class="module-header">
+        <a class="back-link" href="../pages/index.html">Voltar</a>
+
+        <div>
+          <p class="eyebrow">Relatórios</p>
+          <h1>Melhor da Classe</h1>
+          <p class="subtitle">
+            Selecione uma turma para visualizar todos os alunos dela.
+          </p>
+        </div>
+      </header>
+
+      <section class="module-panel">
+        <div class="module-panel__box">
+          <div class="module-intro">
+            <div class="module-note" aria-live="polite">
+              <div>
+                <strong>Turmas disponíveis</strong>
+                <p class="summary-text">
+                        Escolha o período e a turma para consultar o ranking.
+                </p>
+              </div>
+              <span class="summary-pill" id="loadedCount">0 turmas</span>
+            </div>
+
+            <div class="filter-grid">
+              <label>
+                <span class="field-label">Data inicial</span>
+                <input class="field-input" id="startDate" type="date" />
+              </label>
+
+              <label>
+                <span class="field-label">Data final</span>
+                <input class="field-input" id="endDate" type="date" />
+              </label>
+
+              <label>
+                <span class="field-label">Turma</span>
+                <select class="field-select" id="classSelect" aria-label="Selecionar turma">
+                  <option value="" selected>&lt; SELECIONE &gt;</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="search-row">
+              <button class="search-button" id="searchButton" type="button">Buscar</button>
+            </div>
+
+            <div class="filter-summary">
+              <span class="summary-pill" id="studentsCount">0 alunos exibidos</span>
+              <p class="summary-text" id="classDescription">
+                Escolha um período, uma turma e clique em Buscar para consultar o ranking.
+              </p>
+            </div>
+          </div>
+
+          <div class="summary-strip" id="summaryStrip" aria-live="polite" hidden>
+            <article class="summary-card">
+              <p class="summary-card__label">Período consultado</p>
+              <p class="summary-card__value" id="periodRange">Nenhum período selecionado.</p>
+              <p class="summary-card__hint">Intervalo usado no cálculo do ranking.</p>
+            </article>
+
+            <article class="summary-card">
+              <p class="summary-card__label">Alunos exibidos</p>
+              <p class="summary-card__value" id="summaryStudentsCount">0</p>
+              <p class="summary-card__hint">Todos os alunos da turma no período.</p>
+            </article>
+
+            <article class="summary-card">
+              <p class="summary-card__label">Turma ativa</p>
+              <p class="summary-card__value" id="summaryClassLabel">&lt; SELECIONE &gt;</p>
+              <p class="summary-card__hint">Turma usada no filtro.</p>
+            </article>
+          </div>
+
+          <div id="emptyState" class="empty-state">
+            <strong id="emptyTitle">Nenhuma turma selecionada</strong>
+            <p id="emptyMessage">
+              Quando você selecionar uma turma, somente os alunos dela aparecerão na tabela.
+            </p>
+          </div>
+
+          <div id="tableWrap" class="table-wrap" hidden>
+            <table class="ranking-table ranking-table--students" aria-label="Lista de alunos da turma selecionada">
+              <thead>
+                <tr>
+                  <th scope="col">Nome do aluno</th>
+                  <th scope="col">%</th>
+                </tr>
+              </thead>
+              <tbody id="studentsBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+
+
+    <script src="../../../app/config/config.js"></script>
+    <script src="../../../app/config/api.js"></script>
+    <script src="../../../app/config/storage.js"></script>
+    <script src="../../../shared/services/api-client.js"></script>
+    <script src="../../../shared/ui/access-denied-dialog.js"></script>
+    <script src="../services/relatorios.service.js"></script>
+    <script src="../pages/melhor-da-classe.js" defer></script>
+  </body>
+</html>

@@ -1,7 +1,7 @@
 # Consulta de relatórios por período com snapshot imutável
 
 ## Decisão
-O módulo de Relatórios deve pesquisar por intervalo de datas em uma única consulta, armazenar o resultado em um snapshot imutável na memória da tela e liberar o botão Enviar apenas após uma resposta positiva. O botão Enviar não deve ler o DOM para montar o payload; ele deve reutilizar o snapshot já carregado.
+O módulo de Relatórios deve pesquisar por intervalo de datas em uma única consulta, armazenar o resultado em um snapshot imutável na memória da tela e liberar os downloads apenas após uma resposta positiva. O relatório geral deve reutilizar o snapshot já carregado e não deve ler o DOM para montar o payload.
 
 ## Motivo
 Isso mantém a futura geração de PDF estável, evita reconsultar o backend desnecessariamente e separa a exibição da fonte canônica dos dados.
@@ -17,7 +17,7 @@ O botão **Enviar** chegou a gerar o PDF no próprio frontend, a partir do snaps
 
 
 ## Atualização (2026-08-04 — resumo direto e download-only)
-O card de resultado passou a ser o ponto canônico de exibição do relatório no frontend. O módulo normaliza as datas antes de exibir o conteúdo, mostra o resumo completo dentro do próprio painel e o botão **Enviar Relatório** baixa o PDF diretamente. A pré-visualização em `iframe` foi removida.
+O card de resultado passou a ser o ponto canônico de exibição do relatório no frontend. O módulo normaliza as datas antes de exibir o conteúdo, mostra o resumo completo dentro do próprio painel e o fluxo de download foi separado em **Baixar Relatório** e **Presenças**. A pré-visualização em `iframe` foi removida.
 
 
 ## Atualização (2026-08-04 — cards por turma)
@@ -29,3 +29,6 @@ O snapshot preservado após a consulta continua sendo a fonte canônica do módu
 
 ## Atualização (2026-08-05 — total exibido)
 O snapshot continua sendo a fonte canônica do módulo, mas o campo `Total` mostrado nos cards deve ser derivado de `Presentes + Visitantes`. O campo `Matriculados` continua vindo de `total_alunos` para representar a base ativa da turma.
+
+## Atualização (2026-08-08 — downloads separados)
+O snapshot continua sendo a fonte canônica do relatório geral, mas o fluxo de PDF foi dividido: **Baixar Relatório** gera apenas o consolidado por classes e **Presenças** usa o endpoint detalhado para baixar somente o detalhamento de presença.

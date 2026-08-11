@@ -7,6 +7,9 @@
 - O login espera um token em campos comuns de resposta (`token`, `accessToken`, `data.token`, `result.token`, `auth.token`).
 - O dashboard protege a entrada: sem token válido na `sessionStorage`, a página volta para a tela de login.
 - A página de classes usa `GET /api/v1/classes`, renderiza as classes recebidas e navega para a tela de chamada levando `classId` e `className` na query string.
+- O submódulo `relatorios/melhores-classes` agora consulta o backend real em `GET /api/v1/reports/classes-ranking` (com aliases `class-ranking` e `best-classes-ranking`) usando o mesmo período do financeiro (`startDate`/`endDate`), mantendo a lista compacta com apenas `Nome da classe` e `%`.
+- O submódulo `relatorios/melhor-da-classe` agora consulta o backend real: carrega as turmas em `/classes`, mantém a opção inicial `< SELECIONE >` e busca o ranking em `/reports/class-students-ranking` (com aliases) a partir da turma escolhida.
+- O submódulo `relatorios/financeiro` agora consulta o backend real em `GET /api/v1/reports/financial-period`, usando `startDate`, `endDate` e `classId` opcional; a tela renderiza o consolidado e os lançamentos retornados pelo endpoint.
 - A página de classes aplica uma ordem visual fixa para o cadastro 1 antes de renderizar os cards: `Cordeirinhos de Cristo`, `Shalon`, `Filhos de Asáfe`, `Mensageiros de Cristo`, `Filhos de Sião` e `Rosas de Saron`; essa prioridade não depende da ordenação alfabética da API.
 - A tela de chamada carrega alunos ativos e inativos por consultas separadas e preserva `id_aluno_classe` ao mesclar respostas.
 - O salvamento da chamada continua dependendo de `id_aluno_classe` válido e usa `PATCH /attendance/:callId` com `students[]`.
@@ -37,12 +40,15 @@
 - O módulo de Relatórios possui consulta por intervalo de datas ligada ao backend real (`GET /reports/period`, com token e tratamento de erro via `api-client.js`/`error-dialog.js`), snapshot imutável e renderização do resultado no card principal da tela.
 - O frontend não deve usar o DOM como fonte do PDF; o payload consolidado da busca é o estado canônico do relatório.
 - O dashboard não exibe mais o texto visível “Navegação” no hero.
-- O botão **Enviar Relatório** continua baixando o PDF diretamente, mas agora faz uma chamada ao backend (`GET /reports/period/pdf`) no momento do download para acrescentar as páginas diárias detalhadas. O snapshot continua sendo a base dos cartões/resumo já existentes.
+- O módulo de Relatórios agora tem dois downloads: **Baixar Relatório** gera apenas o consolidado por classes a partir do snapshot; **Presenças** faz a consulta detalhada ao backend (`GET /reports/period/pdf`) e baixa somente o PDF de presença. O snapshot continua sendo a base do relatório geral.
 - O layout do relatório na tela deve ficar no card de resultado; a pré-visualização em `iframe` foi removida.
-- A página de Relatórios depende do carregamento de `jspdf.umd.min.js`; sem esse script o botão **Enviar Relatório** não consegue gerar o arquivo.
+- A área de Relatórios foi reorganizada em uma vitrine de módulos em `src/modules/relatorios/pages/index.html`; o fluxo funcional de consulta por data única ficou em `src/modules/relatorios/presencas/index.html`.
+- O service compartilhado de relatórios ganhou `searchFinancialPeriod(...)` e o endpoint `APP_REPORTS_SERVICE.endpoints.financial` para consumir o contrato financeiro sem mock local.
+- Em Presenças, a busca usa uma única data e o service replica o valor para `startDate`/`endDate` quando o endpoint exigir intervalo; os submódulos de ranking já consomem o backend real e os fluxos restantes seguem seus contratos próprios.
+- A página de Relatórios depende do carregamento de `jspdf.umd.min.js`; sem esse script os downloads em PDF não conseguem gerar o arquivo.
 
 
-- No módulo de Relatórios, o card de resultado passou a mostrar o relatório completo no próprio painel; o botão **Enviar Relatório** baixa o PDF diretamente.
+- No módulo de Relatórios, o card de resultado passou a mostrar o relatório completo no próprio painel; os downloads foram separados em **Baixar Relatório** e **Presenças**.
 - As datas do relatório são normalizadas no frontend: apenas data vira `dd/mm/yyyy`; data com hora vira `dd/mm/yyyy - hh:mm`.
 - O PDF continua preservando as páginas de resumo já existentes, sem leitura do DOM como fonte; as páginas detalhadas por data/classe vêm do backend e o layout principal mantém fallback alternativo quando falha.
 
@@ -65,4 +71,59 @@
 
 - A tela de chamada recalcula a data de negócio por request e não deve voltar a congelar `attendanceDate` no estado inicial.
 - O fluxo de abertura da chamada não envia mais data pelo cliente; o backend define a data válida do dia.
+
+- O módulo de classes agora trata HTTP 403 como bloqueio de acesso: o frontend oculta a shell da tela e abre o diálogo reutilizável `APP_ACCESS_DENIED_DIALOG`, em vez de renderizar erro inline.
+- O diálogo de permissão reutilizável mostra somente a mensagem vinda do backend e oferece o botão **Voltar**; ele não exibe trace, stack nem suporte.
+- O diálogo de permissão reutilizável passou a travar também a rolagem/fundo da página enquanto está aberto, para evitar movimento visual atrás do modal.
+- Esse diálogo não fecha por clique fora nem pela tecla Escape; a saída autorizada é o botão **Voltar**.
+
+
+- O submódulo **Melhor Aluno Geral** agora deve ser tratado como uma lista compacta de três colunas: `Nome`, `Classe` e `%`; a presença do aluno sempre aparece com o cabeçalho `%` quando o símbolo não vier da origem.
+
+
+- O submódulo `relatorios/melhor-aluno-geral` está temporariamente desativado: o card fica oculto no hub e a página não executa o ranking enquanto a desativação estiver vigente.
+- O submódulo `relatorios/financeiro` passou a oferecer **Baixar Extrato** com PDF gerado a partir do JSON do backend; o título é `Extrato Financeiro EBD` e o bloco de `Total Geral` se repete no topo das páginas seguintes.
+- O backend agora bloqueia o perfil `Financeiro` nos subdiretórios de relatórios que não sejam `financeiro`; o frontend deve tratar `403` como acesso negado nesses módulos.
+- O hub de Relatórios agora oculta os submódulos não financeiros quando o token pertence ao perfil `Financeiro`, deixando visível apenas **Financeiro**.
+- Os submódulos de Relatórios fora de `Financeiro` passaram a reutilizar `APP_ACCESS_DENIED_DIALOG` ao receber HTTP 403, com retorno para o hub de Relatórios.
+- O extrato financeiro em PDF usa o título `Extrato Financeiro EBD`, repete o bloco de `Total Geral` em todas as páginas e precisa receber metadados de paginação válidos para não quebrar em `pageNumber`.
+
+## Atualização 2026-08-10 — acesso a Relatórios
+
+- `Financeiro` acessa somente o submódulo `Financeiro`; `Presenças`, rankings e demais relatórios não financeiros devolvem 403.
+- `Secretaria` vê o módulo principal `Relatórios` no dashboard, mas não pode entrar; o backend bloqueia o acesso direto e o hub abre `APP_ACCESS_DENIED_DIALOG` em 403.
+- O hub de Relatórios valida `GET /api/v1/reports/access` antes de exibir os cards e usa `APP_ACCESS_DENIED_DIALOG` para 403.
+
+
+
+## Atualização 2026-08-10 — rankings de Classes
+
+- A tela de Classes já consome diretamente `presence-ranking` e `offers-ranking`; não foi necessário alterar o frontend.
+- O erro 403 da Secretaria durante `loadRanking()` era causado pelo guard global de Relatórios no backend.
+- Após liberar essas duas APIs via `CLASSES_VIEW`, os rankings devem carregar normalmente para Secretaria.
+
+## Atualização 2026-08-10 — limpeza de copy técnico na interface
+
+- As mensagens visíveis ao usuário não devem mencionar `API`, `backend`, `endpoint`, `tenant`, autenticação técnica ou "ranking real". A lógica de integração permanece a mesma; apenas a copy foi simplificada.
+- Na página de Presenças, o selo visual com `P` foi removido; o título e as funções da tela permanecem.
+
+## Atualização 2026-08-10 — Melhor da Classe por período
+
+- A tela `melhor-da-classe` passou a usar duas datas e o botão `Buscar`, seguindo o padrão visual/funcional do Financeiro.
+- O service envia `classId`, `startDate` e `endDate`; o período exibido no resumo vem do payload da consulta.
+
+
+## Atualização 2026-08-10 — desativação do Melhor Aluno Geral e lista completa por turma
+
+- **Melhor Aluno Geral** está temporariamente desativado no frontend; a implementação foi preservada para futura reativação.
+- **Melhor da Classe** exibe todos os alunos retornados para a turma e período, sem limite de quantidade.
+- O frontend não envia `limit` para o ranking da turma e o backend ignora eventual `limit` recebido para esse fluxo.
+
+## Atualização 2026-08-10 — correção efetiva do limite do Melhor da Classe
+
+- O backend já retornava o fluxo de **Melhor da Classe** sem limite; o truncamento remanescente estava no frontend, em `normalizeRankingList()`, por causa de `.slice(0, 10)`.
+- `fetchClassStudentsRanking()` agora usa `normalizeClassStudentsRankingList()`, sem truncamento, enquanto rankings Top 10 continuam usando seus normalizadores com limite.
+- O frontend inclui teste de regressão garantindo que uma lista com 25 alunos permaneça com 25 itens.
+
+- `Melhores Classes` agora exibe a participação de cada classe no total de presenças das classes retornadas, em duas casas decimais e total de 100,00%; o cálculo usa `presentes`/`alunos_presentes` já fornecido pelo endpoint e não exige mudança no SQL.
 

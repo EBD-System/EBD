@@ -73,7 +73,7 @@
 
 ### O que foi alterado
 - O bloco de resultado passou a exibir o relatório completo no próprio painel, no card que fica abaixo dos indicadores.
-- O botão passou a chamar **Enviar Relatório** e baixa o PDF diretamente, sem pré-visualização.
+- O botão passou a chamar **Baixar Relatório** e o download de presença foi separado em um botão próprio.
 - As datas de exibição passaram a ser normalizadas para `dd/mm/yyyy` ou `dd/mm/yyyy - hh:mm`, conforme a origem do valor.
 
 ### Conhecimento consolidado
@@ -88,3 +88,7 @@
 
 - O painel de resultado deixou de exibir apenas um resumo agregado e passou a renderizar cards individuais por turma mais um card total consolidado.
 - Os cards usam snapshot imutável, com formatação normalizada de datas e valores, e o PDF continua sendo gerado a partir desse mesmo snapshot.
+
+## Atualização (2026-08-08 — downloads separados)
+- O relatório geral e o detalhamento de presença passaram a ser baixados por botões distintos.
+- O relatório geral continua baseado no snapshot da consulta; o detalhamento de presença continua vindo do endpoint específico do backend.
