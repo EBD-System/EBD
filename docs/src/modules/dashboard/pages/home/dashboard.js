@@ -63,6 +63,13 @@ const navigationItems = [
     href: '../../../relatorios/pages/index.html'
   },
   {
+    title: 'Gerar escala',
+    description: 'Monte a escala dos domingos do ano.',
+    icon: 'E',
+    href: '../../../gerar-escala/index.html',
+    alwaysVisible: true
+  },
+  {
     title: 'Configurações',
     description: 'Abra os ajustes gerais do sistema administrativo.',
     icon: '⚙',
@@ -99,6 +106,10 @@ function renderSession(currentSession) {
 }
 
 function shouldShowNavigationItem(item) {
+  if (item.alwaysVisible) {
+    return true;
+  }
+
   if (typeof APP_CONFIG.isVisibleModule === 'function' && !APP_CONFIG.isVisibleModule(item.title)) {
     return false;
   }

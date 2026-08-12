@@ -172,3 +172,15 @@
 - Nenhuma linha da tabela pode renderizar a classe como célula ou texto adicional.
 - A classe continua disponível no relatório individual/prévia/PDF; a mudança é exclusivamente visual e não altera endpoints.
 - Foi adicionado teste de regressão para impedir o retorno da célula de classe na listagem.
+
+## Atualização 2026-08-12 — Gerar escala
+
+- O módulo `gerar-escala` foi integrado ao padrão visual do site, usando a mesma linguagem visual dos painéis de Relatórios.
+- **Gerar escala** aparece no dashboard imediatamente abaixo de **Relatórios** e é sempre visível para os perfis que acessam o dashboard.
+- A lógica do módulo permanece inalterada; a mudança foi limitada a layout, navegação e textos amigáveis ao usuário.
+
+## Atualização 2026-08-12 — Gerar escala: navegação e exemplos
+
+- Corrigido o botão **Voltar** de `gerar-escala` para `../dashboard/pages/home/index.html`, evitando a rota incorreta `/src/dashboard/pages/home/index.html`.
+- No dashboard, a ordem dos módulos visíveis agora é **Classes**, **Gerar escala**, **Relatórios**; **Gerar escala** continua com `alwaysVisible: true`.
+- Os nomes padrão do módulo passaram a ser **João (Exemplo)**, **Maria (Exemplo)**, **Pedro (Exemplo)** e **Ana (Exemplo)**.

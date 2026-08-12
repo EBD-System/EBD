@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Gere a escala dos domingos do ano e copie cada período com facilidade."
+    />
+    <title>Gerar escala</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="hub-shell">
+      <header class="hub-header">
+        <a class="back-link" href="../dashboard/pages/home/index.html">Voltar</a>
+
+        <div class="hub-brand">
+          <p class="eyebrow">Módulo</p>
+          <h1>Gerar escala</h1>
+          <p class="subtitle">
+            Organize os domingos do ano e tenha a escala pronta para copiar e compartilhar.
+          </p>
+        </div>
+      </header>
+
+      <section class="hub-panel" aria-labelledby="people-title">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Pessoas</p>
+            <h2 id="people-title">Quem participa?</h2>
+          </div>
+        </div>
+
+        <div class="add-row">
+          <input id="personInput" type="text" placeholder="Digite um nome" />
+          <button id="addPersonBtn" class="btn primary add-button" type="button" aria-label="Adicionar pessoa">
+            +
+          </button>
+        </div>
+
+        <ul id="peopleList" class="people-list" aria-live="polite"></ul>
+      </section>
+
+      <section class="hub-panel" aria-labelledby="config-title">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Configuração</p>
+            <h2 id="config-title">Como será a escala?</h2>
+          </div>
+        </div>
+
+        <div class="form-grid">
+          <label class="field">
+            <span>Ano</span>
+            <input id="yearInput" type="number" min="1900" max="2100" />
+          </label>
+
+          <label class="field">
+            <span>Pessoas por domingo</span>
+            <input id="perSundayInput" type="number" min="1" />
+          </label>
+        </div>
+
+        <div class="form-actions">
+          <button id="generateBtn" class="btn primary generate" type="button">
+            Gerar escala
+          </button>
+        </div>
+      </section>
+
+      <section class="hub-panel" aria-labelledby="result-title">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Resultado</p>
+            <h2 id="result-title">Escala pronta</h2>
+          </div>
+        </div>
+
+        <div id="summary" class="summary muted">Nenhuma escala gerada ainda.</div>
+        <div id="output" class="quarters"></div>
+      </section>
+    </main>
+
+    <script src="./script.js"></script>
+  </body>
+</html>
