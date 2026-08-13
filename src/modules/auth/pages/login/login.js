@@ -13,6 +13,9 @@ const loginButton = document.getElementById('loginButton');
 const feedback = document.getElementById('feedback');
 const postLogin = document.getElementById('postLogin');
 const logoutButton = document.getElementById('logoutButton');
+const loginLoading = document.getElementById('loginLoading');
+const loginLoadingMark = loginLoading.querySelector('.login-loading__mark');
+const loginLoadingText = document.getElementById('loginLoadingText');
 
 const rememberedUsername = window.localStorage.getItem(STORAGE_KEYS.username);
 if (rememberedUsername) {
@@ -44,6 +47,7 @@ form.addEventListener('submit', async (event) => {
   }
 
   setLoading(true);
+  showLoginLoading('loading');
 
   try {
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
@@ -68,9 +72,13 @@ form.addEventListener('submit', async (event) => {
     storeToken(token);
     syncRememberedUsername(login, rememberUser.checked);
     passwordInput.value = '';
-    goToDashboard();
+    showLoginLoading('success');
+    window.setTimeout(goToDashboard, 420);
   } catch (error) {
-    feedback.textContent = error.message || 'Falha ao efetuar login.';
+    const message = error.message || 'Falha ao efetuar login.';
+    feedback.textContent = message;
+    showLoginLoading('error', message);
+    window.setTimeout(() => hideLoginLoading(), 800);
   } finally {
     setLoading(false);
   }
@@ -137,4 +145,39 @@ function syncRememberedUsername(login, shouldRemember) {
   }
 
   window.localStorage.removeItem(STORAGE_KEYS.username);
+}
+
+
+function showLoginLoading(state, message = '') {
+  loginLoading.classList.add('is-visible');
+  loginLoading.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('login-loading-active');
+  form.inert = true;
+  forgotPasswordLink.inert = true;
+  loginLoadingMark.className = 'login-loading__mark';
+  loginLoadingMark.innerHTML = '';
+
+  if (state === 'success') {
+    loginLoadingMark.classList.add('login-loading__mark--success');
+    loginLoadingText.textContent = 'Tudo certo. Entrando...';
+    return;
+  }
+
+  if (state === 'error') {
+    loginLoadingMark.classList.add('login-loading__mark--error');
+    loginLoadingText.textContent = message || 'Não foi possível entrar.';
+    return;
+  }
+
+  loginLoadingMark.classList.add('login-loading__mark--loading');
+  loginLoadingMark.innerHTML = '<span class="login-loading__spinner"></span>';
+  loginLoadingText.textContent = 'Aguarde...';
+}
+
+function hideLoginLoading() {
+  loginLoading.classList.remove('is-visible');
+  loginLoading.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('login-loading-active');
+  form.inert = false;
+  forgotPasswordLink.inert = false;
 }

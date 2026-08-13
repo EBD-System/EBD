@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#ffffff" />
     <meta name="description" content="Tela de login com visual limpo, profissional e pronto para GitHub Pages." />
-    <title>Login | Área Restrita</title>
+    <title>Login | Escola Bíblica Dominical</title>
     <link rel="stylesheet" href="./src/modules/auth/pages/login/login.css" />
   </head>
   <body>
@@ -13,20 +13,23 @@
       <section class="brand-panel" aria-hidden="true">
         <div class="brand-mark">
           <span class="brand-mark__halo"></span>
-          <span class="brand-mark__cross">✝</span>
+          <img
+            class="brand-mark__logo"
+            src="./src/modules/auth/pages/login/assets/logo-assembleia-de-deus.png"
+            alt="Logo da Assembleia de Deus"
+          />
         </div>
-        <h1>Área Restrita</h1>
-        <p>
-          Acesso seguro para a base administrativa, com uma experiência limpa,
-          objetiva e pronta para expansão futura.
-        </p>
       </section>
 
-      <section class="card" aria-labelledby="login-title">
+      <div class="login-card-wrap">
+        <div class="login-quote-divider" aria-label='"O maior entre vocês é aquele que serve."'>
+          <span>"O maior entre vocês é aquele que serve."</span>
+        </div>
+
+        <section class="card" aria-labelledby="login-title">
         <div class="card__header">
-          <p class="eyebrow">Entrada oficial</p>
-          <h2 id="login-title">Faça seu login</h2>
-          <p class="subtitle">Use suas credenciais para acessar o sistema.</p>
+          <p class="eyebrow">Escola Bíblica Dominical</p>
+          <h2 id="login-title">Login</h2>
         </div>
 
         <form id="loginForm" class="form" novalidate>
@@ -66,8 +69,18 @@
           </p>
           <button id="logoutButton" class="button button--secondary" type="button">Sair</button>
         </section>
-      </section>
+        </section>
+      </div>
     </main>
+
+    <div id="loginLoading" class="login-loading" aria-hidden="true">
+      <div class="login-loading__content" role="status" aria-live="polite" aria-atomic="true">
+        <div class="login-loading__mark login-loading__mark--loading" aria-hidden="true">
+          <span class="login-loading__spinner"></span>
+        </div>
+        <p id="loginLoadingText" class="login-loading__text">Aguarde...</p>
+      </div>
+    </div>
 
     <script src="./src/app/config/config.js"></script>
     <script src="./src/app/config/api.js"></script>

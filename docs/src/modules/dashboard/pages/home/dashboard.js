@@ -27,6 +27,19 @@ const navigationItems = [
     href: '../../../classe/pages/index.html'
   },
   {
+    title: 'Gerar escala',
+    description: 'Monte a escala dos domingos do ano.',
+    icon: 'E',
+    href: '../../../gerar-escala/index.html',
+    alwaysVisible: true
+  },
+  {
+    title: 'Relatórios',
+    description: 'Entre nos relatórios consolidados e análises operacionais.',
+    icon: 'R',
+    href: '../../../relatorios/pages/index.html'
+  },
+  {
     title: 'Cadastro',
     description: 'Abra o fluxo de registro e manutenção cadastral.',
     icon: '+',
@@ -55,19 +68,6 @@ const navigationItems = [
     description: 'Gerencie registros rápidos de visitantes do ambiente.',
     icon: 'V',
     href: '../../../visitante/pages/index.html'
-  },
-  {
-    title: 'Relatórios',
-    description: 'Entre nos relatórios consolidados e análises operacionais.',
-    icon: 'R',
-    href: '../../../relatorios/pages/index.html'
-  },
-  {
-    title: 'Gerar escala',
-    description: 'Monte a escala dos domingos do ano.',
-    icon: 'E',
-    href: '../../../gerar-escala/index.html',
-    alwaysVisible: true
   },
   {
     title: 'Configurações',

@@ -1,3 +1,12 @@
+## Estado atual — tela de login
+
+- A área de identidade visual do login usa apenas a logo e a frase discreta `"O maior entre vocês é aquele que serve."`; não há mais `h1` `Escola Bíblica Dominical` nessa área.
+- `Escola Bíblica Dominical` permanece somente como identificação pequena no cabeçalho do card; o título do formulário é `Login`.
+- A logo transparente está levemente menor e um pouco mais elevada.
+- O espaçamento entre a identidade visual e o card foi reduzido sem alterar a estrutura de autenticação. Em telas estreitas, o shell inicia no topo e evita linhas de grid esticadas; logo, frase/linha e card ficam visualmente próximos.
+- A tela de login não apresenta rolagem normal: o `body` usa `overflow: hidden`, inclusive fora do estado de carregamento.
+- O overlay de autenticação continua branco, em tela inteira e bloqueando interação/rolagem, com `V` no sucesso e `X` no erro.
+
 # Handoff
 
 - A aplicação tem login, dashboard e o módulo de classes como fluxos funcionais principais.
@@ -184,3 +193,36 @@
 - Corrigido o botão **Voltar** de `gerar-escala` para `../dashboard/pages/home/index.html`, evitando a rota incorreta `/src/dashboard/pages/home/index.html`.
 - No dashboard, a ordem dos módulos visíveis agora é **Classes**, **Gerar escala**, **Relatórios**; **Gerar escala** continua com `alwaysVisible: true`.
 - Os nomes padrão do módulo passaram a ser **João (Exemplo)**, **Maria (Exemplo)**, **Pedro (Exemplo)** e **Ana (Exemplo)**.
+
+## Atualização 2026-08-13 — tela de login
+
+- A tela inicial apresenta **Escola Bíblica Dominical** como identificação.
+- O título do formulário é **Login** e a frase de acesso por credenciais não é exibida.
+- A frase `"O maior entre vocês é aquele que serve."` é discreta e aparece abaixo da identificação da instituição.
+- A logo da Assembleia de Deus fornecida pelo usuário substitui o símbolo anterior e usa PNG com fundo externo transparente.
+- Durante o login existe um overlay branco de tela inteira, com interação e rolagem bloqueadas. O estado de carregamento mostra animação; sucesso mostra `V` azul e erro mostra `X` antes de liberar/redirecionar.
+- A mudança está limitada à entrada/login. Cópias de `index.html`, CSS, JS e logo em `docs/` foram sincronizadas para GitHub Pages.
+- Validação atual: `npm test` = 9/9, sem falhas.
+
+## Atualização 2026-08-13 — refinamento visual da tela de login
+
+- `Área Restrita` permanece removido.
+- O formulário agora usa somente `Login` como título e não exibe `Use suas credenciais para acessar o sistema.`.
+- A frase `"O maior entre vocês é aquele que serve."` é exibida de forma pequena e discreta abaixo de `Escola Bíblica Dominical`.
+- A logo da Assembleia de Deus passou para PNG com fundo externo transparente, baseada no arquivo fornecido pelo usuário, e ficou ligeiramente menor.
+- O overlay de carregamento da autenticação permanece exclusivo da tela de login, cobre toda a viewport, bloqueia interação/rolagem e agora usa fundo branco; `V` azul para sucesso e `X` para erro permanecem.
+
+
+## Atualização 2026-08-13 — ajuste fino de proximidade da tela de login
+
+- Em viewport estreita, o card de login deve ficar praticamente colado à frase, sem espaço vertical excessivo.
+- A logo permanece no canto superior da área de identidade, ligeiramente menor e com separação moderada da frase.
+- Alteração exclusivamente visual no CSS; fluxo de autenticação inalterado.
+
+## Atualização 2026-08-13 — frase integrada à linha azul do card
+
+- A frase `"O maior entre vocês é aquele que serve."` agora aparece centralizada sobre uma linha azul imediatamente acima do card de login.
+- O divisor e o card formam um único conjunto visual, sem o grande intervalo vertical anterior.
+- Em telas estreitas, a mesma composição é mantida com o divisor diretamente acima do card.
+- Alteração exclusivamente visual: autenticação e demais fluxos permanecem inalterados.
+- `docs/` foi regenerado via `npm run build` para manter o GitHub Pages sincronizado.

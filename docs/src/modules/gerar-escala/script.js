@@ -1,8 +1,8 @@
 const people = [
-  "João",
-  "Maria",
-  "Pedro",
-  "Ana"
+  "João (Exemplo)",
+  "Maria (Exemplo)",
+  "Pedro (Exemplo)",
+  "Ana (Exemplo)"
 ];
 
 const personInput = document.getElementById("personInput");
