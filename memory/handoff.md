@@ -226,3 +226,10 @@
 - Em telas estreitas, a mesma composição é mantida com o divisor diretamente acima do card.
 - Alteração exclusivamente visual: autenticação e demais fluxos permanecem inalterados.
 - `docs/` foi regenerado via `npm run build` para manter o GitHub Pages sincronizado.
+
+## Atualização 2026-08-13 — loading informativo do login
+
+- O overlay branco da tela de login agora troca automaticamente mensagens de progresso enquanto o POST `/auth/login` permanece pendente, útil para a primeira requisição lenta do ambiente gratuito.
+- As mensagens são neutras e não antecipam validação de credenciais; a confirmação só aparece após resposta válida com token.
+- Em HTTP 401 ou mensagem do backend claramente relacionada a credencial inválida, a tela informa `Usuário ou senha inválidos.` em vez do texto compartilhado de sessão expirada.
+- Nenhum arquivo do backend foi alterado; a correção foi mantida no `src/modules/auth/pages/login/login.js` e a cópia `docs/` foi regenerada.

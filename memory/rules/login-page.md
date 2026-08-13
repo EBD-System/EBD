@@ -64,3 +64,15 @@ A tela de login não deve apresentar rolagem vertical ou horizontal na composiç
 - `body` mantém `overflow: hidden` na tela de login.
 - O bloqueio é permanente na tela de login, e não depende apenas do estado de carregamento.
 - A alteração é visual e não modifica a autenticação.
+
+## Atualização 2026-08-13 — feedback de autenticação lenta e credenciais inválidas
+
+### Regra
+O overlay de login deve comunicar progresso durante a espera sem afirmar sucesso antes da resposta real do endpoint. Falhas de credencial devem usar mensagem específica de login.
+
+### Aplicação
+- As mensagens de espera devem alternar automaticamente enquanto a requisição estiver pendente.
+- A confirmação `Credenciais confirmadas. Entrando...` só pode aparecer depois de o frontend receber e validar uma resposta de sucesso com token.
+- HTTP 401 ou payload que identifique explicitamente credencial inválida deve resultar em `Usuário ou senha inválidos.`.
+- A mensagem genérica `Sua sessão expirou. Faça login novamente.` não deve ser apresentada como resultado de uma tentativa de login inválida.
+- O comportamento é exclusivo da tela de login; o `api-client.js` compartilhado não deve ser alterado para corrigir essa copy específica.

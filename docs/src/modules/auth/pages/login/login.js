@@ -17,6 +17,17 @@ const loginLoading = document.getElementById('loginLoading');
 const loginLoadingMark = loginLoading.querySelector('.login-loading__mark');
 const loginLoadingText = document.getElementById('loginLoadingText');
 
+const LOGIN_LOADING_MESSAGES = [
+  'Verificando seus dados de acesso...',
+  'Estabelecendo conexão com o sistema...',
+  'Consultando o servidor...',
+  'Aguardando a resposta do sistema...',
+  'Preparando seu acesso...',
+  'Finalizando a autenticação...'
+];
+let loginLoadingMessageTimer = null;
+let loginLoadingMessageIndex = 0;
+
 const rememberedUsername = window.localStorage.getItem(STORAGE_KEYS.username);
 if (rememberedUsername) {
   usernameInput.value = rememberedUsername;
@@ -75,7 +86,7 @@ form.addEventListener('submit', async (event) => {
     showLoginLoading('success');
     window.setTimeout(goToDashboard, 420);
   } catch (error) {
-    const message = error.message || 'Falha ao efetuar login.';
+    const message = getLoginFailureMessage(error);
     feedback.textContent = message;
     showLoginLoading('error', message);
     window.setTimeout(() => hideLoginLoading(), 800);
@@ -149,6 +160,8 @@ function syncRememberedUsername(login, shouldRemember) {
 
 
 function showLoginLoading(state, message = '') {
+  clearLoginLoadingMessageTimer();
+
   loginLoading.classList.add('is-visible');
   loginLoading.setAttribute('aria-hidden', 'false');
   document.body.classList.add('login-loading-active');
@@ -159,7 +172,7 @@ function showLoginLoading(state, message = '') {
 
   if (state === 'success') {
     loginLoadingMark.classList.add('login-loading__mark--success');
-    loginLoadingText.textContent = 'Tudo certo. Entrando...';
+    loginLoadingText.textContent = 'Credenciais confirmadas. Entrando...';
     return;
   }
 
@@ -171,10 +184,37 @@ function showLoginLoading(state, message = '') {
 
   loginLoadingMark.classList.add('login-loading__mark--loading');
   loginLoadingMark.innerHTML = '<span class="login-loading__spinner"></span>';
-  loginLoadingText.textContent = 'Aguarde...';
+  loginLoadingMessageIndex = 0;
+  loginLoadingText.textContent = LOGIN_LOADING_MESSAGES[loginLoadingMessageIndex];
+  loginLoadingMessageTimer = window.setInterval(() => {
+    loginLoadingMessageIndex = (loginLoadingMessageIndex + 1) % LOGIN_LOADING_MESSAGES.length;
+    loginLoadingText.textContent = LOGIN_LOADING_MESSAGES[loginLoadingMessageIndex];
+  }, 1800);
+}
+
+function clearLoginLoadingMessageTimer() {
+  if (loginLoadingMessageTimer === null) return;
+  window.clearInterval(loginLoadingMessageTimer);
+  loginLoadingMessageTimer = null;
+}
+
+function getLoginFailureMessage(error) {
+  const status = Number(error?.status || 0);
+  const backendMessage = String(error?.backendMessage || error?.primaryMessage || '').trim();
+
+  if (status === 401 || /(?:usu[aá]rio|login|senha|credencial).{0,40}(?:inv[aá]lid|incorret|errad)|(?:inv[aá]lid|incorret|errad).{0,40}(?:usu[aá]rio|login|senha|credencial)/i.test(backendMessage)) {
+    return 'Usuário ou senha inválidos.';
+  }
+
+  if (error instanceof TypeError && !backendMessage) {
+    return 'Não foi possível conectar ao sistema. Tente novamente.';
+  }
+
+  return error?.message || 'Não foi possível autenticar agora. Tente novamente.';
 }
 
 function hideLoginLoading() {
+  clearLoginLoadingMessageTimer();
   loginLoading.classList.remove('is-visible');
   loginLoading.setAttribute('aria-hidden', 'true');
   document.body.classList.remove('login-loading-active');

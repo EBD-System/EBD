@@ -9,3 +9,13 @@ O que foi alterado
 Conhecimento consolidado
 
 - Em telas estreitas, o espaçamento entre a frase e o card deve ser mínimo; a identidade visual deve ocupar apenas o espaço necessário antes do formulário.
+
+## Atualização 2026-08-13 — mensagens progressivas no carregamento do login
+
+O overlay de login agora alterna mensagens de progresso enquanto aguarda a resposta do endpoint de autenticação, evitando o texto genérico `Aguarde...` durante respostas lentas.
+
+As mensagens são deliberadamente neutras sobre etapas do backend: conexão, consulta ao servidor, espera de resposta e preparação do acesso. A confirmação de credenciais só aparece depois que a resposta de autenticação é aceita pelo frontend.
+
+Quando a autenticação falha com `401` (ou com payload explicitamente indicando credencial inválida), o frontend mostra `Usuário ou senha inválidos.` em vez da mensagem genérica de sessão expirada.
+
+O timer das mensagens é cancelado ao entrar em sucesso, erro ou ocultar o overlay.
