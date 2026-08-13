@@ -76,3 +76,10 @@ O overlay de login deve comunicar progresso durante a espera sem afirmar sucesso
 - HTTP 401 ou payload que identifique explicitamente credencial inválida deve resultar em `Usuário ou senha inválidos.`.
 - A mensagem genérica `Sua sessão expirou. Faça login novamente.` não deve ser apresentada como resultado de uma tentativa de login inválida.
 - O comportamento é exclusivo da tela de login; o `api-client.js` compartilhado não deve ser alterado para corrigir essa copy específica.
+
+## Atualização 2026-08-13 — duração variável das mensagens de carregamento
+
+- As mensagens do overlay de autenticação não devem trocar em intervalo fixo.
+- Cada etapa possui duração própria entre 3 e 5 segundos, refletindo aproximadamente o tempo esperado da operação, sem simular validação de credenciais antes da resposta real.
+- Durações atuais: `Verificando` 3,2 s; `Estabelecendo conexão` 3,8 s; `Consultando o servidor` 4,4 s; `Aguardando a resposta` 5 s; `Preparando seu acesso` 4,2 s; `Finalizando a autenticação` 3,6 s.
+- O timer é cancelado assim que o servidor responde, seja com sucesso ou erro.

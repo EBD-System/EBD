@@ -17,13 +17,13 @@ const loginLoading = document.getElementById('loginLoading');
 const loginLoadingMark = loginLoading.querySelector('.login-loading__mark');
 const loginLoadingText = document.getElementById('loginLoadingText');
 
-const LOGIN_LOADING_MESSAGES = [
-  'Verificando seus dados de acesso...',
-  'Estabelecendo conexão com o sistema...',
-  'Consultando o servidor...',
-  'Aguardando a resposta do sistema...',
-  'Preparando seu acesso...',
-  'Finalizando a autenticação...'
+const LOGIN_LOADING_STEPS = [
+  { message: 'Verificando seus dados de acesso...', duration: 3200 },
+  { message: 'Estabelecendo conexão com o sistema...', duration: 3800 },
+  { message: 'Consultando o servidor...', duration: 4400 },
+  { message: 'Aguardando a resposta do sistema...', duration: 5000 },
+  { message: 'Preparando seu acesso...', duration: 4200 },
+  { message: 'Finalizando a autenticação...', duration: 3600 },
 ];
 let loginLoadingMessageTimer = null;
 let loginLoadingMessageIndex = 0;
@@ -185,16 +185,34 @@ function showLoginLoading(state, message = '') {
   loginLoadingMark.classList.add('login-loading__mark--loading');
   loginLoadingMark.innerHTML = '<span class="login-loading__spinner"></span>';
   loginLoadingMessageIndex = 0;
-  loginLoadingText.textContent = LOGIN_LOADING_MESSAGES[loginLoadingMessageIndex];
-  loginLoadingMessageTimer = window.setInterval(() => {
-    loginLoadingMessageIndex = (loginLoadingMessageIndex + 1) % LOGIN_LOADING_MESSAGES.length;
-    loginLoadingText.textContent = LOGIN_LOADING_MESSAGES[loginLoadingMessageIndex];
-  }, 1800);
+  showNextLoginLoadingMessage();
+}
+
+function showNextLoginLoadingMessage() {
+  if (!loginLoading.classList.contains('is-visible')) return;
+
+  const step = LOGIN_LOADING_STEPS[loginLoadingMessageIndex];
+  if (!step) return;
+
+  loginLoadingText.textContent = step.message;
+  loginLoadingMessageTimer = window.setTimeout(() => {
+    loginLoadingMessageTimer = null;
+    if (!loginLoading.classList.contains('is-visible')) return;
+
+    loginLoadingMessageIndex += 1;
+    if (loginLoadingMessageIndex >= LOGIN_LOADING_STEPS.length) {
+      loginLoadingMessageIndex = LOGIN_LOADING_STEPS.length - 1;
+      showNextLoginLoadingMessage();
+      return;
+    }
+
+    showNextLoginLoadingMessage();
+  }, step.duration);
 }
 
 function clearLoginLoadingMessageTimer() {
   if (loginLoadingMessageTimer === null) return;
-  window.clearInterval(loginLoadingMessageTimer);
+  window.clearTimeout(loginLoadingMessageTimer);
   loginLoadingMessageTimer = null;
 }
 

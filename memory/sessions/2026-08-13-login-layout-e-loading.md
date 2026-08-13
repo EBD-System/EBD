@@ -19,3 +19,7 @@ As mensagens são deliberadamente neutras sobre etapas do backend: conexão, con
 Quando a autenticação falha com `401` (ou com payload explicitamente indicando credencial inválida), o frontend mostra `Usuário ou senha inválidos.` em vez da mensagem genérica de sessão expirada.
 
 O timer das mensagens é cancelado ao entrar em sucesso, erro ou ocultar o overlay.
+
+## Atualização — duração variável do carregamento
+
+O overlay de autenticação passou a usar timers individuais por mensagem, variando entre 3,2 e 5 segundos. A etapa de espera da resposta recebe o maior tempo; etapas de verificação, preparação e finalização recebem tempos menores. O fluxo continua sendo interrompido imediatamente quando a autenticação responde.

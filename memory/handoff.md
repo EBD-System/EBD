@@ -233,3 +233,10 @@
 - As mensagens são neutras e não antecipam validação de credenciais; a confirmação só aparece após resposta válida com token.
 - Em HTTP 401 ou mensagem do backend claramente relacionada a credencial inválida, a tela informa `Usuário ou senha inválidos.` em vez do texto compartilhado de sessão expirada.
 - Nenhum arquivo do backend foi alterado; a correção foi mantida no `src/modules/auth/pages/login/login.js` e a cópia `docs/` foi regenerada.
+
+## Atualização 2026-08-13 — duração variável do loading do login
+
+- As mensagens de autenticação agora avançam com tempos individuais de 3,2 a 5 segundos em vez de um intervalo fixo.
+- A etapa `Aguardando a resposta do sistema...` recebe 5 segundos por ser a mais dependente da latência do servidor; as demais usam tempos menores dentro da faixa definida.
+- A sequência para imediatamente quando a requisição termina, seja em sucesso ou erro.
+- Alteração restrita ao frontend; nenhuma lógica de backend foi modificada.
