@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Relatórios de presenças com resumo completo e download de PDF." />
+    <title>Presenças</title>
+    <link rel="stylesheet" href="../pages/relatorios.css" />
+  </head>
+  <body>
+    <main class="relatorios-shell">
+      <header class="relatorios-header">
+        <a class="back-link" href="../pages/index.html">Voltar</a>
+
+        <div class="brand">
+          <span class="brand__badge" aria-hidden="true"></span>
+          <div>
+            <p class="eyebrow">Relatórios</p>
+            <h1>Presenças</h1>
+            <p class="subtitle">Consulta por data com resumo completo.</p>
+          </div>
+        </div>
+      </header>
+
+      <section class="relatorios-panel" aria-labelledby="consult-title">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Consulta</p>
+            <h2 id="consult-title">Pesquisar por data</h2>
+          </div>
+        </div>
+
+        <form id="reportForm" class="filter-form">
+          <label class="field" for="reportDate">
+            <span>Data</span>
+            <input id="reportDate" type="date" name="reportDate" required />
+          </label>
+
+          <div class="form-actions">
+            <button id="searchButton" class="action-button action-button--primary" type="submit">Buscar</button>
+            <button id="sendButton" class="action-button action-button--primary" type="button" disabled>
+              Baixar Relatório
+            </button>
+            <button id="attendanceButton" class="action-button action-button--secondary" type="button" disabled>
+              Presenças
+            </button>
+          </div>
+        </form>
+
+        <div id="statusBanner" class="status-banner" role="status" aria-live="polite">
+          Informe uma data para buscar as presenças.
+        </div>
+      </section>
+
+      <section id="resultsPanel" class="relatorios-panel" aria-labelledby="results-title" hidden>
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Resultado</p>
+            <h2 id="results-title">Relatório carregado</h2>
+          </div>
+          <p id="resultsMeta" class="panel-hint">Nenhuma consulta realizada ainda.</p>
+        </div>
+
+        <div id="emptyState" class="results-grid">
+          <article class="preview-card" style="grid-column:1/-1">
+            <p class="placeholder">
+              O relatório aparecerá aqui assim que você buscar uma data válida.
+            </p>
+          </article>
+        </div>
+
+        <div id="reportContent" class="results-grid" aria-live="polite" hidden>
+          <h3 id="reportTitle" class="report-title">Relatório carregado</h3>
+
+          <article class="report-card">
+            <div class="report-card__head">
+              <div>
+                <p class="eyebrow">Resumo completo</p>
+                <h3 class="preview-card__title">Cards por turma</h3>
+              </div>
+              <p id="reportPeriod" class="report-card__date">O relatório normalizado aparecerá aqui.</p>
+            </div>
+
+            <div id="reportSummary" class="report-summary">
+              <p class="placeholder">O relatório aparecerá aqui assim que você buscar uma data válida.</p>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <script src="../../../app/config/config.js"></script>
+    <script src="../../../app/config/api.js"></script>
+    <script src="../../../app/config/storage.js"></script>
+    <script src="../../../shared/services/api-client.js"></script>
+    <script src="../../../shared/ui/access-denied-dialog.js"></script>
+    <script src="../../../app/config/error.js"></script>
+    <script src="../../../shared/ui/error-dialog.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="../services/relatorios.service.js"></script>
+    <script src="../pages/relatorios.js" defer></script>
+  </body>
+</html>

@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Relatório individual do aluno por período."
+    />
+    <title>Relatório do Aluno</title>
+    <link rel="stylesheet" href="../pages/relatorios-module.css" />
+    <link rel="stylesheet" href="../pages/relatorio-aluno.css" />
+  </head>
+  <body>
+    <main class="module-shell">
+      <header class="module-header">
+        <a class="back-link" href="../pages/index.html">Voltar</a>
+
+        <div>
+          <p class="eyebrow">Relatórios</p>
+          <h1>Relatório do Aluno</h1>
+          <p class="subtitle">
+            Consulte os alunos de uma turma e baixe o relatório completo de frequência por período.
+          </p>
+        </div>
+      </header>
+
+      <section class="module-panel">
+        <div class="module-panel__box">
+          <div class="relatorio-aluno-intro">
+            <div class="relatorio-aluno-note" aria-live="polite">
+              <strong>Relatório individual</strong>
+              <p>
+                Escolha o período e a turma. A lista de alunos aparece ao selecionar a turma; use a busca para localizar um aluno e clique em <strong>BAIXAR</strong> para gerar o relatório.
+              </p>
+            </div>
+
+            <div class="student-filter-grid">
+              <label class="field-group">
+                <span class="field-label">Data inicial</span>
+                <input class="field-input" id="startDate" type="date" />
+              </label>
+
+              <label class="field-group">
+                <span class="field-label">Data final</span>
+                <input class="field-input" id="endDate" type="date" />
+              </label>
+
+              <label class="field-group">
+                <span class="field-label">Turma</span>
+                <select class="field-select" id="classSelect" aria-label="Selecionar turma">
+                  <option value="" selected>&lt; SELECIONE &gt;</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="student-search">
+              <label class="field-label" for="studentSearch">Procurar aluno</label>
+              <div class="student-search-row">
+                <input
+                  class="student-search__input"
+                  id="studentSearch"
+                  type="search"
+                  autocomplete="off"
+                  placeholder="Digite o nome do aluno..."
+                  aria-label="Procurar aluno pelo nome"
+                  disabled
+                />
+                <span class="class-count" id="classCount">0 alunos</span>
+              </div>
+              <p class="class-status" id="statusMessage" aria-live="polite">
+                Carregando turmas...
+              </p>
+            </div>
+          </div>
+
+          <div id="studentEmpty" class="student-empty" aria-live="polite">
+            <strong id="studentEmptyTitle">Escolha uma turma</strong>
+            <p id="studentEmptyMessage">
+              As classes são carregadas automaticamente. Selecione uma turma para listar os alunos.
+            </p>
+          </div>
+
+          <div id="studentTableWrap" class="student-table-wrap" hidden>
+            <table class="student-table" aria-label="Alunos da turma selecionada">
+              <thead>
+                <tr>
+                  <th scope="col">Nome do aluno</th>
+                  <th scope="col">Baixar</th>
+                </tr>
+              </thead>
+              <tbody id="studentTableBody"></tbody>
+            </table>
+          </div>
+
+          <section id="reportPreview" hidden aria-labelledby="reportPreviewTitle">
+            <div class="student-summary">
+              <article class="student-summary-card">
+                <p class="student-summary-card__label">Aluno</p>
+                <p class="student-summary-card__value" id="reportStudentName">—</p>
+              </article>
+
+              <article class="student-summary-card">
+                <p class="student-summary-card__label">Classe</p>
+                <p class="student-summary-card__value" id="reportClassName">—</p>
+              </article>
+
+              <article class="student-summary-card">
+                <p class="student-summary-card__label">Presenças</p>
+                <p class="student-summary-card__value" id="reportPresences">0</p>
+              </article>
+
+              <article class="student-summary-card">
+                <p class="student-summary-card__label">Atrasos</p>
+                <p class="student-summary-card__value" id="reportDelays">0</p>
+              </article>
+
+              <article class="student-summary-card student-summary-card--presence">
+                <p class="student-summary-card__label">Presença</p>
+                <p class="student-summary-card__value" id="reportPresencePercent">0%</p>
+              </article>
+            </div>
+
+            <div class="monthly-section">
+              <h2 id="reportPreviewTitle">Resumo mensal</h2>
+              <p id="reportPeriod">Período selecionado</p>
+
+              <div class="monthly-table-wrap">
+                <table class="monthly-table" aria-label="Resumo mensal do aluno">
+                  <thead>
+                    <tr>
+                      <th scope="col">Mês</th>
+                      <th scope="col">Chamadas</th>
+                      <th scope="col">Presenças</th>
+                      <th scope="col">Atrasos</th>
+                      <th scope="col">Ausências</th>
+                      <th scope="col">% presença</th>
+                    </tr>
+                  </thead>
+                  <tbody id="monthlyTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script src="../../../app/config/config.js"></script>
+    <script src="../../../app/config/api.js"></script>
+    <script src="../../../app/config/storage.js"></script>
+    <script src="../../../shared/services/api-client.js"></script>
+    <script src="../../../shared/ui/access-denied-dialog.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="../services/relatorios.service.js"></script>
+    <script src="../pages/relatorio-aluno.js" defer></script>
+  </body>
+</html>

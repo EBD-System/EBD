@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Módulo de relatórios: Melhor Aluno Geral." />
+    <title>Melhor Aluno Geral</title>
+    <link rel="stylesheet" href="../pages/relatorios-module.css" />
+    <style>
+      .module-intro {
+        display: grid;
+        gap: 14px;
+        margin-bottom: 18px;
+      }
+
+      .module-note {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 16px;
+        border-radius: 18px;
+        background: rgba(21, 87, 192, 0.06);
+        border: 1px solid rgba(21, 87, 192, 0.12);
+      }
+
+      .module-note strong {
+        font-weight: 800;
+      }
+
+      .status-banner {
+        display: flex;
+        align-items: center;
+        min-height: 52px;
+        padding: 14px 16px;
+        border-radius: 16px;
+        border: 1px solid rgba(21, 87, 192, 0.14);
+        background: rgba(255, 255, 255, 0.82);
+        color: var(--rel-text);
+        font-weight: 700;
+        line-height: 1.5;
+      }
+
+      .status-banner[data-tone='success'] {
+        border-color: rgba(16, 185, 129, 0.22);
+        background: rgba(16, 185, 129, 0.08);
+      }
+
+      .status-banner[data-tone='warning'] {
+        border-color: rgba(245, 158, 11, 0.22);
+        background: rgba(245, 158, 11, 0.08);
+      }
+
+      .status-banner[data-tone='info'] {
+        border-color: rgba(21, 87, 192, 0.14);
+        background: rgba(21, 87, 192, 0.06);
+      }
+
+      .results-meta {
+        margin: 0;
+        color: var(--rel-muted);
+        line-height: 1.6;
+      }
+
+      .table-wrap {
+        margin-top: 18px;
+        overflow: auto;
+      }
+
+      .ranking-table--students thead th:first-child,
+      .ranking-table--students tbody td:first-child {
+        width: 48%;
+      }
+
+      .ranking-table--students thead th:nth-child(2),
+      .ranking-table--students tbody td:nth-child(2) {
+        width: 32%;
+      }
+
+      .ranking-table--students thead th:last-child,
+      .ranking-table--students tbody td:last-child {
+        width: 20%;
+        text-align: center;
+      }
+
+      .empty-state {
+        display: grid;
+        gap: 8px;
+        justify-items: start;
+        padding: 18px;
+        border-radius: 18px;
+        border: 1px dashed rgba(21, 87, 192, 0.22);
+        background: rgba(255, 255, 255, 0.72);
+        margin-top: 18px;
+      }
+
+      .empty-state strong {
+        font-size: 1rem;
+      }
+
+      .empty-state p {
+        margin: 0;
+        color: var(--rel-muted);
+        line-height: 1.6;
+      }
+
+      @media (max-width: 640px) {
+        .ranking-table--students thead th:first-child,
+        .ranking-table--students tbody td:first-child {
+          width: 44%;
+        }
+
+        .ranking-table--students thead th:nth-child(2),
+        .ranking-table--students tbody td:nth-child(2) {
+          width: 34%;
+        }
+
+        .ranking-table--students thead th:last-child,
+        .ranking-table--students tbody td:last-child {
+          width: 22%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- SUBMÓDULO TEMPORARIAMENTE DESATIVADO: não expor nem executar este ranking no frontend. -->
+    <main class="module-shell">
+      <header class="module-header">
+        <a class="back-link" href="../pages/index.html">Voltar</a>
+
+        <div>
+          <p class="eyebrow">Relatórios</p>
+          <h1>Melhor Aluno Geral</h1>
+          <p class="subtitle">
+            Ranking geral por presença.
+          </p>
+        </div>
+      </header>
+
+      <section class="module-panel">
+        <div class="module-panel__box module-panel__box--tight">
+          <div class="module-intro">
+            <div class="module-note" aria-live="polite">
+              <div>
+                <strong>Top 10 por presença</strong>
+                <p class="results-meta" id="resultsMeta">
+                  Carregando ranking geral...
+                </p>
+              </div>
+              <span class="summary-pill" id="rankingCount">0 alunos</span>
+            </div>
+
+            <div id="statusBanner" class="status-banner" role="status" aria-live="polite" data-tone="info">
+              Carregando o ranking geral de alunos...
+            </div>
+          </div>
+
+          <div id="emptyState" class="empty-state" hidden>
+            <strong>Sem dados para exibir</strong>
+            <p>O ranking geral será mostrado aqui quando houver alunos para exibir.</p>
+          </div>
+
+          <div id="tableWrap" class="table-wrap" hidden>
+            <table class="ranking-table ranking-table--students" aria-label="Lista de alunos do melhor aluno geral">
+              <thead>
+                <tr>
+                  <th scope="col">Nome</th>
+                  <th scope="col">Classe</th>
+                  <th scope="col">%</th>
+                </tr>
+              </thead>
+              <tbody id="rankingBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      // SUBMÓDULO TEMPORARIAMENTE DESATIVADO.
+      // Mantemos os arquivos do módulo para futura reativação, mas ele não deve executar.
+      window.location.replace('../pages/index.html');
+    </script>
+  </body>
+</html>

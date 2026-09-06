@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Central de módulos de relatórios." />
+    <title>Relatórios</title>
+    <link rel="stylesheet" href="./relatorios-hub.css" />
+    <script src="../../../app/config/config.js"></script>
+    <script src="../../../app/config/api.js"></script>
+    <script src="../../../app/config/storage.js"></script>
+    <script src="../../../shared/services/api-client.js"></script>
+    <script src="../../../shared/ui/access-denied-dialog.js"></script>
+  </head>
+  <body>
+    <main class="hub-shell">
+      <header class="hub-header">
+        <a class="back-link" href="../../dashboard/pages/home/index.html">Voltar</a>
+
+        <div class="hub-brand">
+          <p class="eyebrow">Módulo</p>
+          <h1>Relatórios</h1>
+          <p class="subtitle">Escolha o tipo de relatório que deseja abrir.</p>
+        </div>
+      </header>
+
+      <section class="hub-panel" aria-labelledby="modules-title">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Atalhos</p>
+            <h2 id="modules-title">Módulos disponíveis</h2>
+          </div>
+          <p class="panel-hint">Os rankings de classes e alunos estão disponíveis nesta área.</p>
+        </div>
+
+        <div class="module-grid">
+          <a class="module-card module-card--featured" href="../presencas/index.html">
+            <span class="module-card__tag">Operacional</span>
+            <h3>Presenças</h3>
+            <p>Consulta por data única, com download do relatório geral e do PDF de presenças.</p>
+            <span class="module-card__footer">Abrir presenças →</span>
+          </a>
+
+          <!--
+            SUBMÓDULO TEMPORARIAMENTE DESATIVADO:
+            "Melhor Aluno Geral" permanece no código para futura reativação,
+            mas deve ficar oculto no frontend enquanto estiver desativado.
+          -->
+          <!--
+          <a class="module-card" href="../melhor-aluno-geral/index.html">
+            <span class="module-card__tag">Ranking</span>
+            <h3>Melhor Aluno Geral</h3>
+            <p>Ranking geral de alunos por presença.</p>
+            <span class="module-card__footer">Abrir ranking →</span>
+          </a>
+          -->
+
+          <a class="module-card" href="../melhores-classes/index.html">
+            <span class="module-card__tag">Ranking</span>
+            <h3>Melhores Classes</h3>
+            <p>Lista compacta das classes com nome e percentual.</p>
+            <span class="module-card__footer">Abrir módulo →</span>
+          </a>
+
+          <a class="module-card" href="../melhor-da-classe/index.html">
+            <span class="module-card__tag">Ranking</span>
+            <h3>Melhor da Classe</h3>
+            <p>Ranking de alunos filtrado por turma.</p>
+            <span class="module-card__footer">Abrir módulo →</span>
+          </a>
+
+          <a class="module-card" href="../relatorio-aluno/index.html">
+            <span class="module-card__tag">Alunos</span>
+            <h3>Relatório do Aluno</h3>
+            <p>Consulte um aluno por turma e baixe o relatório completo de frequência por período.</p>
+            <span class="module-card__footer">Abrir módulo →</span>
+          </a>
+
+          <a class="module-card" href="../financeiro/index.html">
+            <span class="module-card__tag">Financeiro</span>
+            <h3>Financeiro</h3>
+            <p>Consulta por período com total consolidado e valores individuais das ofertas.</p>
+            <span class="module-card__footer">Abrir módulo →</span>
+          </a>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const HUB_API_BASE_URL =
+        typeof window.APP_CONFIG?.resolveApiBaseUrl === 'function'
+          ? window.APP_CONFIG.resolveApiBaseUrl()
+          : `${window.location?.protocol || 'http:'}//${window.location?.hostname || 'localhost'}${window.location?.port ? `:${window.location.port}` : ''}/api/v1`;
+
+      const HUB_STORAGE_KEYS = window.APP_STORAGE_KEYS;
+      const HUB_AUTH_STORAGE = window.APP_AUTH_STORAGE;
+      const HUB_ACCESS_DENIED_DIALOG = window.APP_ACCESS_DENIED_DIALOG;
+      const HUB_API_CLIENT = window.APP_API_CLIENT;
+
+      (async function initializeReportsHub() {
+        const token = HUB_AUTH_STORAGE?.readToken?.(HUB_STORAGE_KEYS?.token) || '';
+        if (!token) {
+          window.location.replace('../../../../../index.html');
+          return;
+        }
+
+        try {
+          const response = await fetch(`${HUB_API_BASE_URL}/reports/access`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const payload = await HUB_API_CLIENT.safeJson(response);
+
+          if (!response.ok || HUB_API_CLIENT.isFailurePayload?.(payload) || payload?.ok === false) {
+            const error = HUB_API_CLIENT.createApiError(response, payload, {
+              fallbackMessage: 'Você não tem permissão para acessar o módulo de Relatórios.'
+            });
+
+            if (Number(error?.status) === 403) {
+              document.querySelector('.hub-shell')?.setAttribute('hidden', '');
+              HUB_ACCESS_DENIED_DIALOG?.open({
+                title: 'Erro',
+                message: error.primaryMessage || 'Usuário sem permissão',
+                backHref: '../../dashboard/pages/home/index.html'
+              });
+              return;
+            }
+
+            if (error?.requiresRelogin) {
+              window.location.replace('../../../../../index.html');
+              return;
+            }
+
+            throw error;
+          }
+
+          restrictModulesForFinance();
+        } catch (error) {
+          if (Number(error?.status) === 401 || error?.requiresRelogin) {
+            window.location.replace('../../../../../index.html');
+            return;
+          }
+
+          document.querySelector('.hub-shell')?.setAttribute('hidden', '');
+          HUB_ACCESS_DENIED_DIALOG?.open({
+            title: 'Erro',
+            message: 'Não foi possível validar o acesso ao módulo de Relatórios.',
+            backHref: '../../dashboard/pages/home/index.html'
+          });
+        }
+      })();
+
+      function restrictModulesForFinance() {
+        const token = window.APP_AUTH_STORAGE?.readToken?.(window.APP_STORAGE_KEYS?.token) || '';
+        if (!token) {
+          return;
+        }
+
+        const payload = decodeJwtPayload(token);
+        const profiles = Array.isArray(payload?.profiles) ? payload.profiles : [];
+        const normalized = profiles
+          .map((profile) => normalizeProfile(profile))
+          .filter(Boolean);
+
+        if (!normalized.includes('Financeiro')) {
+          return;
+        }
+
+        document.querySelectorAll('.module-card').forEach((card) => {
+          const title = String(card.querySelector('h3')?.textContent || '').trim();
+          if (title !== 'Financeiro') {
+            card.hidden = true;
+          }
+        });
+
+        const hint = document.querySelector('.panel-hint');
+        if (hint) {
+          hint.textContent = 'Seu perfil só pode acessar o módulo Financeiro.';
+        }
+      }
+
+      function decodeJwtPayload(token) {
+        try {
+          const parts = String(token || '').split('.');
+          if (parts.length < 2) return null;
+          const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+          const padded = payload + '='.repeat((4 - (payload.length % 4)) % 4);
+          const json = atob(padded);
+          return JSON.parse(json);
+        } catch {
+          return null;
+        }
+      }
+
+      function normalizeProfile(value) {
+        return String(value || '')
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .trim()
+          .toLowerCase()
+          .replace(/financeiro/g, 'financeiro')
+          .replace(/administrador/g, 'administrador')
+          .replace(/secretaria/g, 'secretaria')
+          .replace(/professor/g, 'professor')
+          .replace(/consulta/g, 'consulta');
+      }
+    </script>
+
+  </body>
+</html>
