@@ -21,6 +21,8 @@
 - O submódulo `relatorios/financeiro` agora consulta o backend real em `GET /api/v1/reports/financial-period`, usando `startDate`, `endDate` e `classId` opcional; a tela renderiza o consolidado e os lançamentos retornados pelo endpoint.
 - A página de classes aplica uma ordem visual fixa para o cadastro 1 antes de renderizar os cards: `Cordeirinhos de Cristo`, `Shalon`, `Filhos de Asáfe`, `Mensageiros de Cristo`, `Filhos de Sião` e `Rosas de Saron`; essa prioridade não depende da ordenação alfabética da API.
 - A tela de chamada carrega alunos ativos e inativos por consultas separadas e preserva `id_aluno_classe` ao mesclar respostas.
+- O popup `Adicionar aluno` começa com uma consulta compacta aos inativos filtrados pela turma; `Criar Novo Aluno` abre o formulário já existente. A ativação individual usa `PUT /students/:id/activate`, que altera o status do aluno globalmente.
+- Na aba **Inativos** da chamada, Administrador e Secretaria podem ativar em lote os alunos da turma por `PUT /classes/:id/students/activate-all`; após sucesso, a tela recarrega os status. O backend mantém o escopo nos vínculos ativos da turma informada.
 - O salvamento da chamada continua dependendo de `id_aluno_classe` válido e usa `PATCH /attendance/:callId` com `students[]`.
 - A tela de chamada carrega e salva o **Resumo da classe** na API oficial: `GET /attendance/classes/:classId/summary` para hidratar os campos e `PUT /attendance/:callId/summary` para persistir `oferta`, `visitantes`, `biblias` e `revistas`.
 - Ao salvar a chamada com sucesso, a tela retorna automaticamente para `../../classe/pages/index.html`, seguindo o mesmo destino do botão flutuante de voltar.

@@ -80,6 +80,13 @@
           </button>
         </div>
 
+        <div id="inactiveBulkActions" class="inactive-bulk-actions" hidden>
+          <button id="activateAllStudentsButton" class="bulk-activate-button" type="button">
+            Ativar todos os alunos
+          </button>
+          <p id="bulkActivationFeedback" class="bulk-activation-feedback" aria-live="polite" hidden></p>
+        </div>
+
         <div id="studentsList" class="students-list" aria-live="polite"></div>
 
         <div class="attendance-footer">
@@ -175,12 +182,21 @@
             <h3 id="dialogTitle">Adicionar aluno</h3>
           </div>
 
-          <button id="dialogCloseButton" type="button" class="dialog-close-button" aria-label="Fechar formulário">
+          <button id="dialogCloseButton" type="button" class="dialog-close-button" aria-label="Fechar cadastro de aluno">
             ×
           </button>
         </div>
 
-        <form id="addStudentForm" class="student-form" novalidate>
+        <section id="studentPickerStep" class="student-picker-step" aria-label="Alunos inativos da turma" hidden>
+          <button id="createNewStudentButton" type="button" class="dialog-button student-picker-create-button">
+            Criar Novo Aluno
+          </button>
+          <p class="student-picker-hint">Veja se o aluno já existe:</p>
+          <ul id="inactiveStudentsList" class="inactive-student-list" aria-live="polite"></ul>
+          <p id="inactiveStudentsFeedback" class="student-picker-feedback" aria-live="polite"></p>
+        </section>
+
+        <form id="addStudentForm" class="student-form" novalidate hidden>
           <section class="form-section" aria-labelledby="studentDataTitle">
             <div class="form-section__head">
               <h4 id="studentDataTitle">Dados do aluno</h4>

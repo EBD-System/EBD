@@ -26,6 +26,9 @@ const studentsCounter = document.getElementById('studentsCounter');
 const attendanceSummary = document.getElementById('attendanceSummary');
 const activeTabButton = document.getElementById('activeTabButton');
 const inactiveTabButton = document.getElementById('inactiveTabButton');
+const inactiveBulkActions = document.getElementById('inactiveBulkActions');
+const activateAllStudentsButton = document.getElementById('activateAllStudentsButton');
+const bulkActivationFeedback = document.getElementById('bulkActivationFeedback');
 const activeCount = document.getElementById('activeCount');
 const inactiveCount = document.getElementById('inactiveCount');
 const studentsList = document.getElementById('studentsList');
@@ -45,6 +48,10 @@ const dialogTitle = document.getElementById('dialogTitle');
 const dialogCloseButton = document.getElementById('dialogCloseButton');
 const cancelButton = document.getElementById('cancelButton');
 const deleteButton = document.getElementById('deleteButton');
+const studentPickerStep = document.getElementById('studentPickerStep');
+const createNewStudentButton = document.getElementById('createNewStudentButton');
+const inactiveStudentsList = document.getElementById('inactiveStudentsList');
+const inactiveStudentsFeedback = document.getElementById('inactiveStudentsFeedback');
 const addStudentForm = document.getElementById('addStudentForm');
 const formFeedback = document.getElementById('formFeedback');
 const submitButton = document.getElementById('submitButton');
@@ -81,13 +88,17 @@ const state = {
   attendanceCallId: '',
   attendanceLoading: false,
   attendanceSaving: false,
+  bulkActivatingStudents: false,
   attendanceOriginalMap: new Map(),
   attendanceDraftMap: new Map(),
   attendanceReady: false,
   classSummaryOriginal: null,
   classSummaryLoaded: false,
   studentDialogMode: 'create',
-  studentDialogKey: ''
+  studentDialogKey: '',
+  studentPickerStudents: [],
+  studentPickerRequestId: 0,
+  studentPickerActivatingIds: new Set()
 };
 
 const sessionToken = readSessionToken();
@@ -141,7 +152,10 @@ function initializePage() {
   bindClassSummaryEvents();
   syncClassSummaryInputs({ clampDependents: true });
   bindStudentsListEvents();
+  activateAllStudentsButton.addEventListener('click', handleActivateAllStudents);
   addStudentButton.addEventListener('click', () => openStudentDialog('create'));
+  createNewStudentButton.addEventListener('click', showNewStudentForm);
+  inactiveStudentsList.addEventListener('click', handleInactiveStudentPickerClick);
   saveAttendanceButtonBottom.addEventListener('click', handleSaveAttendance);
   dialogCloseButton.addEventListener('click', closeDialog);
   cancelButton.addEventListener('click', closeDialog);
@@ -239,6 +253,7 @@ async function loadStudentsAndAttendance() {
     updateCounters();
     renderStudents();
     void preloadInactiveReasons();
+    return true;
   } catch (error) {
     const message = error?.message || 'Não foi possível carregar os alunos agora.';
     renderErrorState(message);
@@ -247,6 +262,7 @@ async function loadStudentsAndAttendance() {
       clearStoredToken();
       window.setTimeout(goToLogin, 350);
     }
+    return false;
   } finally {
     state.loadingStudents = false;
     state.attendanceLoading = false;
@@ -611,6 +627,7 @@ function reconcileAttendanceState(records) {
 
 function renderStudents() {
   if (state.loadingStudents && !state.students.length) {
+    updateBulkActivationControls(0);
     return;
   }
 
@@ -624,6 +641,7 @@ function renderStudents() {
   studentsTitle.textContent = state.currentTab === 'ativo' ? 'Alunos ativos' : 'Alunos inativos';
 
   setTabState(activeStudents.length, inactiveStudents.length);
+  updateBulkActivationControls(inactiveStudents.length);
 
   if (!state.students.length) {
     renderEmptyState('Nenhum aluno foi encontrado para esta classe.');
@@ -818,6 +836,133 @@ function renderEmptyState(message) {
 function renderAttendanceFeedback(message, isError) {
   attendanceFeedback.textContent = message;
   attendanceFeedback.classList.toggle('is-error', Boolean(isError));
+}
+
+async function handleActivateAllStudents() {
+  if (!hasValidClassId() || !canBulkActivateStudents()) {
+    renderBulkActivationFeedback('Seu perfil não tem permissão para ativar todos os alunos.', true);
+    return;
+  }
+
+  const inactiveTotal = state.students.filter((student) => isInactiveStudent(student)).length;
+  if (!inactiveTotal || state.bulkActivatingStudents) return;
+
+  const confirmationAction = inactiveTotal === 1
+    ? 'ativar o único aluno inativo'
+    : `ativar todos os ${inactiveTotal} alunos inativos`;
+  const confirmed = window.confirm(
+    `Deseja ${confirmationAction} desta classe? A operação se limita aos vínculos desta turma.`
+  );
+  if (!confirmed) return;
+
+  state.bulkActivatingStudents = true;
+  renderBulkActivationFeedback('Ativando alunos inativos...', false);
+  updateBulkActivationControls(inactiveTotal);
+
+  try {
+    const { payload } = await apiRequest(
+      `/classes/${encodeURIComponent(classId)}/students/activate-all`,
+      { method: 'PUT', body: {} }
+    );
+
+    const refreshed = await loadStudentsAndAttendance();
+    if (!refreshed) {
+      renderBulkActivationFeedback(
+        'A ativação foi concluída, mas não foi possível atualizar a lista. Recarregue a página para conferir os status.',
+        true
+      );
+      return;
+    }
+
+    const activatedCount = extractActivatedStudentsCount(payload);
+    const successMessage = activatedCount === null
+      ? 'Alunos inativos desta classe ativados com sucesso.'
+      : `${activatedCount} aluno${activatedCount === 1 ? '' : 's'} ativado${activatedCount === 1 ? '' : 's'} com sucesso.`;
+    renderBulkActivationFeedback(successMessage, false);
+  } catch (error) {
+    const fallback = Number(error?.status) === 403
+      ? 'Seu perfil não tem permissão para ativar todos os alunos desta classe.'
+      : 'Não foi possível ativar os alunos inativos desta classe.';
+    renderBulkActivationFeedback(getAttendanceErrorMessage(error, fallback), true);
+  } finally {
+    state.bulkActivatingStudents = false;
+    updateBulkActivationControls();
+  }
+}
+
+function updateBulkActivationControls(inactiveTotal = state.students.filter((student) => isInactiveStudent(student)).length) {
+  if (!inactiveBulkActions || !activateAllStudentsButton) return;
+
+  const hasFeedback = Boolean(bulkActivationFeedback && !bulkActivationFeedback.hidden);
+  const isVisible = state.currentTab === 'inativo' && canBulkActivateStudents() && (inactiveTotal > 0 || hasFeedback);
+  inactiveBulkActions.hidden = !isVisible;
+  activateAllStudentsButton.hidden = inactiveTotal === 0;
+  activateAllStudentsButton.disabled = state.loadingStudents || state.bulkActivatingStudents || inactiveTotal === 0;
+  activateAllStudentsButton.textContent = state.bulkActivatingStudents
+    ? 'Ativando alunos...'
+    : 'Ativar todos os alunos';
+}
+
+function renderBulkActivationFeedback(message, isError) {
+  if (!bulkActivationFeedback) return;
+
+  bulkActivationFeedback.textContent = String(message || '');
+  bulkActivationFeedback.classList.toggle('is-error', Boolean(isError));
+  bulkActivationFeedback.hidden = !message;
+}
+
+function canBulkActivateStudents() {
+  const tokenPayload = decodeTokenPayload(sessionToken);
+  const rawProfiles = Array.isArray(tokenPayload?.profiles) && tokenPayload.profiles.length
+    ? tokenPayload.profiles
+    : [tokenPayload?.profile || tokenPayload?.perfil || tokenPayload?.role || ''];
+  const normalizedProfiles = rawProfiles
+    .map((profile) => String(profile?.name || profile?.nome || profile || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLowerCase())
+    .filter(Boolean);
+
+  return normalizedProfiles.some((profile) =>
+    ['administrador', 'admin', 'secretaria', 'secretario'].includes(profile)
+  );
+}
+
+function decodeTokenPayload(token) {
+  try {
+    const parts = String(token || '').split('.');
+    if (parts.length < 2) return null;
+    const encodedPayload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const paddedPayload = encodedPayload + '='.repeat((4 - (encodedPayload.length % 4)) % 4);
+    const binaryPayload = window.atob(paddedPayload);
+    const bytes = Uint8Array.from(binaryPayload, (character) => character.charCodeAt(0));
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch {
+    return null;
+  }
+}
+
+function extractActivatedStudentsCount(payload) {
+  const sources = [payload, payload?.data, payload?.result, payload?.summary];
+  const keys = [
+    'alunos_ativados', 'alunosAtivados', 'students_activated', 'studentsActivated',
+    'quantidade_ativada', 'quantidadeAtivada', 'quantidade_ativados', 'quantidadeAtivados',
+    'quantidade_alunos_ativados', 'quantidadeAlunosAtivados', 'activatedCount', 'activated_count',
+    'totalAtivados', 'total_ativados', 'count', 'total'
+  ];
+
+  for (const source of sources) {
+    if (!source || typeof source !== 'object') continue;
+    for (const key of keys) {
+      const value = source[key];
+      if (value !== '' && value !== null && value !== undefined && Number.isFinite(Number(value))) {
+        return Math.max(0, Number(value));
+      }
+    }
+  }
+
+  return null;
 }
 
 function getAttendanceErrorMessage(error, fallbackMessage = 'Não foi possível salvar a chamada agora.') {
@@ -1395,6 +1540,7 @@ function openStudentDialog(mode = 'create', studentKey = '') {
   updateStudentDialogCopy(normalizedMode);
   syncStudentDialogControls(normalizedMode, student);
   updateDeleteButtonVisibility();
+  setStudentDialogStage(normalizedMode === 'edit' ? 'form' : 'picker');
 
   if (typeof dialog.showModal === 'function') {
     dialog.showModal();
@@ -1402,9 +1548,155 @@ function openStudentDialog(mode = 'create', studentKey = '') {
     dialog.setAttribute('open', '');
   }
 
+  if (normalizedMode === 'create') {
+    void loadInactiveStudentsForPicker();
+  }
+
   window.requestAnimationFrame(() => {
-    studentNameInput.focus();
+    if (normalizedMode === 'edit') {
+      studentNameInput.focus();
+    } else {
+      createNewStudentButton.focus();
+    }
   });
+}
+
+function setStudentDialogStage(stage) {
+  const normalizedStage = stage === 'picker' ? 'picker' : 'form';
+  dialog.dataset.stage = normalizedStage;
+  studentPickerStep.hidden = normalizedStage !== 'picker';
+  addStudentForm.hidden = normalizedStage === 'picker';
+}
+
+function showNewStudentForm() {
+  if (state.studentDialogMode !== 'create') return;
+
+  setStudentDialogStage('form');
+  clearFeedback();
+  clearAllFieldStates();
+  window.requestAnimationFrame(() => studentNameInput.focus());
+}
+
+async function fetchInactiveStudentsForPicker() {
+  const encodedClassId = encodeURIComponent(classId);
+  const paths = [
+    `/students?classId=${encodedClassId}&status=inativo`,
+    `/students/inactive?classId=${encodedClassId}`
+  ];
+  let lastError = null;
+
+  for (const path of paths) {
+    try {
+      return await apiRequest(path);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error('Não foi possível consultar os alunos inativos.');
+}
+
+async function loadInactiveStudentsForPicker() {
+  const requestId = ++state.studentPickerRequestId;
+  state.studentPickerStudents = [];
+  inactiveStudentsList.innerHTML = '';
+  inactiveStudentsFeedback.textContent = 'Carregando...';
+  inactiveStudentsFeedback.classList.remove('is-error');
+
+  try {
+    const result = await fetchInactiveStudentsForPicker();
+    const students = normalizeStudents(result.payload)
+      .filter((student) => student.enrollmentStatus === 'inativo');
+
+    if (requestId !== state.studentPickerRequestId) return;
+
+    state.studentPickerStudents = students;
+    renderInactiveStudentsPicker(students);
+  } catch (error) {
+    if (requestId !== state.studentPickerRequestId) return;
+    state.studentPickerStudents = [];
+    inactiveStudentsList.innerHTML = '';
+    inactiveStudentsFeedback.textContent = 'Não foi possível carregar.';
+    inactiveStudentsFeedback.classList.add('is-error');
+  }
+}
+
+function renderInactiveStudentsPicker(students) {
+  inactiveStudentsFeedback.textContent = '';
+  inactiveStudentsFeedback.classList.remove('is-error');
+
+  if (!students.length) {
+    inactiveStudentsList.innerHTML = '<li class="inactive-student-empty">Nenhum aluno inativo.</li>';
+    return;
+  }
+
+  inactiveStudentsList.innerHTML = students.map((student) => {
+    const studentId = escapeHtml(student.id);
+    const studentName = escapeHtml(student.name);
+    const isActivating = state.studentPickerActivatingIds.has(String(student.id));
+    const buttonLabel = isActivating ? '...' : 'Ativar';
+    return `
+      <li class="inactive-student-row">
+        <span class="inactive-student-name">${studentName}</span>
+        <span class="inactive-student-status">Inativo</span>
+        <button
+          type="button"
+          class="inactive-student-activate-button"
+          data-student-id="${studentId}"
+          aria-label="Ativar ${studentName}"
+          ${isActivating ? 'disabled' : ''}
+        >${buttonLabel}</button>
+      </li>
+    `;
+  }).join('');
+}
+
+function handleInactiveStudentPickerClick(event) {
+  const button = event.target instanceof Element
+    ? event.target.closest('.inactive-student-activate-button')
+    : null;
+  if (!button || !inactiveStudentsList.contains(button)) return;
+
+  void activateStudentFromPicker(button.dataset.studentId, button);
+}
+
+async function activateStudentFromPicker(studentId, button) {
+  const normalizedId = String(studentId || '').trim();
+  if (!normalizedId || state.studentPickerActivatingIds.has(normalizedId)) return;
+
+  state.studentPickerActivatingIds.add(normalizedId);
+  button.disabled = true;
+  button.textContent = '...';
+  inactiveStudentsFeedback.textContent = '';
+  inactiveStudentsFeedback.classList.remove('is-error');
+
+  try {
+    await apiRequest(`/students/${encodeURIComponent(normalizedId)}/activate`, {
+      method: 'PUT',
+      body: { observacao: '' }
+    });
+
+    for (const student of state.students) {
+      if (String(student.id) !== normalizedId) continue;
+      student.enrollmentStatus = 'ativo';
+      student.raw = { ...(student.raw || {}), status: 'ativo', ativo: true };
+    }
+    state.inactiveReasonMap.delete(normalizedId);
+    renderStudents();
+    updateCounters();
+
+    const remaining = state.studentPickerStudents.filter((student) => String(student.id) !== normalizedId);
+    state.studentPickerStudents = remaining;
+    renderInactiveStudentsPicker(remaining);
+    await loadInactiveStudentsForPicker();
+  } catch (error) {
+    button.disabled = false;
+    button.textContent = 'Ativar';
+    inactiveStudentsFeedback.textContent = getStudentMutationErrorMessage(error, 'Não foi possível ativar.');
+    inactiveStudentsFeedback.classList.add('is-error');
+  } finally {
+    state.studentPickerActivatingIds.delete(normalizedId);
+  }
 }
 
 function closeDialog() {
@@ -1414,10 +1706,12 @@ function closeDialog() {
     dialog.removeAttribute('open');
   }
 
+  state.studentPickerRequestId += 1;
   state.studentDialogMode = 'create';
   state.studentDialogKey = '';
   clearFeedback();
   clearAllFieldStates();
+  setStudentDialogStage('picker');
   updateStudentDialogCopy('create');
   syncStudentDialogControls('create');
   updateDeleteButtonVisibility();

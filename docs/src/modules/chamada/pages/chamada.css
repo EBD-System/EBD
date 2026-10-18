@@ -212,6 +212,55 @@ h1 {
   margin: 20px 0 18px;
 }
 
+.inactive-bulk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 18px;
+}
+
+.inactive-bulk-actions[hidden],
+.bulk-activate-button[hidden] {
+  display: none !important;
+}
+
+.bulk-activate-button {
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 18px;
+  background: linear-gradient(135deg, #16885a 0%, #20a66d 100%);
+  color: #fff;
+  font-weight: 800;
+  box-shadow: 0 12px 24px rgba(22, 136, 90, 0.2);
+  cursor: pointer;
+}
+
+.bulk-activate-button:hover,
+.bulk-activate-button:focus-visible {
+  filter: brightness(1.04);
+  outline: 2px solid rgba(22, 136, 90, 0.24);
+  outline-offset: 2px;
+}
+
+.bulk-activate-button:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+.bulk-activation-feedback {
+  flex: 1 1 100%;
+  margin: 0;
+  color: #16885a;
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.bulk-activation-feedback.is-error {
+  color: #dc2626;
+}
+
 .status-tab {
   display: flex;
   align-items: center;
@@ -623,6 +672,103 @@ h1 {
   background: rgba(10, 20, 35, 0.5);
 }
 
+.class-dialog[data-stage="picker"] .dialog-card {
+  width: min(480px, calc(100vw - 24px));
+  max-height: min(82vh, 620px);
+  padding: 18px;
+  border-radius: 18px;
+}
+
+.class-dialog[data-stage="picker"] .dialog-header {
+  margin-bottom: 12px;
+}
+
+.student-picker-step {
+  display: grid;
+  gap: 10px;
+}
+
+.student-form[hidden],
+.student-picker-step[hidden] {
+  display: none !important;
+}
+
+.student-picker-create-button {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 16px;
+}
+
+.student-picker-hint {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.86rem;
+}
+
+.inactive-student-list {
+  display: grid;
+  gap: 0;
+  max-height: min(46vh, 360px);
+  overflow: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.inactive-student-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.inactive-student-name {
+  min-width: 0;
+  color: #16314e;
+  font-size: 0.9rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.inactive-student-status {
+  color: #dc2626;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.inactive-student-activate-button {
+  min-height: 30px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: #1557c0;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.inactive-student-activate-button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.inactive-student-empty {
+  padding: 8px 0 2px;
+  color: #64748b;
+  font-size: 0.86rem;
+}
+
+.student-picker-feedback {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.82rem;
+}
+
+.student-picker-feedback.is-error {
+  color: #dc2626;
+}
+
 .dialog-card {
   width: min(920px, calc(100vw - 32px));
   max-height: min(92vh, 940px);
@@ -952,6 +1098,18 @@ h1 {
 }
 
 @media (max-width: 640px) {
+  .class-dialog[data-stage="picker"] .dialog-card {
+    padding: 16px;
+  }
+
+  .inactive-student-row {
+    gap: 7px;
+  }
+
+  .inactive-student-name {
+    font-size: 0.84rem;
+  }
+
   .chamada-shell {
     width: min(100% - 20px, 1180px);
   }
